@@ -45,8 +45,10 @@ cli-charts pie \
 # python -m also works:
 python -m cli_charts bar --json '{"labels":["A","B"],"values":[3,7]}'
 
-# check all dependencies:
+# check core dependencies:
 cli-charts --check-deps
+# include optional extras (braille/lttb/tui):
+cli-charts --check-deps --all
 ```
 
 ## Chart types (24)
@@ -55,7 +57,7 @@ cli-charts --check-deps
 |--------|-------|
 | plotext | `kline` `candlestick` `line` `scatter` `step` `bar` `multibar` `stackedbar` `hist` `heatmap` `box` `indicator` `event` `confusion` |
 | rich | `table` `tree` `panel` `gauge` `pie` `dashboard` |
-| drawille | `curve` |
+| drawille *(optional `[braille]`)* | `curve` |
 | uniplot | `uniplot` |
 | misc | `graph` `sparkline` `banner` |
 
