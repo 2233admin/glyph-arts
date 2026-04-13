@@ -1,7 +1,7 @@
 ---
 name: cli-charts
-description: Terminal-visible chart toolkit for Claude Code. Renders 23 chart types directly in the CLI — no files, no GUI. plotext (kline/line/scatter/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), rich (table/tree/panel/gauge/pie/dashboard), drawille braille curve, uniplot scientific line, ASCII network graph, sparkline, pyfiglet banner.
-version: 2.3.0
+description: Terminal-visible chart toolkit for Claude Code. Renders 24 chart types directly in the CLI — no files, no GUI. plotext (kline/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), rich (table/tree/panel/gauge/pie/dashboard), drawille braille curve, uniplot scientific line, ASCII network graph, sparkline, pyfiglet banner. LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
+version: 2.4.0
 ---
 
 # CLI Charts Skill
@@ -86,13 +86,14 @@ What is your data shape?
 
 ## Chart Types Reference
 
-### Engine: plotext (12 types)
+### Engine: plotext (13 types)
 | Type | JSON keys | Notes |
 |------|-----------|-------|
 | `kline` | `dates[], open[], high[], low[], close[]` | dates must be DD/MM/YYYY |
 | `candlestick` | same as kline | alias for kline |
 | `line` | `[{"label":"A","x":[...],"y":[...]}]` | multi-series supported |
 | `scatter` | `[{"label":"A","x":[...],"y":[...]}]` | |
+| `step` | `[{"label":"A","x":[...],"y":[...]}]` | staircase; x-point duplication |
 | `bar` | `{"labels":[], "values":[]}` | use --orientation horizontal |
 | `multibar` | `{"labels":[], "series":[{"label":"A","values":[]}]}` | grouped bars |
 | `stackedbar` | `{"labels":[], "series":[{"label":"A","values":[]}]}` | |
@@ -265,6 +266,10 @@ python $SKILL/scripts/chart.py bar --json '{"labels":["Q1","Q2"],"values":[10,12
 
 ```bash
 pip install plotext rich drawille uniplot pyfiglet sparklines duckdb pandas networkx phart
+# optional: LTTB shape-preserving downsampling (--sample for line/scatter/step/uniplot)
+pip install lttb
+# optional: Textual TUI dashboard (scripts/dashboard.py)
+pip install textual
 ```
 
 Auto-install check:
@@ -280,7 +285,7 @@ python $SKILL/scripts/chart.py --check-deps
 | Chart type | Column mapping |
 |-----------|----------------|
 | kline / candlestick | col0=date, open/high/low/close by name |
-| line / scatter / uniplot | col0=x, col1..N=y series |
+| line / scatter / step / uniplot | col0=x, col1..N=y series |
 | bar / pie | col0=labels, col1=values |
 | table | all columns as-is |
 | hist | all columns as value series |
@@ -292,8 +297,29 @@ python $SKILL/scripts/chart.py --check-deps
 
 ---
 
+## Textual TUI Dashboard
+
+`scripts/dashboard.py` — standalone multi-panel dashboard (separate from `chart.py`).
+
+```bash
+python $SKILL/scripts/dashboard.py --demo                        # interactive Textual TUI
+python $SKILL/scripts/dashboard.py --demo --no-interactive       # Rich static fallback (pipe-safe)
+python $SKILL/scripts/dashboard.py --file config.json           # load panel config from file
+python $SKILL/scripts/dashboard.py --json '{"panels":[...]}'    # inline JSON
+
+# Panel types: gauge | sparkline | table | metric | bar
+# Layout: auto-grid (<=4 panels -> 2col, >4 -> 3col) or manual via panel["row"]
+# Live refresh: add "refresh_interval": 5 (seconds) to config
+# Bindings: q=quit, r=refresh
+```
+
+Falls back to Rich static output if `textual` is not installed or stdout is not a tty.
+
+---
+
 ## Integration Notes
 
 - **Pipe-friendly**: all output is pure stdout, errors go to stderr only. Safe to pipe.
 - **Session logging**: set `CLI_CHARTS_LOG=1` to append render history to `.chart_history.jsonl`.
 - **NO_COLOR**: respects `NO_COLOR` env var (https://no-color.org) and `--no-color` flag.
+- **LTTB sampling**: `--sample N` uses Largest-Triangle-Three-Buckets for line/scatter/step/uniplot (shape-preserving), OHLC group aggregation for kline, uniform stride fallback when `lttb` not installed.

@@ -8,3 +8,7 @@ pandas>=2.0
 duckdb>=0.10
 pyfiglet>=0.8
 uniplot>=0.5
+# optional: LTTB time-series downsampling (--sample for line/scatter/step/kline)
+lttb>=0.3
+# optional: Textual TUI dashboard (scripts/dashboard.py)
+textual>=0.50

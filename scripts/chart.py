@@ -2,8 +2,8 @@
 """cli-charts: terminal-visible chart toolkit for Claude Code.
 
 Usage: python chart.py <type> [options]
-Types (23):
-  plotext : kline line scatter bar multibar stackedbar hist heatmap box indicator event confusion
+Types (24):
+  plotext : kline line scatter step bar multibar stackedbar hist heatmap box indicator event confusion
   rich    : table tree panel gauge pie dashboard
   drawille: curve
   uniplot : uniplot
@@ -95,6 +95,27 @@ def scatter(d, title, w, h, theme, **kw):
         x = s.get('x', list(range(len(s['y']))))
         plt.scatter(x, s['y'], label=s.get('label', ''),
                     marker=s.get('marker'), color=s.get('color'))
+    _plt_finalize(plt, title, w, h, theme, kw)
+
+
+def step(d, title, w, h, theme, **kw):
+    """plotext staircase step chart -- x-point duplication creates stairs.
+    Same schema as line. Use for discrete state changes (e.g. bid price, stock level).
+    """
+    import plotext as plt
+    series = d if isinstance(d, list) else [d]
+    for s in series:
+        x = s.get('x', list(range(len(s['y']))))
+        y = s['y']
+        sx, sy = [], []
+        for i in range(len(x)):
+            sx.append(x[i])
+            sy.append(y[i])
+            if i + 1 < len(x):
+                sx.append(x[i + 1])
+                sy.append(y[i])
+        plt.plot(sx, sy, label=s.get('label', ''),
+                 marker=s.get('marker'), color=s.get('color'))
     _plt_finalize(plt, title, w, h, theme, kw)
 
 
@@ -429,11 +450,59 @@ def uniplot(d, title, w, h, theme, **kw):
 
 # -- helpers (data) ----------------------------------------------------------
 
-def _sample_data(data, n):
-    if isinstance(data, list):
-        if len(data) > n:
-            data = random.sample(data, n)
-        return [_sample_data(item, n) for item in data]
+def _lttb(xs: list, ys: list, n: int) -> tuple:
+    """Largest-Triangle-Three-Buckets -- shape-preserving time-series downsample.
+    Falls back to uniform stride if lttb package is not installed.
+    """
+    try:
+        import numpy as np
+        from lttb import downsample as _lttb_ds
+        data = np.column_stack([xs, ys])
+        out = _lttb_ds(data, n)
+        return out[:, 0].tolist(), out[:, 1].tolist()
+    except ImportError:
+        step = max(1, len(xs) // n)
+        return xs[::step][:n], ys[::step][:n]
+
+
+def _sample_data(data, n, chart_type=None):
+    """Downsample to at most n points with type-aware strategy.
+
+    - line/scatter/step/uniplot : LTTB per series (preserves visual shape)
+    - kline/candlestick         : OHLC group aggregation (preserves extremes)
+    - others                    : random sample any oversized flat list
+    """
+    if chart_type in ('line', 'scatter', 'step', 'uniplot'):
+        series = data if isinstance(data, list) else [data]
+        result = []
+        for s in series:
+            y = s.get('y', [])
+            if len(y) <= n:
+                result.append(s)
+                continue
+            x = s.get('x', list(range(len(y))))
+            nx, ny = _lttb(x, y, n)
+            result.append({**s, 'x': nx, 'y': ny})
+        return result if isinstance(data, list) else result[0]
+    if chart_type in ('kline', 'candlestick'):
+        dates = data.get('dates', [])
+        if len(dates) <= n:
+            return data
+        step = max(1, len(dates) // n)
+        out = {'dates': [], 'open': [], 'high': [], 'low': [], 'close': []}
+        for i in range(0, len(dates), step):
+            end = min(i + step, len(dates))
+            out['dates'].append(data['dates'][i])
+            out['open'].append(data['open'][i])
+            out['high'].append(max(data['high'][i:end]))
+            out['low'].append(min(data['low'][i:end]))
+            out['close'].append(data['close'][end - 1])
+            if len(out['dates']) >= n:
+                break
+        return out
+    # Generic fallback: random sample oversized lists; recurse into dicts
+    if isinstance(data, list) and len(data) > n:
+        return random.sample(data, n)
     if isinstance(data, dict):
         return {k: _sample_data(v, n) for k, v in data.items()}
     return data
@@ -454,7 +523,7 @@ def load_duckdb(sql, db_path, chart_type):
             'low':   df['low'].tolist(),
             'close': df['close'].tolist(),
         }
-    if chart_type in ('line', 'scatter'):
+    if chart_type in ('line', 'scatter', 'step'):
         col0 = df.columns[0]
         return [{'label': c, 'x': df[col0].tolist(), 'y': df[c].tolist()}
                 for c in df.columns[1:]]
@@ -497,6 +566,7 @@ CMDS = {
     'kline':      kline,
     'line':       line,
     'scatter':    scatter,
+    'step':       step,
     'bar':        bar,
     'pie':        pie,
     'multibar':   multibar,
@@ -524,6 +594,7 @@ EXPECTED_SCHEMAS = {
     'kline':      '{"dates":["DD/MM/YYYY",...], "open":[...], "high":[...], "low":[...], "close":[...]}',
     'line':       '[{"label":"A","x":[...],"y":[...]}] or {"label":"A","y":[...]}',
     'scatter':    '[{"label":"A","x":[...],"y":[...]}] or {"label":"A","y":[...]}',
+    'step':       '[{"label":"A","x":[...],"y":[...]}] or {"label":"A","y":[...]}',
     'bar':        '{"labels":[...], "values":[...]}',
     'pie':        '{"labels":["A","B","C"], "values":[30,50,20]}',
     'multibar':   '{"labels":[...], "series":[{"label":"A","values":[...]}, ...]}',
@@ -558,8 +629,8 @@ def main():
         description='CLI Charts -- terminal-visible charts for Claude Code',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Chart types (23):
-  plotext : kline line scatter bar multibar stackedbar hist heatmap box indicator event confusion
+Chart types (24):
+  plotext : kline line scatter step bar multibar stackedbar hist heatmap box indicator event confusion
   rich    : table tree panel gauge pie dashboard
   drawille: curve
   uniplot : uniplot
@@ -615,7 +686,7 @@ Examples:
                    help='Save chart to file instead of displaying (plotext only)')
     p.add_argument('--no-color',    action='store_true',
                    help='Disable ANSI colors (respects NO_COLOR env var)')
-    p.add_argument('--version',     action='version', version='cli-charts 2.3.0')
+    p.add_argument('--version',     action='version', version='cli-charts 2.4.0')
     p.add_argument('--check-deps',  action='store_true',
                    help='Print dependency availability table and exit')
     p.add_argument('--sample',      type=int, default=0, metavar='N',
@@ -687,7 +758,7 @@ Examples:
                 sys.exit(1)
 
         if args.sample > 0:
-            data = _sample_data(data, args.sample)
+            data = _sample_data(data, args.sample, chart_type=args.type)
 
         kw = dict(
             xlabel=args.xlabel,
