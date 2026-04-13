@@ -378,22 +378,17 @@ def gauge(d, title, w, h, theme, **kw):
 
 
 def dashboard(d, title, w, h, theme, **kw):
-    """Rich multi-panel dashboard — renders multiple chart types sequentially."""
-    from rich.console import Console
-    from rich.rule import Rule
-    c = Console()
+    """Delegates to scripts/dashboard.py via subprocess (Textual TUI or Rich static)."""
+    import subprocess
+    config = dict(d)
     if title:
-        c.print(Rule(f'[bold]{title}[/bold]'))
-    for panel_spec in d.get('panels', []):
-        ptype = panel_spec.get('type')
-        pdata = panel_spec.get('data', {})
-        ptitle = panel_spec.get('title', '')
-        if ptype not in CMDS:
-            c.print(f'[red]Unknown panel type: {ptype}[/red]')
-            continue
-        if ptitle:
-            c.print(Rule(f'[dim]{ptitle}[/dim]'))
-        CMDS[ptype](pdata, ptitle, w, h, theme, **kw)
+        config['title'] = title
+    dash_script = os.path.join(os.path.dirname(__file__), 'dashboard.py')
+    cmd = [sys.executable, dash_script, '--json', json.dumps(config)]
+    if not sys.stdout.isatty():
+        cmd.append('--no-interactive')
+    result = subprocess.run(cmd)
+    sys.exit(result.returncode)
 
 
 def confusion(d, title, w, h, theme, **kw):
@@ -686,7 +681,7 @@ Examples:
                    help='Save chart to file instead of displaying (plotext only)')
     p.add_argument('--no-color',    action='store_true',
                    help='Disable ANSI colors (respects NO_COLOR env var)')
-    p.add_argument('--version',     action='version', version='cli-charts 2.4.0')
+    p.add_argument('--version',     action='version', version='cli-charts 2.4.1')
     p.add_argument('--check-deps',  action='store_true',
                    help='Print dependency availability table and exit')
     p.add_argument('--sample',      type=int, default=0, metavar='N',

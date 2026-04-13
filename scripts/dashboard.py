@@ -293,7 +293,21 @@ Examples:
                      help="Built-in 6-panel system monitor demo")
     parser.add_argument("--no-interactive", action="store_true",
                         help="Rich static output (pipe-safe, no Textual required)")
+    parser.add_argument("--check-deps", action="store_true",
+                        help="Check required dependencies and exit")
     args = parser.parse_args()
+
+    if args.check_deps:
+        pkgs = [("rich", "rich"), ("textual", "textual")]
+        all_ok = True
+        for name, pip_name in pkgs:
+            try:
+                __import__(name)
+                print(f"OK: {name}")
+            except ImportError:
+                print(f"MISSING: {pip_name} -> pip install {pip_name}")
+                all_ok = False
+        sys.exit(0 if all_ok else 2)
 
     if args.demo:
         config = DEMO_CONFIG

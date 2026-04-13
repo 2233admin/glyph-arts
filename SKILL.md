@@ -1,7 +1,7 @@
 ---
 name: cli-charts
 description: Terminal-visible chart toolkit for Claude Code. Renders 24 chart types directly in the CLI — no files, no GUI. plotext (kline/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), rich (table/tree/panel/gauge/pie/dashboard), drawille braille curve, uniplot scientific line, ASCII network graph, sparkline, pyfiglet banner. LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
-version: 2.4.0
+version: 2.4.1
 ---
 
 # CLI Charts Skill
@@ -112,7 +112,7 @@ What is your data shape?
 | `panel` | `{"content":"text","title":"optional","box":"ROUNDED"}` |
 | `gauge` | `[{"label":"CPU","value":72,"max":100,"color":"green"}]` |
 | `pie` | `{"labels":["A","B","C"],"values":[30,50,20]}` |
-| `dashboard` | `{"panels":[{"type":"gauge","data":{...},"title":"CPU"},...]}` |
+| `dashboard` | `{"panels":[{"type":"gauge","data":{...},"title":"CPU"},...]}` — delegates to scripts/dashboard.py |
 
 ### Engine: drawille (1 type)
 | Type | JSON keys |
