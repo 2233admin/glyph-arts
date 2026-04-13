@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "cli-charts"
+dynamic = ["version"]
+description = "Terminal-visible chart toolkit — 24 chart types rendered directly in the CLI, no browser, no files."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+keywords = ["cli", "charts", "terminal", "visualization", "ascii", "claude"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Terminals",
+]
+dependencies = [
+    "plotext>=5.2",
+    "rich>=13.0",
+    "drawille>=0.1",
+    "phart>=0.4",
+    "networkx>=3.0",
+    "sparklines>=0.4",
+    "pandas>=2.0",
+    "duckdb>=0.10",
+    "pyfiglet>=0.8",
+    "uniplot>=0.5",
+]
+
+[project.optional-dependencies]
+lttb = ["lttb>=0.3"]
+tui  = ["textual>=0.50"]
+all  = ["lttb>=0.3", "textual>=0.50"]
+
+[project.scripts]
+cli-charts = "cli_charts.chart:main"
+
+[project.urls]
+Repository = "https://github.com/your-org/cli-charts"
+
+[tool.setuptools.dynamic]
+version = {file = "VERSION"}
+
+[tool.setuptools.packages.find]
+include = ["cli_charts*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
