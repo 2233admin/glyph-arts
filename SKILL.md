@@ -1,7 +1,7 @@
 ---
 name: cli-charts
-description: Terminal-visible chart toolkit for Claude Code. Renders 21 chart types directly in the CLI — no files, no GUI. Covers plotext (kline/line/scatter/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), rich (table/tree/panel/gauge), drawille braille curve, uniplot scientific line, ASCII network graph, sparkline, and pyfiglet banner.
-version: 2.1.0
+description: Terminal-visible chart toolkit for Claude Code. Renders 22 chart types directly in the CLI — no files, no GUI. Covers plotext (kline/line/scatter/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), rich (table/tree/panel/gauge/pie), drawille braille curve, uniplot scientific line, ASCII network graph, sparkline, and pyfiglet banner.
+version: 2.2.0
 ---
 
 # CLI Charts Skill
@@ -21,9 +21,9 @@ python $SKILL/scripts/chart.py <type> [--json '...'] [--duckdb 'SQL'] [--db PATH
 
 Themes: `pro` (colored) | `dark` | `clear` | `matrix`
 
-**21 chart types:**
+**22 chart types:**
 - **plotext**: `kline` `line` `scatter` `bar` `multibar` `stackedbar` `hist` `heatmap` `box` `indicator` `event` `confusion`
-- **rich**: `table` `tree` `panel` `gauge`
+- **rich**: `table` `tree` `panel` `gauge` `pie`
 - **drawille**: `curve`
 - **uniplot**: `uniplot`
 - **misc**: `graph` `sparkline` `banner`
@@ -109,6 +109,22 @@ python $SKILL/scripts/chart.py bar --orientation horizontal \
 # DuckDB — first col = labels, second col = values
 python $SKILL/scripts/chart.py bar \
   --duckdb "SELECT industry, avg(close) FROM stock_daily GROUP BY industry LIMIT 10" \
+  --db /path/to/data.duckdb
+```
+
+---
+
+## Pie Chart
+
+Proportional slice chart for part-to-whole breakdowns.
+
+```bash
+python $SKILL/scripts/chart.py pie --title "资产配置" \
+  --json '{"labels":["股票","债券","现金"],"values":[60,30,10]}'
+
+# DuckDB — first col = labels, second col = values
+python $SKILL/scripts/chart.py pie \
+  --duckdb "SELECT industry, count(*) FROM stocks GROUP BY industry LIMIT 8" \
   --db /path/to/data.duckdb
 ```
 
@@ -468,6 +484,7 @@ Auto column mapping by chart type:
 | kline | col0=date, open, high, low, close |
 | line / scatter | col0=x-axis, remaining cols=series |
 | bar | col0=labels, col1=values |
+| pie | col0=labels, col1=values |
 | table | all columns as-is |
 | hist | each column = one series |
 | heatmap | full matrix (rows×cols) |

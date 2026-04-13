@@ -2,9 +2,9 @@
 """cli-charts: terminal-visible chart toolkit for Claude Code.
 
 Usage: python chart.py <type> [options]
-Types (21):
+Types (22):
   plotext : kline line scatter bar multibar stackedbar hist heatmap box indicator event confusion
-  rich    : table tree panel gauge
+  rich    : table tree panel gauge pie
   drawille: curve
   uniplot : uniplot
   misc    : graph sparkline banner
@@ -101,6 +101,29 @@ def bar(d, title, w, h, theme, **kw):
     plt.bar(d['labels'], d['values'],
             orientation=kw.get('orientation', 'vertical'))
     _plt_finalize(plt, title, w, h, theme, kw)
+
+
+def pie(d, title, w, h, theme, **kw):
+    """Rich percentage-bar pie breakdown. labels + values arrays of equal length."""
+    from rich.console import Console
+    from rich.table import Table
+    from rich import box as rich_box
+    total = sum(d['values']) or 1
+    bar_w = 36
+    colors = ['red', 'green', 'blue', 'yellow', 'magenta', 'cyan',
+              'bright_red', 'bright_green', 'bright_blue']
+    tbl = Table(title=title or None, box=rich_box.ROUNDED, show_lines=False)
+    tbl.add_column('Label', style='bold')
+    tbl.add_column('Pct', justify='right')
+    tbl.add_column('Distribution', min_width=bar_w)
+    tbl.add_column('Value', justify='right')
+    for i, (label, val) in enumerate(zip(d['labels'], d['values'])):
+        pct = val / total * 100
+        filled = round(pct / 100 * bar_w)
+        color = colors[i % len(colors)]
+        bar = f'[{color}]{"█" * filled}[/{color}]{"░" * (bar_w - filled)}'
+        tbl.add_row(str(label), f'{pct:.1f}%', bar, str(val))
+    Console().print(tbl)
 
 
 def multibar(d, title, w, h, theme, **kw):
@@ -401,7 +424,7 @@ def load_duckdb(sql, db_path, chart_type):
         col0 = df.columns[0]
         return [{'label': c, 'x': df[col0].tolist(), 'y': df[c].tolist()}
                 for c in df.columns[1:]]
-    if chart_type in ('bar',):
+    if chart_type in ('bar', 'pie'):
         cols = list(df.columns)
         return {'labels': df[cols[0]].astype(str).tolist(),
                 'values': df[cols[1]].tolist()}
@@ -441,6 +464,7 @@ CMDS = {
     'line':       line,
     'scatter':    scatter,
     'bar':        bar,
+    'pie':        pie,
     'multibar':   multibar,
     'stackedbar': stackedbar,
     'hist':       hist,
@@ -465,6 +489,7 @@ EXPECTED_SCHEMAS = {
     'line':       '[{"label":"A","x":[...],"y":[...]}] or {"label":"A","y":[...]}',
     'scatter':    '[{"label":"A","x":[...],"y":[...]}] or {"label":"A","y":[...]}',
     'bar':        '{"labels":[...], "values":[...]}',
+    'pie':        '{"labels":["A","B","C"], "values":[30,50,20]}',
     'multibar':   '{"labels":[...], "series":[{"label":"A","values":[...]}, ...]}',
     'stackedbar': '{"labels":[...], "series":[{"label":"A","values":[...]}, ...]}',
     'hist':       '{"values":[...], "bins":20} or [{"label":"A","values":[...]}, ...]',
@@ -485,7 +510,7 @@ EXPECTED_SCHEMAS = {
 }
 
 # Types where --width/--height/--theme have no effect
-_NO_SIZE_THEME = {'table', 'tree', 'panel', 'graph', 'sparkline', 'gauge', 'banner'}
+_NO_SIZE_THEME = {'table', 'tree', 'panel', 'graph', 'sparkline', 'gauge', 'banner', 'pie'}
 
 
 # -- main --------------------------------------------------------------------
@@ -495,9 +520,9 @@ def main():
         description='CLI Charts -- terminal-visible charts for Claude Code',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Chart types (21):
+Chart types (22):
   plotext : kline line scatter bar multibar stackedbar hist heatmap box indicator event confusion
-  rich    : table tree panel gauge
+  rich    : table tree panel gauge pie
   drawille: curve
   uniplot : uniplot
   misc    : graph sparkline banner
@@ -549,7 +574,7 @@ Examples:
                    help='Save chart to file instead of displaying (plotext only)')
     p.add_argument('--no-color',    action='store_true',
                    help='Disable ANSI colors (respects NO_COLOR env var)')
-    p.add_argument('--version',     action='version', version='cli-charts 2.1.0')
+    p.add_argument('--version',     action='version', version='cli-charts 2.2.0')
     args = p.parse_args()
 
     # Warn when size/theme options are silently ignored
