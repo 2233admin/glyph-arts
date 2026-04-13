@@ -6,3 +6,5 @@ networkx>=3.0
 sparklines>=0.4
 pandas>=2.0
 duckdb>=0.10
+pyfiglet>=0.8
+uniplot>=0.5

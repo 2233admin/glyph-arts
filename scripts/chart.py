@@ -2,11 +2,12 @@
 """cli-charts: terminal-visible chart toolkit for Claude Code.
 
 Usage: python chart.py <type> [options]
-Types (17):
-  plotext : kline line scatter bar multibar stackedbar hist heatmap box indicator event
-  rich    : table tree panel
+Types (21):
+  plotext : kline line scatter bar multibar stackedbar hist heatmap box indicator event confusion
+  rich    : table tree panel gauge
   drawille: curve
-  misc    : graph sparkline
+  uniplot : uniplot
+  misc    : graph sparkline banner
 """
 import sys
 import os
@@ -302,6 +303,85 @@ def curve(d, title, w, h, theme, **kw):
     print(c.frame())
 
 
+def gauge(d, title, w, h, theme, **kw):
+    """rich multi-metric progress bars (static gauge).
+    Auto-colors: green <70%, yellow <90%, red >=90%.
+    """
+    from rich.console import Console
+    from rich.table import Table
+    from rich import box as richbox
+    no_color = kw.get('no_color', False)
+    c = Console(no_color=no_color)
+    metrics = d if isinstance(d, list) else d.get('metrics', [d])
+    t = Table(title=title, box=richbox.SIMPLE, show_header=False, padding=(0, 1))
+    t.add_column('Label', style='bold', min_width=12)
+    t.add_column('Bar', min_width=32)
+    t.add_column('Value', justify='right', min_width=10)
+    for m in metrics:
+        val = float(m['value'])
+        mx  = float(m.get('max', 100))
+        pct = max(0.0, min(1.0, val / mx)) if mx != 0 else 0.0
+        bar_w = 30
+        filled = round(pct * bar_w)
+        auto_color = 'green' if pct < 0.7 else ('yellow' if pct < 0.9 else 'red')
+        color = m.get('color', auto_color)
+        bar = f'[{color}]{"█" * filled}{"░" * (bar_w - filled)}[/{color}]'
+        t.add_row(m.get('label', ''), bar, f'{val:.1f} / {mx:.0f}')
+    c.print(t)
+
+
+def confusion(d, title, w, h, theme, **kw):
+    """plotext ML confusion matrix.
+    actual/predicted must be lists of class labels (int or str).
+    """
+    import plotext as plt
+    plt.confusion_matrix(d['actual'], d['predicted'],
+                         labels=d.get('labels'))
+    _plt_finalize(plt, title, w, h, theme, kw)
+
+
+def banner(d, title, w, h, theme, **kw):
+    """pyfiglet large ASCII art text banner."""
+    import pyfiglet
+    text = d.get('text', title or 'BANNER')
+    font = d.get('font', 'big')
+    result = pyfiglet.figlet_format(text, font=font, width=d.get('width', w))
+    color = d.get('color')
+    if color and not kw.get('no_color'):
+        from rich.console import Console
+        Console().print(f'[{color}]{result}[/{color}]', end='')
+    else:
+        print(result, end='')
+
+
+def uniplot(d, title, w, h, theme, **kw):
+    """uniplot scientific line/scatter with labeled axes.
+    Same multi-series schema as 'line'. Set "lines":false per series for scatter.
+    Respects --xlim, --ylim, --width, --height.
+    """
+    from uniplot import plot as uplot
+    series = d if isinstance(d, list) else [d]
+    ys = [s['y'] for s in series]
+    xs = [s.get('x', list(range(len(s['y'])))) for s in series]
+    labels = [s.get('label', f'S{i}') for i, s in enumerate(series)]
+    lines = all(s.get('lines', True) for s in series)
+    plot_kw = dict(
+        title=title or '',
+        legend_labels=labels,
+        lines=lines,
+        width=w,
+        height=h,
+    )
+    if kw.get('xlim'):
+        plot_kw['x_min'], plot_kw['x_max'] = kw['xlim']
+    if kw.get('ylim'):
+        plot_kw['y_min'], plot_kw['y_max'] = kw['ylim']
+    if len(series) == 1:
+        uplot(ys=ys[0], xs=xs[0], **plot_kw)
+    else:
+        uplot(ys=ys, xs=xs, **plot_kw)
+
+
 # -- DuckDB loader -----------------------------------------------------------
 
 def load_duckdb(sql, db_path, chart_type):
@@ -339,6 +419,13 @@ def load_duckdb(sql, db_path, chart_type):
         return {'points': list(zip(df[cols[0]].tolist(), df[cols[1]].tolist()))}
     if chart_type == 'sparkline':
         return {'values': df.iloc[:, 0].tolist()}
+    if chart_type == 'confusion':
+        cols = list(df.columns)
+        return {'actual': df[cols[0]].tolist(), 'predicted': df[cols[1]].tolist()}
+    if chart_type == 'uniplot':
+        col0 = df.columns[0]
+        return [{'label': c, 'x': df[col0].tolist(), 'y': df[c].tolist()}
+                for c in df.columns[1:]]
     # graph: 2-col edge list; others: generic dict
     if chart_type == 'graph':
         cols = list(df.columns)
@@ -361,12 +448,16 @@ CMDS = {
     'box':        box,
     'indicator':  indicator,
     'event':      event,
+    'confusion':  confusion,
     'sparkline':  sparkline,
     'table':      table,
     'tree':       tree,
     'panel':      panel,
+    'gauge':      gauge,
     'graph':      graph,
     'curve':      curve,
+    'uniplot':    uniplot,
+    'banner':     banner,
 }
 
 EXPECTED_SCHEMAS = {
@@ -380,17 +471,21 @@ EXPECTED_SCHEMAS = {
     'heatmap':    '{"matrix":[[...]], "xlabels":[...], "ylabels":[...]}',
     'box':        '{"data":[[s1_vals],[s2_vals],...], "labels":["A","B",...]}',
     'indicator':  '{"value":23.4, "label":"Total Return %"}',
-    'event':      '{"data":[x1,x2,...], "orientation":"vertical"}',
+    'event':      '{"data":[x1,x2,...]}',
+    'confusion':  '{"actual":[0,1,2,0], "predicted":[0,2,1,0], "labels":["Cat","Dog","Bird"]}',
     'sparkline':  '{"values":[1,3,5,2,8,4,6]}',
     'table':      '{"columns":[...], "rows":[[...], ...]}',
     'tree':       '{"label":"root","children":[{"label":"A","children":[...]}]}',
     'panel':      '{"content":"text here", "title":"optional", "box":"ROUNDED"}',
+    'gauge':      '[{"label":"CPU","value":75,"max":100,"color":"red"}, ...] or {"metrics":[...]}',
     'graph':      '{"edges":[["A","B"],...], "directed":true, "node_style":"ROUND"}',
     'curve':      '{"points":[[x,y],...]}',
+    'uniplot':    '[{"label":"A","x":[...],"y":[...]}] or {"label":"A","y":[...]}',
+    'banner':     '{"text":"PROFIT","font":"big","color":"green"}',
 }
 
 # Types where --width/--height/--theme have no effect
-_NO_SIZE_THEME = {'table', 'tree', 'panel', 'graph', 'sparkline'}
+_NO_SIZE_THEME = {'table', 'tree', 'panel', 'graph', 'sparkline', 'gauge', 'banner'}
 
 
 # -- main --------------------------------------------------------------------
@@ -400,11 +495,12 @@ def main():
         description='CLI Charts -- terminal-visible charts for Claude Code',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Chart types (17):
-  plotext : kline line scatter bar multibar stackedbar hist heatmap box indicator event
-  rich    : table tree panel
+Chart types (21):
+  plotext : kline line scatter bar multibar stackedbar hist heatmap box indicator event confusion
+  rich    : table tree panel gauge
   drawille: curve
-  misc    : graph sparkline
+  uniplot : uniplot
+  misc    : graph sparkline banner
 
 Examples:
   python chart.py kline --json '{"dates":["07/04/2026"],"open":[100],"high":[102],"low":[99],"close":[101]}'
@@ -414,6 +510,10 @@ Examples:
   python chart.py box --json '{"data":[[1,2,3,4,5],[2,3,4,5,6]],"labels":["A","B"]}'
   python chart.py sparkline --json '{"values":[1,3,5,2,8,4,6]}'
   python chart.py indicator --json '{"value":23.4,"label":"Total Return %"}'
+  python chart.py confusion --json '{"actual":[0,1,2,0,1,2],"predicted":[0,2,2,0,0,1],"labels":["Cat","Dog","Bird"]}'
+  python chart.py gauge --json '[{"label":"CPU","value":72,"max":100},{"label":"RAM","value":14,"max":32}]'
+  python chart.py banner --json '{"text":"PROFIT","font":"big","color":"green"}'
+  python chart.py uniplot --json '[{"label":"A","x":[1,2,3,4],"y":[2,4,3,6]},{"label":"B","y":[1,3,2,5]}]'
   python chart.py tree --json '{"label":"root","children":[{"label":"A"},{"label":"B","children":[{"label":"C"}]}]}'
   python chart.py panel --json '{"content":"Hello world","title":"Info","box":"ROUNDED"}'
   python chart.py multibar --json '{"labels":["Q1","Q2"],"series":[{"label":"Rev","values":[10,12]},{"label":"Cost","values":[8,9]}]}'
@@ -449,7 +549,7 @@ Examples:
                    help='Save chart to file instead of displaying (plotext only)')
     p.add_argument('--no-color',    action='store_true',
                    help='Disable ANSI colors (respects NO_COLOR env var)')
-    p.add_argument('--version',     action='version', version='cli-charts 2.0.0')
+    p.add_argument('--version',     action='version', version='cli-charts 2.1.0')
     args = p.parse_args()
 
     # Warn when size/theme options are silently ignored

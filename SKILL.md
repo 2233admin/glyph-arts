@@ -1,7 +1,7 @@
 ---
 name: cli-charts
-description: Terminal-visible chart toolkit for Claude Code. Renders 17 chart types directly in the CLI — no files, no GUI. Covers plotext (kline/line/scatter/bar/multibar/stackedbar/hist/heatmap/box/indicator/event), rich (table/tree/panel), drawille braille curve, ASCII network graph, and sparkline.
-version: 2.0.0
+description: Terminal-visible chart toolkit for Claude Code. Renders 21 chart types directly in the CLI — no files, no GUI. Covers plotext (kline/line/scatter/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), rich (table/tree/panel/gauge), drawille braille curve, uniplot scientific line, ASCII network graph, sparkline, and pyfiglet banner.
+version: 2.1.0
 ---
 
 # CLI Charts Skill
@@ -21,13 +21,14 @@ python $SKILL/scripts/chart.py <type> [--json '...'] [--duckdb 'SQL'] [--db PATH
 
 Themes: `pro` (colored) | `dark` | `clear` | `matrix`
 
-**17 chart types:**
-- **plotext**: `kline` `line` `scatter` `bar` `multibar` `stackedbar` `hist` `heatmap` `box` `indicator` `event`
-- **rich**: `table` `tree` `panel`
+**21 chart types:**
+- **plotext**: `kline` `line` `scatter` `bar` `multibar` `stackedbar` `hist` `heatmap` `box` `indicator` `event` `confusion`
+- **rich**: `table` `tree` `panel` `gauge`
 - **drawille**: `curve`
-- **misc**: `graph` `sparkline`
+- **uniplot**: `uniplot`
+- **misc**: `graph` `sparkline` `banner`
 
-Note: `--width`, `--height`, `--theme` are ignored for `table`, `tree`, `panel`, `graph`, `sparkline` (a warning is printed if you pass them with non-default values).
+Note: `--width`, `--height`, `--theme` are ignored for `table`, `tree`, `panel`, `graph`, `sparkline`, `gauge`, `banner` (a warning is printed if you pass them with non-default values).
 
 ---
 
@@ -377,6 +378,85 @@ python $SKILL/scripts/chart.py curve \
 
 ---
 
+## Confusion Matrix
+
+ML confusion matrix via plotext — actual vs predicted, color-coded cells with percentages.
+
+```bash
+python $SKILL/scripts/chart.py confusion --title "分类结果" --width 80 --height 20 \
+  --json '{"actual":[0,1,2,0,1,2],"predicted":[0,2,2,0,0,1],"labels":["Cat","Dog","Bird"]}'
+
+# DuckDB — 2-col (actual, predicted)
+python $SKILL/scripts/chart.py confusion \
+  --duckdb "SELECT actual_label, predicted_label FROM model_results" \
+  --db /path/to/data.duckdb
+```
+
+---
+
+## Gauge (Progress Bars)
+
+Rich multi-metric progress bars. Auto-colors green (<70%), yellow (<90%), red (>=90%).
+
+```bash
+python $SKILL/scripts/chart.py gauge --title "系统状态" \
+  --json '[
+    {"label":"CPU","value":72,"max":100},
+    {"label":"RAM","value":14,"max":32},
+    {"label":"GPU","value":95,"max":100,"color":"magenta"}
+  ]'
+
+# Single metric as object
+python $SKILL/scripts/chart.py gauge \
+  --json '{"metrics":[{"label":"胜率","value":63,"max":100}]}'
+```
+
+---
+
+## Banner (ASCII Art Text)
+
+pyfiglet large ASCII art text. Good for dashboard headers and alerts.
+
+```bash
+python $SKILL/scripts/chart.py banner --json '{"text":"PROFIT","font":"big"}'
+
+# With color (rich markup)
+python $SKILL/scripts/chart.py banner \
+  --json '{"text":"ERROR","font":"banner3","color":"red"}'
+
+# Available fonts (partial): big, banner, banner3, block, digital, doom, isometric1, larry3d, speed, standard, starwars, stop
+python -c "import pyfiglet; print(pyfiglet.FigletFont.getFonts())"  # list all ~150 fonts
+```
+
+---
+
+## Uniplot (Scientific Line/Scatter)
+
+uniplot braille-pixel scientific charts with real axis labels. Same schema as `line`.
+Prefer over `line` when axis precision matters; prefer `curve` for smooth math functions.
+
+```bash
+# Multi-series line
+python $SKILL/scripts/chart.py uniplot --title "收益曲线" \
+  --json '[{"label":"策略","y":[1.0,1.05,1.03,1.08,1.12]},
+           {"label":"基准","y":[1.0,1.02,1.01,1.03,1.04]}]'
+
+# Scatter mode (set "lines":false)
+python $SKILL/scripts/chart.py uniplot \
+  --json '[{"label":"因子","x":[1,2,3,4,5],"y":[2.1,1.8,3.2,2.7,4.0],"lines":false}]'
+
+# With axis limits
+python $SKILL/scripts/chart.py uniplot --ylim 0 2 --width 80 --height 20 \
+  --json '{"label":"净值","y":[1.0,1.1,0.95,1.2,1.35]}'
+
+# DuckDB — same mapping as line (col0=x, remaining=series)
+python $SKILL/scripts/chart.py uniplot \
+  --duckdb "SELECT trade_date_idx, close FROM stock_daily WHERE ts_code='000001.SH' LIMIT 60" \
+  --db /path/to/data.duckdb
+```
+
+---
+
 ## DuckDB Integration
 
 Always pass `--db /path/to/data.duckdb` with `--duckdb`. No default path.
@@ -394,6 +474,8 @@ Auto column mapping by chart type:
 | curve | col0=x, col1=y |
 | sparkline | col0=values |
 | graph | col0=source, col1=target (edge list) |
+| confusion | col0=actual, col1=predicted |
+| uniplot | col0=x-axis, remaining cols=series |
 
 ---
 
@@ -402,8 +484,8 @@ Auto column mapping by chart type:
 | Flag | Applies to | Default |
 |------|-----------|---------|
 | `--title` | all | '' |
-| `--width` | plotext + curve | 70 |
-| `--height` | plotext + curve | 20 |
+| `--width` | plotext + curve + uniplot | 70 |
+| `--height` | plotext + curve + uniplot | 20 |
 | `--theme` | plotext | pro |
 | `--xlabel` | plotext | '' |
 | `--ylabel` | plotext | '' |
@@ -424,3 +506,7 @@ Auto column mapping by chart type:
 - Architecture/flow diagrams → use beautiful-mermaid instead
 - Need SVG/PNG output → use beautiful-mermaid with `--format svg`
 - Need highest resolution curve → use `curve` (braille, 4× more pixels than plotext)
+- ML model evaluation → `confusion` for confusion matrix
+- System/resource dashboards → `gauge` for multi-metric progress bars
+- Dashboard section headers / alerts → `banner` (ASCII art, 150+ fonts)
+- Scientific plots with precise axis labels → `uniplot` over `line`
