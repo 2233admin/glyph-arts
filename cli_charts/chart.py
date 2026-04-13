@@ -8,6 +8,11 @@ Types (24):
   drawille: curve
   uniplot : uniplot
   misc    : graph sparkline banner
+
+Animation (--animate):
+  Stream values from stdin line-by-line; chart re-renders after each point.
+  Supported types: line, scatter, sparkline
+  Flags: --refresh FPS (default 10), --window N (default 50), --duration SEC
 """
 import sys
 import os
@@ -698,6 +703,14 @@ Examples:
                    help='With --check-deps: also show optional deps (braille/lttb/tui)')
     p.add_argument('--sample',      type=int, default=0, metavar='N',
                    help='Downsample any list longer than N in the input data')
+    p.add_argument('--animate',    action='store_true',
+                   help='Read stdin line-by-line and re-render chart after each value')
+    p.add_argument('--refresh',    type=int, default=10, metavar='FPS',
+                   help='Animation refresh rate in frames/sec (default: 10)')
+    p.add_argument('--window',     type=int, default=50,  metavar='N',
+                   help='Keep last N data points in view (0=unlimited, default: 50)')
+    p.add_argument('--duration',   type=float, default=0, metavar='SEC',
+                   help='Auto-stop after SEC seconds (0=until EOF/Ctrl-C)')
     if '--check-deps' in sys.argv:
         _CORE = ['plotext', 'rich', 'uniplot', 'pyfiglet',
                  'sparklines', 'duckdb', 'pandas', 'networkx', 'phart']
@@ -728,6 +741,16 @@ Examples:
         sys.exit(0)
 
     args = p.parse_args()
+
+    if args.animate:
+        no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
+        kw = dict(xlabel=args.xlabel, ylabel=args.ylabel, xlim=args.xlim,
+                  ylim=args.ylim, xscale=args.xscale, yscale=args.yscale,
+                  orientation=args.orientation, output=args.output,
+                  no_color=no_color)
+        _animate_stdin(args.type, args.title, args.width, args.height,
+                       args.theme, args.refresh, args.window, args.duration, kw)
+        return
 
     # Warn when size/theme options are silently ignored
     _default_width = shutil.get_terminal_size((70, 20)).columns
@@ -815,6 +838,72 @@ Examples:
         last = traceback.format_exc().strip().splitlines()[-1]
         print(f'ERROR:render: {last}', file=sys.stderr)
         sys.exit(4)
+
+
+# ---------------------------------------------------------------------------
+# Animation helpers
+# ---------------------------------------------------------------------------
+
+_ANIMATE_TYPES = {'line', 'scatter', 'sparkline'}
+
+
+def _animate_stdin(chart_type, title, w, h, theme, refresh, window, duration, kw):
+    """Stream values from stdin and re-render chart after each point.
+
+    Input format: one numeric value per line (whitespace-separated fields are
+    accepted; only the last field is used as the Y value).
+    """
+    import collections
+    import time
+    import plotext as plt
+    from rich.live import Live
+    from rich.console import Console
+    from rich.text import Text
+
+    if chart_type not in _ANIMATE_TYPES:
+        print(f'ERROR:schema: --animate supports: {", ".join(sorted(_ANIMATE_TYPES))}',
+              file=sys.stderr)
+        sys.exit(1)
+
+    buf = collections.deque(maxlen=window if window > 0 else None)
+    t_start = time.monotonic()
+    console = Console()
+
+    def make_frame():
+        ys = list(buf)
+        xs = list(range(len(ys)))
+        label = (title + ' ' if title else '') + f'[n={len(ys)}]'
+        if chart_type == 'sparkline':
+            try:
+                from sparklines import sparklines as _sparklines
+                lines = _sparklines(ys)
+                return '\n'.join(lines) + f'\n{label}'
+            except ImportError:
+                return label + '\n' + ' '.join(f'{v:.1f}' for v in ys[-20:])
+        plt.clf()
+        getattr(plt, chart_type)(xs, ys)
+        plt.title(label)
+        plt.plotsize(w - 2, h)
+        plt.theme(theme)
+        return plt.build()
+
+    try:
+        with Live(console=console, refresh_per_second=refresh, screen=False) as live:
+            for raw_line in sys.stdin:
+                raw_line = raw_line.strip()
+                if not raw_line:
+                    continue
+                try:
+                    val = float(raw_line.split()[-1])
+                except ValueError:
+                    continue
+                buf.append(val)
+                if len(buf) >= 2:
+                    live.update(Text.from_ansi(make_frame()))
+                if duration > 0 and time.monotonic() - t_start >= duration:
+                    break
+    except KeyboardInterrupt:
+        pass  # clean exit on Ctrl-C
 
 
 if __name__ == '__main__':

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cli-charts"
 dynamic = ["version"]
-description = "Terminal-visible chart toolkit — 24 chart types rendered directly in the CLI, no browser, no files."
+description = "Terminal-visible chart toolkit — 24 chart types + live animation rendered directly in the CLI, no browser, no files."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
@@ -54,3 +54,6 @@ include = ["cli_charts*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "slow: marks tests that require a real TTY or subprocess (deselect with '-m \"not slow\"')",
+]
