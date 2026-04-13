@@ -2,9 +2,9 @@
 """cli-charts: terminal-visible chart toolkit for Claude Code.
 
 Usage: python chart.py <type> [options]
-Types (22):
+Types (23):
   plotext : kline line scatter bar multibar stackedbar hist heatmap box indicator event confusion
-  rich    : table tree panel gauge pie
+  rich    : table tree panel gauge pie dashboard
   drawille: curve
   uniplot : uniplot
   misc    : graph sparkline banner
@@ -13,6 +13,9 @@ import sys
 import os
 import json
 import argparse
+import shutil
+import random
+import datetime
 
 
 # -- helpers -----------------------------------------------------------------
@@ -353,6 +356,25 @@ def gauge(d, title, w, h, theme, **kw):
     c.print(t)
 
 
+def dashboard(d, title, w, h, theme, **kw):
+    """Rich multi-panel dashboard — renders multiple chart types sequentially."""
+    from rich.console import Console
+    from rich.rule import Rule
+    c = Console()
+    if title:
+        c.print(Rule(f'[bold]{title}[/bold]'))
+    for panel_spec in d.get('panels', []):
+        ptype = panel_spec.get('type')
+        pdata = panel_spec.get('data', {})
+        ptitle = panel_spec.get('title', '')
+        if ptype not in CMDS:
+            c.print(f'[red]Unknown panel type: {ptype}[/red]')
+            continue
+        if ptitle:
+            c.print(Rule(f'[dim]{ptitle}[/dim]'))
+        CMDS[ptype](pdata, ptitle, w, h, theme, **kw)
+
+
 def confusion(d, title, w, h, theme, **kw):
     """plotext ML confusion matrix.
     actual/predicted must be lists of class labels (int or str).
@@ -405,6 +427,18 @@ def uniplot(d, title, w, h, theme, **kw):
         uplot(ys=ys, xs=xs, **plot_kw)
 
 
+# -- helpers (data) ----------------------------------------------------------
+
+def _sample_data(data, n):
+    if isinstance(data, list):
+        if len(data) > n:
+            data = random.sample(data, n)
+        return [_sample_data(item, n) for item in data]
+    if isinstance(data, dict):
+        return {k: _sample_data(v, n) for k, v in data.items()}
+    return data
+
+
 # -- DuckDB loader -----------------------------------------------------------
 
 def load_duckdb(sql, db_path, chart_type):
@@ -449,7 +483,7 @@ def load_duckdb(sql, db_path, chart_type):
         col0 = df.columns[0]
         return [{'label': c, 'x': df[col0].tolist(), 'y': df[c].tolist()}
                 for c in df.columns[1:]]
-    # graph: 2-col edge list; others: generic dict
+    # dashboard: not supported via DuckDB (composite type); graph: 2-col edge list; others: generic dict
     if chart_type == 'graph':
         cols = list(df.columns)
         return {'edges': list(zip(df[cols[0]].astype(str),
@@ -478,10 +512,12 @@ CMDS = {
     'tree':       tree,
     'panel':      panel,
     'gauge':      gauge,
+    'dashboard':  dashboard,
     'graph':      graph,
     'curve':      curve,
     'uniplot':    uniplot,
-    'banner':     banner,
+    'banner':      banner,
+    'candlestick': kline,
 }
 
 EXPECTED_SCHEMAS = {
@@ -503,14 +539,16 @@ EXPECTED_SCHEMAS = {
     'tree':       '{"label":"root","children":[{"label":"A","children":[...]}]}',
     'panel':      '{"content":"text here", "title":"optional", "box":"ROUNDED"}',
     'gauge':      '[{"label":"CPU","value":75,"max":100,"color":"red"}, ...] or {"metrics":[...]}',
+    'dashboard':  '{"panels":[{"type":"gauge","data":{"label":"CPU","value":72,"max":100},"title":"CPU"},{"type":"sparkline","data":{"values":[1,3,5,2,8]},"title":"Load"}]}',
     'graph':      '{"edges":[["A","B"],...], "directed":true, "node_style":"ROUND"}',
     'curve':      '{"points":[[x,y],...]}',
     'uniplot':    '[{"label":"A","x":[...],"y":[...]}] or {"label":"A","y":[...]}',
-    'banner':     '{"text":"PROFIT","font":"big","color":"green"}',
+    'banner':      '{"text":"PROFIT","font":"big","color":"green"}',
+    'candlestick': '{"dates":["DD/MM/YYYY",...], "open":[...], "high":[...], "low":[...], "close":[...]}',
 }
 
 # Types where --width/--height/--theme have no effect
-_NO_SIZE_THEME = {'table', 'tree', 'panel', 'graph', 'sparkline', 'gauge', 'banner', 'pie'}
+_NO_SIZE_THEME = {'table', 'tree', 'panel', 'graph', 'sparkline', 'gauge', 'banner', 'pie', 'dashboard'}
 
 
 # -- main --------------------------------------------------------------------
@@ -520,9 +558,9 @@ def main():
         description='CLI Charts -- terminal-visible charts for Claude Code',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Chart types (22):
+Chart types (23):
   plotext : kline line scatter bar multibar stackedbar hist heatmap box indicator event confusion
-  rich    : table tree panel gauge pie
+  rich    : table tree panel gauge pie dashboard
   drawille: curve
   uniplot : uniplot
   misc    : graph sparkline banner
@@ -549,12 +587,15 @@ Examples:
     p.add_argument('type', choices=list(CMDS), metavar='TYPE',
                    help='Chart type: ' + ' | '.join(CMDS))
     p.add_argument('--json',        dest='data', help='JSON data string')
+    p.add_argument('--file',        metavar='PATH',
+                   help='Read JSON from a file path')
     p.add_argument('--duckdb',      metavar='SQL',
                    help='SQL query against a DuckDB database')
     p.add_argument('--db',          default=None,
                    help='DuckDB file path (required with --duckdb)')
     p.add_argument('--title',       default='')
-    p.add_argument('--width',       type=int, default=70,
+    p.add_argument('--width',       type=int,
+                   default=shutil.get_terminal_size((70, 20)).columns,
                    help='Chart width in terminal columns (ignored for table/tree/panel/graph/sparkline)')
     p.add_argument('--height',      type=int, default=20,
                    help='Chart height in terminal rows (ignored for table/tree/panel/graph/sparkline)')
@@ -574,15 +615,44 @@ Examples:
                    help='Save chart to file instead of displaying (plotext only)')
     p.add_argument('--no-color',    action='store_true',
                    help='Disable ANSI colors (respects NO_COLOR env var)')
-    p.add_argument('--version',     action='version', version='cli-charts 2.2.0')
+    p.add_argument('--version',     action='version', version='cli-charts 2.3.0')
+    p.add_argument('--check-deps',  action='store_true',
+                   help='Print dependency availability table and exit')
+    p.add_argument('--sample',      type=int, default=0, metavar='N',
+                   help='Downsample any list longer than N in the input data')
+    if '--check-deps' in sys.argv:
+        _DEPS = ['plotext', 'rich', 'drawille', 'uniplot', 'pyfiglet',
+                 'sparklines', 'duckdb', 'pandas', 'networkx', 'phart']
+        for pkg in _DEPS:
+            try:
+                __import__(pkg)
+                status = 'OK'
+            except ImportError:
+                status = 'MISSING'
+            print(f'{pkg:<14} {status}')
+        sys.exit(0)
+
     args = p.parse_args()
 
+    if args.check_deps:
+        _DEPS = ['plotext', 'rich', 'drawille', 'uniplot', 'pyfiglet',
+                 'sparklines', 'duckdb', 'pandas', 'networkx', 'phart']
+        for pkg in _DEPS:
+            try:
+                __import__(pkg)
+                status = 'OK'
+            except ImportError:
+                status = 'MISSING'
+            print(f'{pkg:<14} {status}')
+        sys.exit(0)
+
     # Warn when size/theme options are silently ignored
+    _default_width = shutil.get_terminal_size((70, 20)).columns
     if args.type in _NO_SIZE_THEME:
         ignored = []
-        if args.width != 70:    ignored.append('--width')
-        if args.height != 20:   ignored.append('--height')
-        if args.theme != 'pro': ignored.append('--theme')
+        if args.width != _default_width: ignored.append('--width')
+        if args.height != 20:            ignored.append('--height')
+        if args.theme != 'pro':          ignored.append('--theme')
         if ignored:
             print(f"warning: {', '.join(ignored)} ignored for {args.type} charts",
                   file=sys.stderr)
@@ -590,39 +660,78 @@ Examples:
     # Respect NO_COLOR env var (https://no-color.org)
     no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
 
-    if args.duckdb:
-        if not args.db:
-            p.error('--db is required when using --duckdb '
-                    '(e.g. --db /path/to/data.duckdb)')
-        data = load_duckdb(args.duckdb, args.db, args.type)
-    else:
-        raw = args.data or sys.stdin.read().strip()
-        if not raw:
-            p.error('Provide --json, --duckdb, or pipe JSON to stdin')
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            p.error(f'Invalid JSON: {exc}')
-
-    kw = dict(
-        xlabel=args.xlabel,
-        ylabel=args.ylabel,
-        xlim=args.xlim,
-        ylim=args.ylim,
-        xscale=args.xscale,
-        yscale=args.yscale,
-        orientation=args.orientation,
-        output=args.output,
-        no_color=no_color,
-    )
-
     try:
-        CMDS[args.type](data, args.title, args.width, args.height, args.theme, **kw)
-    except (KeyError, IndexError, TypeError, ValueError) as exc:
-        p.error(
-            f'Invalid {args.type} data schema: {exc}\n'
-            f'Expected: {EXPECTED_SCHEMAS[args.type]}'
+        if args.duckdb:
+            if not args.db:
+                print('ERROR:schema: --db is required when using --duckdb '
+                      '(e.g. --db /path/to/data.duckdb)', file=sys.stderr)
+                sys.exit(1)
+            import duckdb as _duckdb_mod  # noqa: F401
+            data = load_duckdb(args.duckdb, args.db, args.type)
+        else:
+            if args.file:
+                with open(args.file) as _f:
+                    raw = _f.read().strip()
+            elif args.data:
+                raw = args.data
+            else:
+                raw = sys.stdin.read().strip()
+            if not raw:
+                print('ERROR:schema: Provide --json, --file, --duckdb, or pipe JSON to stdin',
+                      file=sys.stderr)
+                sys.exit(1)
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                print(f'ERROR:json: {exc}', file=sys.stderr)
+                sys.exit(1)
+
+        if args.sample > 0:
+            data = _sample_data(data, args.sample)
+
+        kw = dict(
+            xlabel=args.xlabel,
+            ylabel=args.ylabel,
+            xlim=args.xlim,
+            ylim=args.ylim,
+            xscale=args.xscale,
+            yscale=args.yscale,
+            orientation=args.orientation,
+            output=args.output,
+            no_color=no_color,
         )
+
+        try:
+            CMDS[args.type](data, args.title, args.width, args.height, args.theme, **kw)
+        except (KeyError, IndexError, TypeError, ValueError) as exc:
+            print(f'ERROR:schema: Invalid {args.type} data schema: {exc}\n'
+                  f'Expected: {EXPECTED_SCHEMAS.get(args.type, "?")}',
+                  file=sys.stderr)
+            sys.exit(1)
+
+        if os.environ.get('CLI_CHARTS_LOG') == '1':
+            try:
+                entry = json.dumps({
+                    'ts': datetime.datetime.now().isoformat(),
+                    'type': args.type,
+                    'title': args.title,
+                })
+                with open('.chart_history.jsonl', 'a') as _lf:
+                    _lf.write(entry + '\n')
+            except Exception:
+                pass
+
+    except ImportError as exc:
+        pkg = str(exc).split("'")[1] if "'" in str(exc) else str(exc)
+        print(f'ERROR:dep: pip install {pkg}', file=sys.stderr)
+        sys.exit(2)
+    except SystemExit:
+        raise
+    except Exception as exc:
+        import traceback
+        last = traceback.format_exc().strip().splitlines()[-1]
+        print(f'ERROR:render: {last}', file=sys.stderr)
+        sys.exit(4)
 
 
 if __name__ == '__main__':
