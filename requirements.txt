@@ -1,0 +1,8 @@
+plotext>=5.2
+drawille>=0.1
+rich>=13.0
+phart>=0.4
+networkx>=3.0
+sparklines>=0.4
+pandas>=2.0
+duckdb>=0.10

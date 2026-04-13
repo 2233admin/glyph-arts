@@ -167,16 +167,16 @@ def indicator(d, title, w, h, theme, **kw):
     """plotext big-number KPI display."""
     import plotext as plt
     plt.indicator(d['value'], d.get('label', title or ''))
-    plt.plotsize(w, h)
-    plt.theme(theme)
-    plt.show()
+    _plt_finalize(plt, None, w, h, theme, kw)  # title already baked into label
 
 
 def event(d, title, w, h, theme, **kw):
-    """plotext event / timeline plot."""
+    """plotext event / timeline plot.
+    Orientation comes from --orientation CLI flag (kw) not JSON data.
+    """
     import plotext as plt
     plt.event_plot(d['data'],
-                   orientation=d.get('orientation', 'vertical'))
+                   orientation=kw.get('orientation', 'vertical'))
     _plt_finalize(plt, title, w, h, theme, kw)
 
 
