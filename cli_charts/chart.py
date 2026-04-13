@@ -881,7 +881,8 @@ def _animate_stdin(chart_type, title, w, h, theme, refresh, window, duration, kw
             except ImportError:
                 return label + '\n' + ' '.join(f'{v:.1f}' for v in ys[-20:])
         plt.clf()
-        getattr(plt, chart_type)(xs, ys)
+        _plt_fn = {'line': 'plot', 'scatter': 'scatter'}.get(chart_type, chart_type)
+        getattr(plt, _plt_fn)(xs, ys)
         plt.title(label)
         plt.plotsize(w - 2, h)
         plt.theme(theme)
