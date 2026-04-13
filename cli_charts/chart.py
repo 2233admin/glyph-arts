@@ -694,33 +694,40 @@ Examples:
     p.add_argument('--version',     action='version', version=f'cli-charts {_VERSION}')
     p.add_argument('--check-deps',  action='store_true',
                    help='Print dependency availability table and exit')
+    p.add_argument('--all',         action='store_true',
+                   help='With --check-deps: also show optional deps (braille/lttb/tui)')
     p.add_argument('--sample',      type=int, default=0, metavar='N',
                    help='Downsample any list longer than N in the input data')
     if '--check-deps' in sys.argv:
-        _DEPS = ['plotext', 'rich', 'drawille', 'uniplot', 'pyfiglet',
+        _CORE = ['plotext', 'rich', 'uniplot', 'pyfiglet',
                  'sparklines', 'duckdb', 'pandas', 'networkx', 'phart']
-        for pkg in _DEPS:
+        _OPT = [
+            ('drawille', 'curve chart',   'cli-charts[braille]'),
+            ('lttb',     'LTTB sampling', 'cli-charts[lttb]'),
+            ('textual',  'dashboard TUI', 'cli-charts[tui]'),
+        ]
+        print('[core]')
+        for pkg in _CORE:
             try:
                 __import__(pkg)
                 status = 'OK'
             except ImportError:
                 status = 'MISSING'
-            print(f'{pkg:<14} {status}')
+            print(f'  {pkg:<13} {status}')
+        if '--all' in sys.argv:
+            print('[optional]')
+            for pkg, purpose, install in _OPT:
+                try:
+                    __import__(pkg)
+                    status = 'OK'
+                    hint = ''
+                except ImportError:
+                    status = 'MISSING'
+                    hint = f'  -> pip install {install}'
+                print(f'  {pkg:<13} {status}  ({purpose}){hint}')
         sys.exit(0)
 
     args = p.parse_args()
-
-    if args.check_deps:
-        _DEPS = ['plotext', 'rich', 'drawille', 'uniplot', 'pyfiglet',
-                 'sparklines', 'duckdb', 'pandas', 'networkx', 'phart']
-        for pkg in _DEPS:
-            try:
-                __import__(pkg)
-                status = 'OK'
-            except ImportError:
-                status = 'MISSING'
-            print(f'{pkg:<14} {status}')
-        sys.exit(0)
 
     # Warn when size/theme options are silently ignored
     _default_width = shutil.get_terminal_size((70, 20)).columns

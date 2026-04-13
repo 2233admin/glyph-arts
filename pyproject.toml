@@ -24,7 +24,6 @@ classifiers = [
 dependencies = [
     "plotext>=5.2",
     "rich>=13.0",
-    "drawille>=0.1",
     "phart>=0.4",
     "networkx>=3.0",
     "sparklines>=0.4",
@@ -35,15 +34,18 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-lttb = ["lttb>=0.3"]
-tui  = ["textual>=0.50"]
-all  = ["lttb>=0.3", "textual>=0.50"]
+braille = ["drawille>=0.2"]
+lttb    = ["lttb>=0.3"]
+tui     = ["textual>=0.50"]
+all     = ["drawille>=0.2", "lttb>=0.3", "textual>=0.50"]
 
 [project.scripts]
 cli-charts = "cli_charts.chart:main"
 
 [project.urls]
-Repository = "https://github.com/your-org/cli-charts"
+Homepage = "https://github.com/2233admin/chartex"
+Repository = "https://github.com/2233admin/chartex"
+Changelog = "https://github.com/2233admin/chartex/blob/main/CHANGELOG.md"
 
 [tool.setuptools.dynamic]
 version = {file = "VERSION"}
