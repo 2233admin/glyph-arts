@@ -4,6 +4,37 @@ All notable changes to cli-charts are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [3.0.0] - 2026-04-14
+
+### Added
+- **`image` chart type**: render any image file (PNG/JPEG/GIF/BMP/WebP) to
+  the terminal via `chafa`. Supports 24-bit truecolor braille by default.
+  Invocation: `cli-charts image --file path/to.png --width 80 --height 24`.
+  New flag `--symbols SET` exposes chafa's symbol selector (`braille`, `block`,
+  `ascii`, `half`, `all`, etc.).
+- **`video` chart type**: play a video file in the terminal by piping through
+  `ffmpeg` -> `chafa`. Frames extracted to a tempdir at a configurable fps,
+  then streamed with cursor-home + hide-cursor ANSI escapes for minimal
+  flicker. New flag `--fps N` (default 12). Reuses `--duration SEC` to clip.
+  Invocation: `cli-charts video --file clip.mp4 --width 100 --height 30 --fps 15`.
+- `chart.py --check-deps` now reports `chafa` and `ffmpeg` availability.
+
+### Changed
+- **Architectural split**: charts -> native engine (plotext/rich/drawille/
+  plotille/uniprint); images and video -> shell out to chafa+ffmpeg. Rationale
+  in HANDOFF 2026-04-14: the `curve` Bresenham polyline renderer is unsuitable
+  for image data (every consecutive point-pair gets connected -> silhouettes
+  become filled blobs), so pixel-accurate media work belongs with a purpose-
+  built tool. chafa is a superset of timg/viu on Windows and pre-installed
+  via `scoop install chafa`.
+- Top-level docstring and `--help` now list 29 types (was 27).
+
+### Removed
+- `draw_cat.py`, `draw_crane.py`, `draw_cyberpunk.py`, `_draw_helpers.py`,
+  `_smoke.png` -- failed-experiment scratch files from the image-via-curve
+  dead-end. `img_to_curve.py` is kept; it still works for edge-only single-
+  stroke ASCII art if a polyline renderer ever materializes.
+
 ## [2.4.1] - 2026-04-14
 
 ### Fixed

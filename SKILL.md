@@ -1,6 +1,6 @@
 ---
 name: cli-charts
-description: cli-ARTS — terminal-visible chart toolkit. 27 chart types directly in the CLI — no files, no GUI. plotext (kline/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), rich (table/tree/panel/gauge/pie/dashboard), hires (24-bit braille Catmull-Rom+glow), radar (polar spider chart), plotille (composable braille Figure), drawille braille curve, uniplot scientific line, ASCII network graph, sparkline, pyfiglet banner. LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
+description: cli-ARTS -- terminal-visible chart toolkit. 29 chart types directly in the CLI -- no files, no GUI. plotext (kline/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), rich (table/tree/panel/gauge/pie/dashboard), hires (24-bit braille Catmull-Rom+glow), radar (polar spider chart), plotille (composable braille Figure), drawille braille curve, uniplot scientific line, ASCII network graph, sparkline, pyfiglet banner, image/video (via chafa+ffmpeg, 2x4 braille sub-pixel with 24-bit truecolor). LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
 version: 3.0.0
 ---
 
@@ -139,6 +139,24 @@ What is your data shape?
 | Type | JSON keys |
 |------|-----------|
 | `uniplot` | `[{"label":"A","x":[...],"y":[...]}]` -- scientific axis formatting |
+
+### Engine: media (chafa + ffmpeg) -- 2 types
+Charts use a native Python engine. Media (image/video) shells out to
+`chafa` (pre-installed via `scoop install chafa` on Windows, distro
+package elsewhere) for 24-bit truecolor braille rendering. Video also
+needs `ffmpeg`. These types take a filesystem path via `--file`, not
+JSON data.
+
+| Type | Input | Notes |
+|------|-------|-------|
+| `image` | `--file path/to.png` | any format chafa accepts (PNG/JPEG/GIF/BMP/WebP/SVG). Size via `--width`/`--height`. `--symbols SET` picks chafa symbol set (default `braille`; also `block`, `ascii`, `half`, `all`). `--no-color` forces monochrome |
+| `video` | `--file path/to.mp4` | ffmpeg extracts frames to tempdir then chafa renders each. `--fps N` (default 12) paces playback. `--duration SEC` clips (else plays to EOF). Ctrl-C exits cleanly, cursor restored |
+
+Rationale for chart/media split: the native `curve` renderer connects
+every consecutive point-pair via Bresenham, which fills silhouettes into
+blobs when fed pixel data. chafa is purpose-built and superset of
+timg/viu on Windows. HANDOFF 2026-04-14 records the full architectural
+decision.
 
 ### Misc (3 types)
 | Type | JSON keys |

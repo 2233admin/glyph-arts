@@ -7,4 +7,4 @@ except Exception:
         from pathlib import Path
         __version__ = (Path(__file__).parent.parent / "VERSION").read_text().strip()
     except Exception:
-        __version__ = "2.4.1"
+        __version__ = "3.0.0"

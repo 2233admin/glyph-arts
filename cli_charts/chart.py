@@ -2,13 +2,14 @@
 """cli-charts: terminal-visible chart toolkit for Claude Code.
 
 Usage: python chart.py <type> [options]
-Types (27):
+Types (29):
   plotext  : kline line scatter step bar multibar stackedbar hist heatmap box indicator event confusion
   rich     : table tree panel gauge pie dashboard rich_live
   braille  : curve hires radar
   plotille : plotille
   uniplot  : uniplot
   misc     : graph sparkline banner
+  media    : image video   (via chafa / ffmpeg -- requires --file PATH)
 
 Animation (--animate):
   Stream values from stdin line-by-line; chart re-renders after each point.
@@ -22,6 +23,7 @@ import argparse
 import shutil
 import random
 import datetime
+import subprocess
 
 try:
     from importlib.metadata import version as _pkg_version
@@ -54,6 +56,92 @@ def _canvas_line(canvas, x0, y0, x1, y1):
         if e2 < dx:
             err += dx
             y0 += sy
+
+
+# -- media renderers (chafa + ffmpeg) ----------------------------------------
+
+_MEDIA_TYPES = {'image', 'video'}
+
+
+def _render_image(path, w, h, symbols='braille', no_color=False):
+    """Render an image file to the terminal by shelling out to chafa.
+
+    Why chafa instead of reinventing: chafa 1.18 ships 2x4 braille sub-pixels
+    with 24-bit truecolor, outperforming any pure-Python renderer. See HANDOFF
+    2026-04-14 for the architectural split (charts = native, media = chafa).
+    """
+    import subprocess
+    if not shutil.which('chafa'):
+        print('ERROR:dep: chafa not found -- install from https://hpjansson.org/chafa/',
+              file=sys.stderr)
+        sys.exit(2)
+    cmd = ['chafa', '--size', f'{w}x{h}', '--symbols', symbols]
+    if no_color:
+        cmd += ['--colors', 'none']
+    cmd.append(path)
+    subprocess.run(cmd, check=True)
+
+
+def _render_video(path, w, h, fps=12, symbols='braille', duration=0.0, no_color=False):
+    """Play a video in the terminal: ffmpeg extracts frames, chafa renders each.
+
+    Frames are extracted to a tempdir upfront (bounded by --duration if set),
+    then streamed at the target fps. Cursor hidden during playback; restored
+    on exit or Ctrl-C. Not suitable for hours-long input -- prefer clipping
+    first with ffmpeg -ss/-t.
+    """
+    import subprocess
+    import tempfile
+    import time
+    import glob
+
+    if not shutil.which('chafa'):
+        print('ERROR:dep: chafa not found', file=sys.stderr)
+        sys.exit(2)
+    if not shutil.which('ffmpeg'):
+        print('ERROR:dep: ffmpeg not found -- required for video input',
+              file=sys.stderr)
+        sys.exit(2)
+
+    with tempfile.TemporaryDirectory(prefix='clichart_frames_') as tmp:
+        ff = ['ffmpeg', '-loglevel', 'error', '-y', '-i', path,
+              '-vf', f'fps={fps}']
+        if duration and duration > 0:
+            ff += ['-t', str(duration)]
+        ff.append(os.path.join(tmp, 'f_%05d.png'))
+        subprocess.run(ff, check=True)
+
+        frames = sorted(glob.glob(os.path.join(tmp, 'f_*.png')))
+        if not frames:
+            print('ERROR:render: ffmpeg produced no frames', file=sys.stderr)
+            sys.exit(4)
+
+        delay = 1.0 / fps if fps > 0 else 1.0 / 12
+        is_tty = sys.stdout.isatty()
+        chafa_cmd = ['chafa', '--size', f'{w}x{h}', '--symbols', symbols,
+                     '--format', 'symbols']
+        if no_color:
+            chafa_cmd += ['--colors', 'none']
+
+        if is_tty:
+            sys.stdout.write('\x1b[?25l')  # hide cursor
+            sys.stdout.flush()
+        try:
+            for frame in frames:
+                t0 = time.time()
+                if is_tty:
+                    sys.stdout.write('\x1b[H')  # cursor home (less flicker than \x1b[2J)
+                    sys.stdout.flush()
+                subprocess.run(chafa_cmd + [frame], check=True)
+                elapsed = time.time() - t0
+                if elapsed < delay:
+                    time.sleep(delay - elapsed)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            if is_tty:
+                sys.stdout.write('\x1b[?25h')  # show cursor
+                sys.stdout.flush()
 
 
 def _plt_finalize(plt, title, w, h, theme, kw):
@@ -1067,8 +1155,9 @@ Examples:
   python chart.py line --duckdb "SELECT trade_date, close FROM stock_daily LIMIT 60" --db /path/to/data.duckdb
   cat data.json | python chart.py line
 """)
-    p.add_argument('type', choices=list(CMDS), metavar='TYPE',
-                   help='Chart type: ' + ' | '.join(CMDS))
+    p.add_argument('type', choices=list(CMDS) + sorted(_MEDIA_TYPES), metavar='TYPE',
+                   help='Chart type: ' + ' | '.join(CMDS) +
+                        ' | image | video (media via chafa/ffmpeg)')
     p.add_argument('--json',        dest='data', help='JSON data string')
     p.add_argument('--file',        metavar='PATH',
                    help='Read JSON from a file path')
@@ -1098,6 +1187,11 @@ Examples:
                    help='Save chart to file instead of displaying (plotext only)')
     p.add_argument('--no-color',    action='store_true',
                    help='Disable ANSI colors (respects NO_COLOR env var)')
+    p.add_argument('--symbols',     default='braille', metavar='SET',
+                   help='chafa --symbols value for image/video (default: braille; '
+                        'e.g. block, ascii, all, half)')
+    p.add_argument('--fps',         type=int, default=12, metavar='N',
+                   help='Video playback frames/sec for type=video (default: 12)')
     p.add_argument('--version',     action='version', version=f'cli-charts {_VERSION}')
     p.add_argument('--check-deps',  action='store_true',
                    help='Print dependency availability table and exit')
@@ -1129,6 +1223,11 @@ Examples:
             except ImportError:
                 status = 'MISSING'
             print(f'  {pkg:<13} {status}')
+        print('[media]')
+        for tool, purpose in (('chafa', 'image/video render'),
+                              ('ffmpeg', 'video frame extract')):
+            status = 'OK' if shutil.which(tool) else 'MISSING'
+            print(f'  {tool:<13} {status}  ({purpose})')
         if '--all' in sys.argv:
             print('[optional]')
             for pkg, purpose, install in _OPT:
@@ -1143,6 +1242,28 @@ Examples:
         sys.exit(0)
 
     args = p.parse_args()
+
+    # Media types (image/video) bypass JSON loading -- they take a filesystem path.
+    if args.type in _MEDIA_TYPES:
+        path = args.file or args.data
+        if not path:
+            print(f'ERROR:schema: {args.type} needs a path via --file PATH or --json PATH',
+                  file=sys.stderr)
+            sys.exit(1)
+        if not os.path.exists(path):
+            print(f'ERROR:schema: file not found: {path}', file=sys.stderr)
+            sys.exit(1)
+        no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
+        try:
+            if args.type == 'image':
+                _render_image(path, args.width, args.height, args.symbols, no_color)
+            else:
+                _render_video(path, args.width, args.height, args.fps,
+                              args.symbols, args.duration, no_color)
+        except subprocess.CalledProcessError as exc:
+            print(f'ERROR:render: chafa/ffmpeg exit {exc.returncode}', file=sys.stderr)
+            sys.exit(4)
+        return
 
     if args.animate:
         no_color = args.no_color or bool(os.environ.get('NO_COLOR'))

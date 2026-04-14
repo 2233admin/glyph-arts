@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cli-charts"
 dynamic = ["version"]
-description = "Terminal-visible chart toolkit — 24 chart types + live animation rendered directly in the CLI, no browser, no files."
+description = "Terminal-visible chart toolkit -- 29 chart types (incl. image/video via chafa+ffmpeg) + live animation rendered directly in the CLI, no browser, no files."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
