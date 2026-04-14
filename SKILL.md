@@ -1,7 +1,7 @@
 ---
 name: cli-charts
-description: Terminal-visible chart toolkit for Claude Code. Renders 24 chart types directly in the CLI — no files, no GUI. plotext (kline/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), rich (table/tree/panel/gauge/pie/dashboard), drawille braille curve, uniplot scientific line, ASCII network graph, sparkline, pyfiglet banner. LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
-version: 2.4.1
+description: cli-ARTS — terminal-visible chart toolkit. 27 chart types directly in the CLI — no files, no GUI. plotext (kline/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), rich (table/tree/panel/gauge/pie/dashboard), hires (24-bit braille Catmull-Rom+glow), radar (polar spider chart), plotille (composable braille Figure), drawille braille curve, uniplot scientific line, ASCII network graph, sparkline, pyfiglet banner. LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
+version: 3.0.0
 ---
 
 # CLI Charts Skill
@@ -10,7 +10,7 @@ version: 2.4.1
 
 When AI lives in the terminal, visualization must live there too.
 No browser. No generated files. No context switch.
-cli-charts gives the AI a native sense of sight inside the terminal.
+cli-ARTS gives the AI a native sense of sight inside the terminal.
 
 ## Invocation
 
@@ -118,6 +118,21 @@ What is your data shape?
 | Type | JSON keys |
 |------|-----------|
 | `curve` | `{"points":[[x,y],...]}` -- Braille Unicode, highest resolution |
+
+### Engine: hires (1 type) — 24-bit Braille
+| Type | JSON keys | Notes |
+|------|-----------|-------|
+| `hires` | `[{"label":"A","y":[...],"x":[...],"color":[r,g,b],"glow":true}]` | Catmull-Rom smooth curves, per-dot 24-bit RGB, glow halos |
+
+### Engine: radar (1 type) — Polar Braille
+| Type | JSON keys | Notes |
+|------|-----------|-------|
+| `radar` | `{"labels":[...],"series":[{"label":"A","values":[...],"color":[r,g,b]}],"max":100}` | Spider/radar chart, min 3 axes |
+
+### Engine: plotille (1 type)
+| Type | JSON keys | Notes |
+|------|-----------|-------|
+| `plotille` | `[{"label":"A","x":[...],"y":[...],"color":"bright_cyan"}]` | Composable braille Figure with axis labels |
 
 ### Engine: uniplot (1 type)
 | Type | JSON keys |

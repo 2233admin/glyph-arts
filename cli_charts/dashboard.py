@@ -141,6 +141,7 @@ PANEL_RENDERERS = {
     "sparkline": render_sparkline,
     "table": render_table,
     "metric": render_metric,
+    "indicator": render_metric,  # alias: same schema {value, label, unit, delta}
     "bar": render_bar,
 }
 

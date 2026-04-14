@@ -2,12 +2,13 @@
 """cli-charts: terminal-visible chart toolkit for Claude Code.
 
 Usage: python chart.py <type> [options]
-Types (24):
-  plotext : kline line scatter step bar multibar stackedbar hist heatmap box indicator event confusion
-  rich    : table tree panel gauge pie dashboard
-  drawille: curve
-  uniplot : uniplot
-  misc    : graph sparkline banner
+Types (27):
+  plotext  : kline line scatter step bar multibar stackedbar hist heatmap box indicator event confusion
+  rich     : table tree panel gauge pie dashboard
+  braille  : curve hires radar
+  plotille : plotille
+  uniplot  : uniplot
+  misc     : graph sparkline banner
 
 Animation (--animate):
   Stream values from stdin line-by-line; chart re-renders after each point.
@@ -79,12 +80,129 @@ def _plt_finalize(plt, title, w, h, theme, kw):
         plt.show()
 
 
+# ── 24-bit Braille engine (hires / radar) ────────────────────────────────────
+
+_BRAILLE_DOTS = [[0x01, 0x08], [0x02, 0x10], [0x04, 0x20], [0x40, 0x80]]
+
+_HIRES_PALETTE = [
+    (0, 245, 212),
+    (255, 107, 107),
+    (255, 209, 102),
+    (120, 180, 255),
+    (200, 120, 255),
+    (80, 240, 140),
+]
+
+
+class _HiresCanvas:
+    """Per-dot 24-bit ANSI braille canvas.  2 px wide x 4 px tall per cell."""
+
+    def __init__(self, w: int, h: int):
+        self.cw, self.ch = w, h
+        self.buf = [[0] * w for _ in range(h)]
+        self.col: list = [[None] * w for _ in range(h)]
+
+    def dot(self, px: int, py: int, c):
+        cx, cy = px // 2, py // 4
+        if 0 <= cx < self.cw and 0 <= cy < self.ch:
+            self.buf[cy][cx] |= _BRAILLE_DOTS[py % 4][px % 2]
+            if self.col[cy][cx] is None:
+                self.col[cy][cx] = c
+
+    def line(self, x0: int, y0: int, x1: int, y1: int, c):
+        dx, dy = abs(x1 - x0), abs(y1 - y0)
+        sx = 1 if x0 < x1 else -1
+        sy = 1 if y0 < y1 else -1
+        err = dx - dy
+        while True:
+            self.dot(x0, y0, c)
+            if x0 == x1 and y0 == y1:
+                break
+            e2 = 2 * err
+            if e2 > -dy:
+                err -= dy
+                x0 += sx
+            if e2 < dx:
+                err += dx
+                y0 += sy
+
+    def render(self, no_color: bool = False) -> list:
+        out = []
+        for cy in range(self.ch):
+            row = ""
+            for cx in range(self.cw):
+                b = self.buf[cy][cx]
+                c = self.col[cy][cx]
+                ch = chr(0x2800 + b)
+                if b and c and not no_color:
+                    row += f"\033[38;2;{c[0]};{c[1]};{c[2]}m{ch}\033[0m"
+                else:
+                    row += "\u2800" if not b else ch
+            out.append(row)
+        return out
+
+
+def _catmull_pixels(ys, xs, cx0, cy0, pw, ph, y_min, y_max, tension=0.35):
+    """Catmull-Rom spline -> cubic Bezier -> pixel coordinate list."""
+    n = len(ys)
+    if n == 0:
+        return []
+    span = max(y_max - y_min, 1e-9)
+    x_span = max(xs[-1] - xs[0], 1e-9) if len(xs) > 1 else 1.0
+
+    def xp(xv):
+        return cx0 + int((xv - xs[0]) / x_span * pw)
+
+    def yp(v):
+        return cy0 + ph - int((v - y_min) / span * ph)
+
+    pts = [(xp(xs[i]), yp(ys[i])) for i in range(n)]
+    result = []
+    for i in range(len(pts) - 1):
+        p0 = pts[max(0, i - 1)]
+        p1 = pts[i]
+        p2 = pts[i + 1]
+        p3 = pts[min(len(pts) - 1, i + 2)]
+        cp1x = p1[0] + (p2[0] - p0[0]) * tension
+        cp1y = p1[1] + (p2[1] - p0[1]) * tension
+        cp2x = p2[0] - (p3[0] - p1[0]) * tension
+        cp2y = p2[1] - (p3[1] - p1[1]) * tension
+        steps = max(abs(p2[0] - p1[0]), abs(p2[1] - p1[1]), 1) * 2
+        for s in range(steps + 1):
+            t = s / steps
+            t2 = t * t
+            t3 = t2 * t
+            mt = 1 - t
+            mt2 = mt * mt
+            mt3 = mt2 * mt
+            x = int(mt3 * p1[0] + 3 * mt2 * t * cp1x + 3 * mt * t2 * cp2x + t3 * p2[0])
+            y = int(mt3 * p1[1] + 3 * mt2 * t * cp1y + 3 * mt * t2 * cp2y + t3 * p2[1])
+            result.append((x, y))
+    return result
+
+
 # -- renderers ---------------------------------------------------------------
 
+def _normalize_kline_dates(dates):
+    """Convert common date formats to DD/MM/YYYY required by plotext."""
+    from datetime import datetime
+    result = []
+    for s in dates:
+        for fmt in ('%d/%m/%Y', '%Y-%m-%d', '%Y/%m/%d', '%m/%d/%Y'):
+            try:
+                result.append(datetime.strptime(s, fmt).strftime('%d/%m/%Y'))
+                break
+            except ValueError:
+                continue
+        else:
+            result.append(s)
+    return result
+
+
 def kline(d, title, w, h, theme, **kw):
-    """plotext candlestick K-line. dates MUST be DD/MM/YYYY."""
+    """plotext candlestick K-line. Accepts DD/MM/YYYY or YYYY-MM-DD dates."""
     import plotext as plt
-    plt.candlestick(d['dates'], {
+    plt.candlestick(_normalize_kline_dates(d['dates']), {
         'Open': d['open'], 'High': d['high'],
         'Low': d['low'],   'Close': d['close'],
     })
@@ -263,7 +381,7 @@ def table(d, title, w, h, theme, **kw):
     t = Table(title=title, box=box_style,
               caption=d.get('caption'),
               row_styles=d.get('row_styles'))
-    for col in d['columns']:
+    for col in d.get('columns') or d.get('headers', []):
         if isinstance(col, dict):
             t.add_column(col['name'], style=col.get('style', 'white'),
                          footer=str(col.get('footer', '')))
@@ -458,6 +576,186 @@ def uniplot(d, title, w, h, theme, **kw):
         uplot(ys=ys, xs=xs, **plot_kw)
 
 
+def hires(d, title, w, h, theme, **kw):
+    """24-bit colored braille renderer.  Catmull-Rom smooth curves + glow halos.
+    Same multi-series schema as 'line'.  Each series accepts optional "color":[r,g,b]
+    and "glow":false to disable the halo.
+    """
+    no_color = kw.get('no_color', False)
+    series = d if isinstance(d, list) else [d]
+
+    pw = w * 2 - 4
+    ph = h * 4 - 4
+    cx0, cy0 = 2, 0
+
+    all_y = [v for s in series for v in s['y']]
+    if not all_y:
+        return
+    y_range = max(all_y) - min(all_y)
+    y_min = min(all_y) - y_range * 0.05
+    y_max = max(all_y) + y_range * 0.05
+
+    canvas = _HiresCanvas(w, h)
+
+    for idx, s in enumerate(series):
+        rgb = tuple(s['color']) if 'color' in s else _HIRES_PALETTE[idx % len(_HIRES_PALETTE)]
+        dim = tuple(max(0, c // 5) for c in rgb)
+        do_glow = s.get('glow', True) and not no_color
+        ys = s['y']
+        xs = s.get('x', list(range(len(ys))))
+        pts = _catmull_pixels(ys, xs, cx0, cy0, pw, ph, y_min, y_max)
+        if do_glow:
+            for ox in (-1, 0, 1):
+                for oy in (-1, 0, 1):
+                    if ox == 0 and oy == 0:
+                        continue
+                    for px, py in pts:
+                        canvas.dot(px + ox, py + oy, dim)
+        for px, py in pts:
+            canvas.dot(px, py, rgb)
+
+    if title:
+        print(title)
+    for row in canvas.render(no_color):
+        print(row)
+
+
+def radar(d, title, w, h, theme, **kw):
+    """Polar radar/spider chart on a 24-bit braille canvas.
+    {"labels":["ATK","DEF","SPD","MGC","LCK"],
+     "series":[{"label":"Hero","values":[80,60,90,70,50],"color":[0,245,212]}],
+     "max":100}
+    'max' defaults to the largest value across all series.
+    """
+    import math
+    no_color = kw.get('no_color', False)
+    labels = d['labels']
+    series_list = d.get('series', [d])
+    n_axes = len(labels)
+    if n_axes < 3:
+        print('ERROR:schema: radar requires at least 3 labels', file=sys.stderr)
+        sys.exit(1)
+
+    pw = w * 2
+    ph = h * 4
+    canvas = _HiresCanvas(w, h)
+    cx = pw // 2
+    cy = ph // 2
+    r_max = min(cx, cy) - 8
+
+    v_max = d.get('max', max(v for s in series_list for v in s['values']))
+    GRID  = (32, 34, 55)
+    AXIS  = (50, 52, 80)
+
+    # Concentric rings
+    for ring_pct in (0.25, 0.50, 0.75, 1.0):
+        r = int(r_max * ring_pct)
+        for i in range(n_axes):
+            a1 = math.pi / 2 - 2 * math.pi * i / n_axes
+            a2 = math.pi / 2 - 2 * math.pi * (i + 1) / n_axes
+            x1 = cx + int(r * math.cos(a1))
+            y1 = cy - int(r * math.sin(a1))
+            x2 = cx + int(r * math.cos(a2))
+            y2 = cy - int(r * math.sin(a2))
+            canvas.line(x1, y1, x2, y2, GRID)
+
+    # Axis spokes
+    spoke_ends = []
+    for i in range(n_axes):
+        angle = math.pi / 2 - 2 * math.pi * i / n_axes
+        ex = cx + int(r_max * math.cos(angle))
+        ey = cy - int(r_max * math.sin(angle))
+        spoke_ends.append((ex, ey, angle))
+        canvas.line(cx, cy, ex, ey, AXIS)
+
+    # Data polygons
+    for idx, s in enumerate(series_list):
+        vals = s['values']
+        rgb = tuple(s['color']) if 'color' in s else _HIRES_PALETTE[idx % len(_HIRES_PALETTE)]
+        dim = tuple(max(0, c // 5) for c in rgb)
+        pts = []
+        for i, v in enumerate(vals):
+            pct = min(v / v_max, 1.0)
+            angle = math.pi / 2 - 2 * math.pi * i / n_axes
+            px = cx + int(r_max * pct * math.cos(angle))
+            py = cy - int(r_max * pct * math.sin(angle))
+            pts.append((px, py))
+        pts.append(pts[0])
+        # glow
+        if not no_color:
+            for j in range(len(pts) - 1):
+                for ox in (-1, 0, 1):
+                    for oy in (-1, 0, 1):
+                        if ox == 0 and oy == 0:
+                            continue
+                        canvas.line(pts[j][0] + ox, pts[j][1] + oy,
+                                    pts[j + 1][0] + ox, pts[j + 1][1] + oy, dim)
+        for j in range(len(pts) - 1):
+            canvas.line(pts[j][0], pts[j][1], pts[j + 1][0], pts[j + 1][1], rgb)
+
+    if title:
+        print(title)
+    rows = canvas.render(no_color)
+    for row in rows:
+        print(row)
+
+    # Print axis labels below chart
+    label_line = "  ".join(
+        f"\033[38;2;{_HIRES_PALETTE[0][0]};{_HIRES_PALETTE[0][1]};{_HIRES_PALETTE[0][2]}m{lbl}\033[0m"
+        if not no_color else lbl
+        for lbl in labels
+    )
+    print(label_line)
+
+    # Legend
+    if len(series_list) > 1 or series_list[0].get('label'):
+        for idx, s in enumerate(series_list):
+            lbl = s.get('label', f'S{idx}')
+            rgb = tuple(s['color']) if 'color' in s else _HIRES_PALETTE[idx % len(_HIRES_PALETTE)]
+            if no_color:
+                print(f"  [{lbl}]")
+            else:
+                print(f"  \033[38;2;{rgb[0]};{rgb[1]};{rgb[2]}m\u2588\u2588 {lbl}\033[0m")
+
+
+def plotille_chart(d, title, w, h, theme, **kw):
+    """plotille Figure: composable braille chart with proper axis labels.
+    Same multi-series schema as 'line'.  Each series supports "color":"bright_cyan" etc.
+    plotille color names: bright_cyan bright_red bright_yellow bright_green white grey
+    """
+    try:
+        import plotille
+    except ImportError:
+        print('ERROR:dep: pip install plotille', file=sys.stderr)
+        sys.exit(2)
+
+    series = d if isinstance(d, list) else [d]
+    fig = plotille.Figure()
+    fig.width = w
+    fig.height = h
+    if kw.get('xlabel'):
+        fig.x_label = kw['xlabel']
+    if kw.get('ylabel'):
+        fig.y_label = kw['ylabel']
+    if kw.get('xlim'):
+        fig.set_x_limits(*kw['xlim'])
+    if kw.get('ylim'):
+        fig.set_y_limits(*kw['ylim'])
+
+    colors = ['bright_cyan', 'bright_red', 'bright_yellow', 'bright_green',
+              'bright_blue', 'bright_magenta']
+    for idx, s in enumerate(series):
+        ys = s['y']
+        xs = s.get('x', list(range(len(ys))))
+        color = s.get('color', colors[idx % len(colors)])
+        label = s.get('label', f'S{idx}')
+        fig.plot(xs, ys, lc=color, label=label)
+
+    if title:
+        print(title)
+    print(fig.show(legend=True))
+
+
 # -- helpers (data) ----------------------------------------------------------
 
 def _lttb(xs: list, ys: list, n: int) -> tuple:
@@ -598,6 +896,9 @@ CMDS = {
     'uniplot':    uniplot,
     'banner':      banner,
     'candlestick': kline,
+    'hires':       hires,
+    'radar':       radar,
+    'plotille':    plotille_chart,
 }
 
 EXPECTED_SCHEMAS = {
@@ -626,6 +927,9 @@ EXPECTED_SCHEMAS = {
     'uniplot':    '[{"label":"A","x":[...],"y":[...]}] or {"label":"A","y":[...]}',
     'banner':      '{"text":"PROFIT","font":"big","color":"green"}',
     'candlestick': '{"dates":["DD/MM/YYYY",...], "open":[...], "high":[...], "low":[...], "close":[...]}',
+    'hires':       '[{"label":"Q5","y":[3.5,9.2,9.4],"color":[0,245,212]},{"label":"Q1","y":[3.1,5.1,4.5],"color":[255,107,107]}]',
+    'radar':       '{"labels":["ATK","DEF","SPD","MGC","LCK"],"series":[{"label":"Hero","values":[80,60,90,70,50],"color":[0,245,212]}],"max":100}',
+    'plotille':    '[{"label":"A","x":[1,2,3,4],"y":[2,4,3,6],"color":"bright_cyan"}]',
 }
 
 # Types where --width/--height/--theme have no effect
@@ -639,12 +943,13 @@ def main():
         description='CLI Charts -- terminal-visible charts for Claude Code',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Chart types (24):
-  plotext : kline line scatter step bar multibar stackedbar hist heatmap box indicator event confusion
-  rich    : table tree panel gauge pie dashboard
-  drawille: curve
-  uniplot : uniplot
-  misc    : graph sparkline banner
+Chart types (27):
+  plotext  : kline line scatter step bar multibar stackedbar hist heatmap box indicator event confusion
+  rich     : table tree panel gauge pie dashboard
+  braille  : curve hires radar
+  plotille : plotille
+  uniplot  : uniplot
+  misc     : graph sparkline banner
 
 Examples:
   python chart.py kline --json '{"dates":["07/04/2026"],"open":[100],"high":[102],"low":[99],"close":[101]}'
