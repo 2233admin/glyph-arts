@@ -1,7 +1,7 @@
-"""cli-charts: terminal-visible chart toolkit for Claude Code."""
+"""glyph-arts: terminal-visible chart toolkit for Claude Code."""
 try:
     from importlib.metadata import version as _pkg_version
-    __version__ = _pkg_version("cli-charts")
+    __version__ = _pkg_version("glyph-arts")
 except Exception:
     try:
         from pathlib import Path

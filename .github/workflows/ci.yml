@@ -33,9 +33,9 @@ jobs:
           python-version: "3.12"
       - name: Install package (all extras)
         run: pip install -e ".[all]"
-      - name: cli-charts --check-deps
-        run: cli-charts --check-deps
-      - name: cli-charts --check-deps --all
-        run: cli-charts --check-deps --all
+      - name: glyph-arts --check-deps
+        run: glyph-arts --check-deps
+      - name: glyph-arts --check-deps --all
+        run: glyph-arts --check-deps --all
       - name: dashboard --check-deps
         run: python -m cli_charts.dashboard --check-deps

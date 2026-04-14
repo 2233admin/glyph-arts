@@ -1,9 +1,9 @@
-# cli-charts
+# glyph-arts
 
 > When AI lives in the terminal, visualization must live there too.
 
-24 chart types rendered directly in your terminal — no browser, no generated files, no context switch.
-`pip install cli-charts` and your AI agent has a native sense of sight inside the CLI.
+29 chart types rendered directly in your terminal — no browser, no generated files, no context switch.
+`pip install glyph-arts` and your AI agent has a native sense of sight inside the CLI.
 
 ```
 demo.gif  <-- record with: python -m cli_charts.dashboard --demo --no-interactive
@@ -14,31 +14,31 @@ demo.gif  <-- record with: python -m cli_charts.dashboard --demo --no-interactiv
 ## Install
 
 ```bash
-pip install cli-charts
+pip install glyph-arts
 
 # with LTTB downsampling (recommended for time-series):
-pip install "cli-charts[lttb]"
+pip install "glyph-arts[lttb]"
 
 # with Textual TUI dashboard:
-pip install "cli-charts[tui]"
+pip install "glyph-arts[tui]"
 
 # everything:
-pip install "cli-charts[all]"
+pip install "glyph-arts[all]"
 ```
 
 ## Quick start
 
 ```bash
 # bar chart
-cli-charts bar --json '{"labels":["Q1","Q2","Q3"],"values":[10,14,12]}' --title "Revenue"
+glyph-arts bar --json '{"labels":["Q1","Q2","Q3"],"values":[10,14,12]}' --title "Revenue"
 
 # time series
-cli-charts line \
+glyph-arts line \
   --json '[{"label":"DAU","x":[1,2,3,4,5],"y":[100,120,115,130,125]}]' \
   --title "Daily Active Users"
 
 # pie chart
-cli-charts pie \
+glyph-arts pie \
   --json '{"labels":["Equity","Bond","Cash"],"values":[60,30,10]}' \
   --title "Asset Allocation"
 
@@ -46,12 +46,12 @@ cli-charts pie \
 python -m cli_charts bar --json '{"labels":["A","B"],"values":[3,7]}'
 
 # check core dependencies:
-cli-charts --check-deps
+glyph-arts --check-deps
 # include optional extras (braille/lttb/tui):
-cli-charts --check-deps --all
+glyph-arts --check-deps --all
 ```
 
-## Chart types (24)
+## Chart types (29)
 
 | Engine | Types |
 |--------|-------|
@@ -64,7 +64,7 @@ cli-charts --check-deps --all
 ## All flags
 
 ```
-cli-charts <type> [--json JSON | --file PATH | --duckdb SQL --db PATH]
+glyph-arts <type> [--json JSON | --file PATH | --duckdb SQL --db PATH]
                   [--title TEXT] [--width N] [--height N] [--theme THEME]
                   [--sample N] [--xlabel X] [--ylabel Y]
                   [--xlim MIN MAX] [--ylim MIN MAX]
@@ -81,16 +81,16 @@ cli-charts <type> [--json JSON | --file PATH | --duckdb SQL --db PATH]
 
 ```bash
 # stdin pipe (for large data)
-cat metrics.json | cli-charts bar --title "Benchmark"
+cat metrics.json | glyph-arts bar --title "Benchmark"
 
 # file (use with --sample for large datasets)
-cli-charts scatter --file ./data/million_points.json --sample 5000 --title "Correlation"
+glyph-arts scatter --file ./data/million_points.json --sample 5000 --title "Correlation"
 ```
 
 ## DuckDB integration
 
 ```bash
-cli-charts kline \
+glyph-arts kline \
   --duckdb "SELECT trade_date,open,high,low,close FROM stock_daily WHERE ts_code='600519.SH' ORDER BY trade_date DESC LIMIT 60" \
   --db /path/to/data.duckdb \
   --title "Kweichow Moutai K-line"
@@ -119,7 +119,7 @@ python -m cli_charts.dashboard --demo
 python -m cli_charts.dashboard --demo --no-interactive
 
 # custom panels:
-cli-charts dashboard --json '{
+glyph-arts dashboard --json '{
   "panels": [
     {"type":"gauge","data":[{"label":"CPU","value":73,"max":100}],"title":"CPU"},
     {"type":"sparkline","data":{"values":[1,3,5,2,8,4,6]},"title":"Load"},
@@ -143,7 +143,7 @@ See [SKILL.md](SKILL.md) for the full AI usage contract: decision tree, schema r
 
 ```bash
 # Claude Code skill (no pip required — uses scripts/ shims):
-SKILL=~/.claude/skills/cli-charts
+SKILL=~/.claude/skills/glyph-arts
 python $SKILL/scripts/chart.py bar \
   --json '{"labels":["A","B","C"],"values":[3,7,5]}' \
   --title "Example"

@@ -266,7 +266,7 @@ def run_tui(config: dict) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="cli-charts dashboard: Textual TUI or Rich static output",
+        description="glyph-arts dashboard: Textual TUI or Rich static output",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Panel types: gauge | sparkline | table | metric | bar

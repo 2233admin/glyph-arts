@@ -1,21 +1,21 @@
 ---
-name: cli-charts
-description: cli-ARTS -- terminal-visible chart toolkit. 29 chart types directly in the CLI -- no files, no GUI. plotext (kline/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), rich (table/tree/panel/gauge/pie/dashboard), hires (24-bit braille Catmull-Rom+glow), radar (polar spider chart), plotille (composable braille Figure), drawille braille curve, uniplot scientific line, ASCII network graph, sparkline, pyfiglet banner, image/video (via chafa+ffmpeg, 2x4 braille sub-pixel with 24-bit truecolor). LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
+name: glyph-arts
+description: glyph-arts -- terminal-visible chart toolkit. 29 chart types directly in the CLI -- no files, no GUI. plotext (kline/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), rich (table/tree/panel/gauge/pie/dashboard), hires (24-bit braille Catmull-Rom+glow), radar (polar spider chart), plotille (composable braille Figure), drawille braille curve, uniplot scientific line, ASCII network graph, sparkline, pyfiglet banner, image/video (via chafa+ffmpeg, 2x4 braille sub-pixel with 24-bit truecolor). LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
 version: 3.0.0
 ---
 
-# CLI Charts Skill
+# Glyph Arts Skill
 
 ## Vision
 
 When AI lives in the terminal, visualization must live there too.
 No browser. No generated files. No context switch.
-cli-ARTS gives the AI a native sense of sight inside the terminal.
+glyph-arts gives the AI a native sense of sight inside the terminal.
 
 ## Invocation
 
 ```bash
-SKILL=~/.claude/skills/cli-charts
+SKILL=~/.claude/skills/glyph-arts
 python $SKILL/scripts/chart.py <type> [--json '<data>'] [--file path.json] \
   [--duckdb 'SQL'] [--db PATH] \
   [--title 'T'] [--width N] [--height 20] [--theme pro] \

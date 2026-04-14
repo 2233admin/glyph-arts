@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate demo/chartex-demo.gif by rendering cli-charts output with PIL.
+Generate demo/glyph-arts-demo.gif by rendering glyph-arts output with PIL.
 Runs plotext in-process with a fake TTY stdout so ANSI colors are emitted.
 """
 import io, re, os, sys
@@ -10,7 +10,7 @@ from PIL import Image, ImageDraw, ImageFont
 # ── Paths ────────────────────────────────────────────────────────────────────
 ROOT = Path(__file__).parent.parent
 FONT_PATH = r"C:\Windows\Fonts\CascadiaMono.ttf"
-OUT_GIF = ROOT / "demo" / "chartex-demo.gif"
+OUT_GIF = ROOT / "demo" / "glyph-arts-demo.gif"
 
 # ── Catppuccin Mocha palette ──────────────────────────────────────────────────
 BG   = (30,  30,  46)    # #1e1e2e  base

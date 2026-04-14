@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""cli-charts: terminal-visible chart toolkit for Claude Code.
+"""glyph-arts: terminal-visible chart toolkit for Claude Code.
 
 Usage: python chart.py <type> [options]
 Types (29):
@@ -27,7 +27,7 @@ import subprocess
 
 try:
     from importlib.metadata import version as _pkg_version
-    _VERSION = _pkg_version("cli-charts")
+    _VERSION = _pkg_version("glyph-arts")
 except Exception:
     try:
         from pathlib import Path as _Path
@@ -1125,7 +1125,7 @@ _NO_SIZE_THEME = {'table', 'tree', 'panel', 'graph', 'sparkline', 'gauge', 'bann
 
 def main():
     p = argparse.ArgumentParser(
-        description='CLI Charts -- terminal-visible charts for Claude Code',
+        description='glyph-arts -- terminal-visible charts for Claude Code',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Chart types (27):
@@ -1192,7 +1192,7 @@ Examples:
                         'e.g. block, ascii, all, half)')
     p.add_argument('--fps',         type=int, default=12, metavar='N',
                    help='Video playback frames/sec for type=video (default: 12)')
-    p.add_argument('--version',     action='version', version=f'cli-charts {_VERSION}')
+    p.add_argument('--version',     action='version', version=f'glyph-arts {_VERSION}')
     p.add_argument('--check-deps',  action='store_true',
                    help='Print dependency availability table and exit')
     p.add_argument('--all',         action='store_true',
@@ -1211,9 +1211,9 @@ Examples:
         _CORE = ['plotext', 'rich', 'uniplot', 'pyfiglet',
                  'sparklines', 'duckdb', 'pandas', 'networkx', 'phart']
         _OPT = [
-            ('drawille', 'curve chart',   'cli-charts[braille]'),
-            ('lttb',     'LTTB sampling', 'cli-charts[lttb]'),
-            ('textual',  'dashboard TUI', 'cli-charts[tui]'),
+            ('drawille', 'curve chart',   'glyph-arts[braille]'),
+            ('lttb',     'LTTB sampling', 'glyph-arts[lttb]'),
+            ('textual',  'dashboard TUI', 'glyph-arts[tui]'),
         ]
         print('[core]')
         for pkg in _CORE:

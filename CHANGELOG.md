@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to cli-charts are documented here.
+All notable changes to glyph-arts are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
@@ -9,14 +9,14 @@ Versioning: [Semantic Versioning](https://semver.org/).
 ### Added
 - **`image` chart type**: render any image file (PNG/JPEG/GIF/BMP/WebP) to
   the terminal via `chafa`. Supports 24-bit truecolor braille by default.
-  Invocation: `cli-charts image --file path/to.png --width 80 --height 24`.
+  Invocation: `glyph-arts image --file path/to.png --width 80 --height 24`.
   New flag `--symbols SET` exposes chafa's symbol selector (`braille`, `block`,
   `ascii`, `half`, `all`, etc.).
 - **`video` chart type**: play a video file in the terminal by piping through
   `ffmpeg` -> `chafa`. Frames extracted to a tempdir at a configurable fps,
   then streamed with cursor-home + hide-cursor ANSI escapes for minimal
   flicker. New flag `--fps N` (default 12). Reuses `--duration SEC` to clip.
-  Invocation: `cli-charts video --file clip.mp4 --width 100 --height 30 --fps 15`.
+  Invocation: `glyph-arts video --file clip.mp4 --width 100 --height 30 --fps 15`.
 - `chart.py --check-deps` now reports `chafa` and `ffmpeg` availability.
 
 ### Changed

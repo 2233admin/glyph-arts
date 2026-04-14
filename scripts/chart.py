@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Backward-compat shim -- real code lives in cli_charts/chart.py.
 
-Works with or without `pip install cli-charts`:
+Works with or without `pip install glyph-arts`:
   python scripts/chart.py <type> [options]
 """
 import sys
