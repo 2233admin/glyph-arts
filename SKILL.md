@@ -104,7 +104,7 @@ What is your data shape?
 | `event` | `{"data":[x1,x2,...]}` | timeline plot |
 | `confusion` | `{"actual":[], "predicted":[], "labels":[]}` | ML confusion matrix |
 
-### Engine: rich (6 types)
+### Engine: rich (7 types)
 | Type | JSON keys |
 |------|-----------|
 | `table` | `{"columns":[], "rows":[[]]}` |
@@ -113,6 +113,7 @@ What is your data shape?
 | `gauge` | `[{"label":"CPU","value":72,"max":100,"color":"green"}]` |
 | `pie` | `{"labels":["A","B","C"],"values":[30,50,20]}` |
 | `dashboard` | `{"panels":[{"type":"gauge","data":{...},"title":"CPU"},...]}` — delegates to scripts/dashboard.py |
+| `rich_live` | `{"panels":[{"type":"sparkline","data":{...},"title":"Left"},...],"layout":"row","frames":1}` — multi-panel Rich Layout, `layout:"row"` or `"column"`, `frames:1` for pipe-safe snapshot |
 
 ### Engine: drawille (1 type)
 | Type | JSON keys |
