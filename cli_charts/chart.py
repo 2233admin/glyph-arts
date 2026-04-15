@@ -25,6 +25,8 @@ import random
 import datetime
 import subprocess
 
+from .themes import get_palette as _get_palette
+
 try:
     from importlib.metadata import version as _pkg_version
     _VERSION = _pkg_version("glyph-arts")
@@ -149,7 +151,15 @@ def _plt_finalize(plt, title, w, h, theme, kw):
     if title:
         plt.title(title)
     plt.plotsize(w, h)
-    plt.theme(theme)
+    _palette = _get_palette(theme)
+    if _palette:
+        if _palette.get('plt_base'):
+            plt.theme(_palette['plt_base'])
+        plt.canvas_color(_palette['canvas'])
+        plt.axes_color(_palette['axes'])
+        plt.ticks_color(_palette['ticks'])
+    else:
+        plt.theme(theme)
     if kw.get('xlabel'):
         plt.xlabel(kw['xlabel'])
     if kw.get('ylabel'):
@@ -1185,7 +1195,7 @@ Examples:
     p.add_argument('--height',      type=int, default=20,
                    help='Chart height in terminal rows (ignored for table/tree/panel/graph/sparkline)')
     p.add_argument('--theme',       default='pro',
-                   help='plotext theme: pro dark clear matrix (ignored for rich/graph/sparkline)')
+                   help='plotext theme: pro dark clear matrix retro elegant + brand palettes: claude linear tesla vercel (ignored for rich/graph/sparkline)')
     p.add_argument('--xlabel',      default='', help='X-axis label (plotext charts)')
     p.add_argument('--ylabel',      default='', help='Y-axis label (plotext charts)')
     p.add_argument('--xlim',        nargs=2, type=float, metavar=('MIN', 'MAX'),
@@ -1421,7 +1431,15 @@ def _animate_stdin(chart_type, title, w, h, theme, refresh, window, duration, kw
         getattr(plt, _plt_fn)(xs, ys)
         plt.title(label)
         plt.plotsize(w - 2, h)
-        plt.theme(theme)
+        _ap = _get_palette(theme)
+        if _ap:
+            if _ap.get('plt_base'):
+                plt.theme(_ap['plt_base'])
+            plt.canvas_color(_ap['canvas'])
+            plt.axes_color(_ap['axes'])
+            plt.ticks_color(_ap['ticks'])
+        else:
+            plt.theme(theme)
         return plt.build()
 
     try:
