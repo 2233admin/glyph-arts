@@ -4,6 +4,13 @@ All notable changes to glyph-arts are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [3.0.1] - 2026-04-15
+
+### Fixed
+- `confusion` chart: guard against plotext `ZeroDivisionError` on uniform confusion matrices
+  (all cells equal -> `M-m=0` in internal color normalization). Falls back to Rich table render.
+  Regression tests: `tests/test_confusion.py` (5 tests, issue #6).
+
 ## [3.0.0] - 2026-04-14
 
 ### Added

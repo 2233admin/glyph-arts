@@ -712,8 +712,21 @@ def confusion(d, title, w, h, theme, **kw):
     actual/predicted must be lists of class labels (int or str).
     """
     import plotext as plt
-    plt.confusion_matrix(d['actual'], d['predicted'],
-                         labels=d.get('labels'))
+    try:
+        plt.confusion_matrix(d['actual'], d['predicted'], labels=d.get('labels'))
+    except ZeroDivisionError:  # plotext bug: M==m when all matrix cells are equal
+        from collections import Counter
+        from rich.console import Console
+        from rich.table import Table
+        actual, predicted = d['actual'], d['predicted']
+        labs = d.get('labels') or sorted(set(actual) | set(predicted))
+        counts = Counter(zip(actual, predicted))
+        t = Table(title=title or 'Confusion Matrix')
+        t.add_column('actual \\ predicted')
+        for p in labs: t.add_column(str(p))
+        for a in labs: t.add_row(str(a), *[str(counts.get((a, p), 0)) for p in labs])
+        Console().print(t)
+        return
     _plt_finalize(plt, title, w, h, theme, kw)
 
 
