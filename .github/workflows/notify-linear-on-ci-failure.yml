@@ -1,0 +1,105 @@
+name: Notify Linear on CI failure
+
+# Listens for the "CI" workflow to complete on master.
+# If it failed, opens an Urgent issue in the Linear project this repo
+# is tracked under (XartPro / glyph-arts).
+#
+# Setup (one-time):
+#   1. Linear  -> Settings -> API -> Personal API Keys -> Create
+#   2. GitHub  -> Settings -> Secrets and variables -> Actions ->
+#                 New repository secret -> name: LINEAR_API_KEY
+#
+# To replicate this workflow on another repo, only LINEAR_PROJECT_ID
+# below needs to change.
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    if: >-
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.head_branch == 'master'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create Linear issue for the failure
+        env:
+          LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
+          LINEAR_PROJECT_ID: e039f2d5-e552-4e3d-8ccc-74ca90bd8f43
+          LINEAR_TEAM_ID: d87f5bad-c6df-4eb1-8fa8-2f16558ac0c7
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          ACTOR: ${{ github.event.workflow_run.actor.login }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ -z "${LINEAR_API_KEY:-}" ]; then
+            echo "::warning::LINEAR_API_KEY secret is not set. Skipping notification."
+            exit 0
+          fi
+
+          SHORT_SHA="${HEAD_SHA:0:7}"
+          TITLE="CI failed on ${HEAD_BRANCH} @ ${SHORT_SHA}"
+
+          DESC=$(cat <<EOF
+          GitHub Actions \`CI\` workflow failed on default branch.
+
+          - **Repo:** \`${REPO}\`
+          - **Branch:** \`${HEAD_BRANCH}\`
+          - **Commit:** \`${HEAD_SHA}\`
+          - **Pushed by:** @${ACTOR}
+          - **Run:** ${RUN_URL}
+          - **Run id:** \`${RUN_ID}\`
+
+          ## Triage checklist
+          - [ ] Reproduce locally: \`git checkout ${SHORT_SHA} && pytest tests/\`
+          - [ ] Identify which job(s) failed in the run above
+          - [ ] Decide: hotfix on master, revert, or open follow-up issue
+          - [ ] Close this issue once master is green again
+
+          _Auto-created by \`.github/workflows/notify-linear-on-ci-failure.yml\`._
+          EOF
+          )
+
+          PAYLOAD=$(jq -n \
+            --arg title "$TITLE" \
+            --arg description "$DESC" \
+            --arg projectId "$LINEAR_PROJECT_ID" \
+            --arg teamId "$LINEAR_TEAM_ID" \
+            '{
+              query: "mutation IssueCreate($input: IssueCreateInput!) { issueCreate(input: $input) { success issue { identifier url } } }",
+              variables: {
+                input: {
+                  title: $title,
+                  description: $description,
+                  projectId: $projectId,
+                  teamId: $teamId,
+                  priority: 1
+                }
+              }
+            }')
+
+          RESPONSE=$(curl -sS -X POST https://api.linear.app/graphql \
+            -H "Authorization: $LINEAR_API_KEY" \
+            -H "Content-Type: application/json" \
+            --data-raw "$PAYLOAD")
+
+          echo "$RESPONSE"
+
+          OK=$(echo "$RESPONSE" | jq -r '.data.issueCreate.success // false')
+          if [ "$OK" != "true" ]; then
+            echo "::error::Linear issue creation failed."
+            echo "$RESPONSE" | jq .
+            exit 1
+          fi
+
+          IDENT=$(echo "$RESPONSE" | jq -r '.data.issueCreate.issue.identifier')
+          URL=$(echo "$RESPONSE" | jq -r '.data.issueCreate.issue.url')
+          echo "::notice::Filed Linear issue ${IDENT}: ${URL}"
