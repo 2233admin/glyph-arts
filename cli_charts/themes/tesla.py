@@ -1,10 +1,11 @@
 # This palette is inspired by Tesla, Inc.'s publicly published brand guidelines. glyph-arts is not affiliated with or endorsed by Tesla, Inc.
 """Tesla brand palette.
 
-Tesla's minimal high-tech aesthetic: deep navy (#171A20) background with
-the signature red (#E82127) as primary data colour.  Supporting series use
-cool metallics and electric accents.
+Tesla's minimal high-tech aesthetic: deep navy (#171A20) background with a
+viridis data gradient for perceptual contrast in pixel output.
 """
+
+GRADIENT = ['#440154', '#3b528b', '#21908c', '#5dc863', '#fde725']
 
 PALETTE: dict = {
     # canvas / background
@@ -16,17 +17,15 @@ PALETTE: dict = {
     # tick labels + title
     "ticks":    (210, 215, 222),  # cool silver-white
 
-    # 8 data series colours
+    # 5 data series colours
     "series": [
-        (232,  33,  39),  # Tesla red    (primary brand)
-        (200, 210, 220),  # platinum silver
-        ( 65, 145, 215),  # electric blue
-        ( 50, 195, 130),  # green (Model 3 trim)
-        (245, 195,  55),  # amber (indicator yellow)
-        (150, 160, 175),  # steel grey
-        (220, 100,  50),  # copper orange
-        (100, 180, 240),  # ice blue
+        (68,   1,  84),
+        (59,  82, 139),
+        (33, 144, 140),
+        (93, 200,  99),
+        (253, 231, 37),
     ],
+    "gradient": GRADIENT,
 
     "plt_base": "dark",
 }

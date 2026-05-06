@@ -38,6 +38,21 @@ Install them once before using those types:
 
 All other chart types are pure-Python and work after `pip install glyph-arts` alone.
 
+## Art tiers (--engine pixel)
+
+The pixel engine renders charts via matplotlib + chafa. The chafa
+output character set controls visual fidelity:
+
+| Tier | Flag | Symbol set | Resolution | Font requirement |
+|---|---|---|---|---|
+| Low | `--art low` | block | 1x1 px/char | Universal (any terminal) |
+| Default | `--art default` | vhalf | 1x2 px/char | Universal (Block element) |
+| High | `--art high` | sextant | 2x3 px/char | Needs Symbols-for-Legacy-Computing font (Cascadia Code OK) |
+
+Default is `--art default` -- btop-like aesthetic, broad terminal compat.
+
+![art tiers](docs/art-tiers.png)
+
 ## Quick start
 
 ```bash

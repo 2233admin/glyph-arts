@@ -43,6 +43,64 @@ def test_render_pixel_signature():
     assert params[:4] == ['chart_type', 'data', 'w', 'h']
 
 
+def test_art_tier_low_uses_block_symbols():
+    from cli_charts.render.matplotlib_engine import _build_chafa_cmd
+
+    cmd = _build_chafa_cmd(40, 10, 'symbols', False, art='low')
+
+    assert cmd[cmd.index('--symbols') + 1] == 'block'
+
+
+def test_art_tier_default_uses_vhalf_symbols():
+    from cli_charts.render.matplotlib_engine import _build_chafa_cmd
+
+    cmd = _build_chafa_cmd(40, 10, 'symbols', False)
+
+    assert cmd[cmd.index('--symbols') + 1] == 'vhalf'
+
+
+def test_art_tier_high_uses_sextant_symbols():
+    from cli_charts.render.matplotlib_engine import _build_chafa_cmd
+
+    cmd = _build_chafa_cmd(40, 10, 'symbols', False, art='high')
+
+    assert cmd[cmd.index('--symbols') + 1] == 'sextant'
+
+
+def test_art_tier_includes_truecolor_flag():
+    from cli_charts.render.matplotlib_engine import _build_chafa_cmd
+
+    for art in ('low', 'default', 'high'):
+        cmd = _build_chafa_cmd(40, 10, 'symbols', False, art=art)
+        assert cmd[cmd.index('-c') + 1] == 'full'
+
+
+def test_art_flag_argparse_choices():
+    result = _run(['bar', '--engine', 'pixel', '--art', 'low', '--help'])
+
+    assert result.returncode == 0
+    assert b'--art' in result.stdout
+
+
+def test_art_flag_default_is_default():
+    from cli_charts.render.matplotlib_engine import render_pixel
+
+    sig = inspect.signature(render_pixel)
+
+    assert sig.parameters['art'].default == 'default'
+
+
+def test_pixel_render_with_art_flag():
+    result = _run([
+        'bar', '--engine', 'pixel', '--art', 'low',
+        '--json', '{"labels":["A","B"],"values":[1,2]}',
+        '--width', '40', '--height', '10',
+    ])
+
+    assert result.returncode == 0, f'stderr={_stderr_text(result)}'
+    assert len(result.stdout) > 100
+
+
 def test_bar_pixel_exit0():
     result = _run([
         'bar', '--engine', 'pixel',

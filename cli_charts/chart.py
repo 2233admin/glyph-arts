@@ -1301,6 +1301,8 @@ Examples:
                         'Phase A pixel support: bar/line/scatter only. '
                         'interactive = Textual keyboard-first TUI for line charts '
                         '(requires `pip install glyph-arts[interactive]`).')
+    p.add_argument('--art', choices=['low', 'default', 'high'], default='default',
+                   help='Visual fidelity tier (only with --engine pixel). low=block(compat). default=vhalf(btop-style). high=sextant(max resolution).')
     p.add_argument('--xlabel',      default='', help='X-axis label (plotext charts)')
     p.add_argument('--ylabel',      default='', help='Y-axis label (plotext charts)')
     p.add_argument('--xlim',        nargs=2, type=float, metavar=('MIN', 'MAX'),
@@ -1472,7 +1474,7 @@ Examples:
                     rc = render_pixel(
                         args.type, data, args.width, args.height,
                         title=args.title, theme=args.theme,
-                        output=args.output, no_color=no_color,
+                        output=args.output, no_color=no_color, art=args.art,
                     )
                     sys.exit(rc)
             if args.engine == 'interactive':

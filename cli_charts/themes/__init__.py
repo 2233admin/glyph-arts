@@ -27,3 +27,17 @@ CUSTOM_THEMES: dict[str, dict] = {
 def get_palette(name: str) -> dict | None:
     """Return the palette dict for *name*, or None if it's a built-in plotext theme."""
     return CUSTOM_THEMES.get(name)
+
+
+def get_gradient(name: str) -> list[str] | None:
+    """Return a theme's gradient as hex strings, if one is defined."""
+    palette = get_palette(name)
+    if not palette:
+        return None
+    gradient = palette.get("gradient")
+    if gradient:
+        return list(gradient)
+    series = palette.get("series")
+    if not series:
+        return None
+    return ["#{:02x}{:02x}{:02x}".format(*rgb) for rgb in series]

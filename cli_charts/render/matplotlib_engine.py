@@ -10,6 +10,7 @@ import sys
 from collections.abc import Sequence
 
 PIXEL_SUPPORTED = frozenset({'bar', 'line', 'scatter'})
+ART_SYMBOLS = {'low': 'block', 'default': 'vhalf', 'high': 'sextant'}
 
 
 def _is_numeric_sequence(value):
@@ -58,6 +59,14 @@ def _validate_data(chart_type, data):
     return out
 
 
+def _theme_gradient(theme):
+    try:
+        from cli_charts.themes import get_gradient
+    except ImportError:
+        return []
+    return get_gradient(theme) or []
+
+
 def _apply_theme(matplotlib, theme, no_color):
     if no_color:
         matplotlib.rcParams.update({
@@ -88,9 +97,35 @@ def _apply_theme(matplotlib, theme, no_color):
             'lines.color': '#89dceb',
             'patch.facecolor': '#89dceb',
         })
+        return
+
+    try:
+        from cli_charts.themes import get_palette
+    except ImportError:
+        return
+
+    palette = get_palette(theme)
+    if not palette:
+        return
+
+    def rgb_hex(name):
+        rgb = palette[name]
+        return '#{:02x}{:02x}{:02x}'.format(*rgb)
+
+    matplotlib.rcParams.update({
+        'axes.facecolor': rgb_hex('axes'),
+        'figure.facecolor': rgb_hex('canvas'),
+        'savefig.facecolor': rgb_hex('canvas'),
+        'axes.edgecolor': rgb_hex('ticks'),
+        'axes.labelcolor': rgb_hex('ticks'),
+        'text.color': rgb_hex('ticks'),
+        'xtick.color': rgb_hex('ticks'),
+        'ytick.color': rgb_hex('ticks'),
+        'grid.color': rgb_hex('ticks'),
+    })
 
 
-def _build_figure(plt, chart_type, data, w, h, title):
+def _build_figure(plt, chart_type, data, w, h, title, theme='pro'):
     fig_w = max(4.0, float(w) / 10.0)
     fig_h = max(3.0, float(h) / 5.0)
     fig, ax = plt.subplots(figsize=(fig_w, fig_h), dpi=100)
@@ -98,17 +133,23 @@ def _build_figure(plt, chart_type, data, w, h, title):
     if title:
         fig.suptitle(title)
 
+    gradient = _theme_gradient(theme)
+
     if chart_type == 'bar':
         labels, values = _validate_data(chart_type, data)
         positions = range(len(labels))
-        ax.bar(positions, values)
+        colors = gradient[:len(values)] if gradient else None
+        if gradient and len(values) > len(gradient):
+            colors = [gradient[i % len(gradient)] for i in range(len(values))]
+        ax.bar(positions, values, color=colors)
         ax.set_xticks(list(positions))
         ax.set_xticklabels(labels)
     elif chart_type in ('line', 'scatter'):
         series = _validate_data(chart_type, data)
         plotter = ax.plot if chart_type == 'line' else ax.scatter
-        for label, x_values, y_values in series:
-            plotter(x_values, y_values, label=label)
+        for i, (label, x_values, y_values) in enumerate(series):
+            color = gradient[i % len(gradient)] if gradient else None
+            plotter(x_values, y_values, label=label, color=color)
         if any(s[0] for s in series):
             ax.legend()
     else:
@@ -154,16 +195,21 @@ def _detect_chafa_format() -> str:
     return 'symbols'
 
 
-def _pipe_to_chafa(png_bytes, w, h, no_color):
-    """Pipe PNG to chafa, write its stdout, return 0 on success / 4 on failure."""
-    fmt = _detect_chafa_format()
+def _build_chafa_cmd(w, h, fmt, no_color, art='default'):
     cmd = ['chafa', '--size', f'{w}x{h}', '--format', fmt]
     if fmt == 'symbols':
-        # block chars give the closest-to-pixel look on text-mode terminals
-        cmd += ['--symbols', 'block']
+        symbols = ART_SYMBOLS.get(art, 'vhalf')
+        cmd += ['--symbols', symbols, '-c', 'full']
     if no_color:
         cmd += ['--colors', 'none']
     cmd += ['-']
+    return cmd
+
+
+def _pipe_to_chafa(png_bytes, w, h, no_color, art='default'):
+    """Pipe PNG to chafa, write its stdout, return 0 on success / 4 on failure."""
+    fmt = _detect_chafa_format()
+    cmd = _build_chafa_cmd(w, h, fmt, no_color, art)
     try:
         result = subprocess.run(cmd, input=png_bytes, capture_output=True, timeout=10)
     except (OSError, subprocess.TimeoutExpired) as e:
@@ -184,7 +230,19 @@ def _pipe_to_chafa(png_bytes, w, h, no_color):
     return 0
 
 
-def render_pixel(chart_type, data, w, h, *, title='', theme='pro', output=None, no_color=False, **_unused):
+def render_pixel(
+    chart_type,
+    data,
+    w,
+    h,
+    *,
+    title='',
+    theme='pro',
+    output=None,
+    no_color=False,
+    art='default',
+    **_unused,
+):
     if chart_type not in PIXEL_SUPPORTED:
         print(f'ERROR:render: --engine pixel does not support {chart_type!r} '
               f'(Phase A: bar/line/scatter)', file=sys.stderr)
@@ -214,7 +272,7 @@ def render_pixel(chart_type, data, w, h, *, title='', theme='pro', output=None, 
     fig = None
     try:
         _apply_theme(matplotlib, theme, no_color)
-        fig = _build_figure(plt, chart_type, data, w, h, title)
+        fig = _build_figure(plt, chart_type, data, w, h, title, theme)
         # Note: argparse passes default='' (empty string), not None. Use
         # truthy check so unspecified --output falls through to chafa path.
         if output:
@@ -222,7 +280,7 @@ def render_pixel(chart_type, data, w, h, *, title='', theme='pro', output=None, 
             return 0
 
         png_bytes = _figure_to_png(fig)
-        return _pipe_to_chafa(png_bytes, w, h, no_color)
+        return _pipe_to_chafa(png_bytes, w, h, no_color, art)
     except (TypeError, ValueError) as e:
         print(f'ERROR:schema: pixel engine input invalid: {e}', file=sys.stderr)
         return 1
