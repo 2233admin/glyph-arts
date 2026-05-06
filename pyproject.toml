@@ -41,6 +41,7 @@ lttb    = ["lttb>=0.3"]
 pixel   = ["matplotlib>=3.7"]
 test    = ["pytest>=7", "numpy>=1.24"]
 tui     = ["textual>=0.50"]
+interactive = ["textual>=0.50"]
 all     = ["drawille>=0.2", "lttb>=0.3", "matplotlib>=3.7", "textual>=0.50"]
 
 [project.scripts]

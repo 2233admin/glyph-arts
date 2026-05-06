@@ -1242,6 +1242,7 @@ EXPECTED_SCHEMAS = {
 _NO_SIZE_THEME = {'table', 'tree', 'panel', 'graph', 'sparkline', 'gauge', 'banner', 'pie', 'dashboard', 'rich_live'}
 
 PIXEL_SUPPORTED = frozenset({'bar', 'line', 'scatter'})
+INTERACTIVE_SUPPORTED = frozenset({'line'})
 
 
 # -- main --------------------------------------------------------------------
@@ -1293,11 +1294,13 @@ Examples:
                    help='Chart height in terminal rows (ignored for table/tree/panel/graph/sparkline)')
     p.add_argument('--theme',       default='pro',
                    help='plotext theme: pro dark clear matrix retro elegant + brand palettes: claude linear tesla vercel (ignored for rich/graph/sparkline)')
-    p.add_argument('--engine',      choices=['ascii', 'pixel'], default='ascii',
+    p.add_argument('--engine',      choices=['ascii', 'pixel', 'interactive'], default='ascii',
                    help='Render backend. ascii (default) = plotext/rich/drawille text art. '
                         'pixel = matplotlib + chafa true-color pixel chart (requires '
                         '`pip install glyph-arts[pixel]` + chafa system binary). '
-                        'Phase A pixel support: bar/line/scatter only.')
+                        'Phase A pixel support: bar/line/scatter only. '
+                        'interactive = Textual keyboard-first TUI for line charts '
+                        '(requires `pip install glyph-arts[interactive]`).')
     p.add_argument('--xlabel',      default='', help='X-axis label (plotext charts)')
     p.add_argument('--ylabel',      default='', help='Y-axis label (plotext charts)')
     p.add_argument('--xlim',        nargs=2, type=float, metavar=('MIN', 'MAX'),
@@ -1472,6 +1475,13 @@ Examples:
                         output=args.output, no_color=no_color,
                     )
                     sys.exit(rc)
+            if args.engine == 'interactive':
+                from cli_charts.render.interactive_engine import render_interactive
+                rc = render_interactive(
+                    args.type, data, args.width, args.height,
+                    title=args.title, theme=args.theme, no_color=no_color,
+                )
+                sys.exit(rc)
 
             CMDS[args.type](data, args.title, args.width, args.height, args.theme, **kw)
         except (KeyError, IndexError, TypeError, ValueError) as exc:
