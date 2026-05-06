@@ -1,3 +1,4 @@
+# This palette is inspired by Anthropic's publicly published brand guidelines. glyph-arts is not affiliated with or endorsed by Anthropic.
 """Claude (Anthropic) brand palette.
 
 Anchored on Anthropic's signature terracotta coral (#CC785C) against a

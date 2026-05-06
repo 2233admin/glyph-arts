@@ -1,0 +1,59 @@
+name: Bug report
+description: Something is broken or behaves unexpectedly
+labels: ["bug"]
+body:
+  - type: input
+    id: chart-type
+    attributes:
+      label: Chart type
+      description: Which chart type? (e.g. `bar`, `kline`, `dashboard`)
+    validations:
+      required: true
+
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      placeholder: "3.12.10"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "macOS 14.5 / Windows 11 / Ubuntu 24.04"
+    validations:
+      required: true
+
+  - type: textarea
+    id: check-deps
+    attributes:
+      label: glyph-arts --check-deps --all output
+      description: Paste the full output (helps us see which deps are present)
+      render: text
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command that triggered the bug
+      description: Include the full glyph-arts invocation + JSON / DuckDB args
+      render: bash
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include stderr / traceback if any
+      render: text
+    validations:
+      required: true

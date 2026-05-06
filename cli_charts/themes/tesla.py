@@ -1,3 +1,4 @@
+# This palette is inspired by Tesla, Inc.'s publicly published brand guidelines. glyph-arts is not affiliated with or endorsed by Tesla, Inc.
 """Tesla brand palette.
 
 Tesla's minimal high-tech aesthetic: deep navy (#171A20) background with

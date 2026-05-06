@@ -1,3 +1,4 @@
+# This palette is inspired by Linear (linear.app)'s publicly published brand guidelines. glyph-arts is not affiliated with or endorsed by Linear (linear.app).
 """Linear brand palette.
 
 Linear's design language: near-black void background, precise indigo

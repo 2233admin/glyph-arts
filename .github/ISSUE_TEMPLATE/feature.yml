@@ -1,0 +1,46 @@
+name: Feature request / new chart type
+description: Suggest a new chart type or capability
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of feature?
+      options:
+        - New chart type
+        - New flag / option on existing chart
+        - Theme / palette
+        - DuckDB / JSON schema extension
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use case
+      description: What are you trying to visualize? Why do existing chart types not fit?
+    validations:
+      required: true
+
+  - type: textarea
+    id: sketch
+    attributes:
+      label: Sketch
+      description: ASCII mockup, similar tool reference, or rough JSON input shape
+      render: text
+
+  - type: dropdown
+    id: engine
+    attributes:
+      label: Likely rendering engine
+      options:
+        - plotext
+        - rich
+        - drawille (braille)
+        - plotille
+        - uniplot
+        - chafa / ffmpeg (media)
+        - "Don't know"
+    validations:
+      required: false

@@ -1,3 +1,4 @@
+# This palette is inspired by Vercel's publicly published brand guidelines. glyph-arts is not affiliated with or endorsed by Vercel.
 """Vercel brand palette.
 
 Vercel's famously minimal identity: pure black background, white primary,
