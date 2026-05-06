@@ -53,6 +53,22 @@ Default is `--art default` -- btop-like aesthetic, broad terminal compat.
 
 ![art tiers](docs/art-tiers.png)
 
+## Art command (Phase 2)
+
+The `art` command renders composable terminal text art: figlet font,
+optional art-lib decoration, optional Rich frame, and optional ANSI gradient.
+Install the opt-in extra first:
+
+```bash
+pip install "glyph-arts[art]"
+
+glyph-arts art SHIP IT --font slant --decor barcode --frame double --gradient sunset
+glyph-arts art GLYPH-ARTS --font big --frame rounded --gradient viridis --no-color
+```
+
+Use `--output PATH` to write the rendered text to a file. `--no-color` strips
+ANSI color and ignores gradients.
+
 ## Quick start
 
 ```bash
@@ -87,10 +103,10 @@ glyph-arts --check-deps --all
 | drawille *(optional `[braille]`)* | `curve` `hires` `radar` |
 | plotille | `plotille` |
 | uniplot | `uniplot` |
-| misc | `graph` `sparkline` `banner` |
+| misc | `graph` `sparkline` `banner` `art` |
 | media *(requires chafa + ffmpeg)* | `image` `video` |
 
-Total: **31 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
+Total: **32 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
 
 ## All flags
 

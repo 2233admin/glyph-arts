@@ -802,6 +802,25 @@ def banner(d, title, w, h, theme, **kw):
         print(result, end='')
 
 
+def art_command(d, title, w, h, theme, **kw):
+    """Composable text art command (argparse dispatch only)."""
+    del d, title
+    from cli_charts.render.art_engine import render_art
+    rc = render_art(
+        kw.get('text', ''),
+        kw.get('font', 'slant'),
+        kw.get('decor'),
+        kw.get('frame'),
+        kw.get('gradient'),
+        theme,
+        w,
+        h,
+        kw.get('no_color', False),
+        kw.get('output', ''),
+    )
+    sys.exit(rc)
+
+
 def uniplot(d, title, w, h, theme, **kw):
     """uniplot scientific line/scatter with labeled axes.
     Same multi-series schema as 'line'. Set "lines":false per series for scatter.
@@ -1178,6 +1197,7 @@ CMDS = {
     'curve':      curve,
     'uniplot':    uniplot,
     'banner':      banner,
+    'art':         art_command,
     'candlestick': kline,
     'hires':       hires,
     'radar':       radar,
@@ -1196,7 +1216,7 @@ CHART_TYPES_BY_ENGINE: dict[str, list[str]] = {
     'drawille': ['curve', 'hires', 'radar'],
     'plotille': ['plotille'],
     'uniplot': ['uniplot'],
-    'misc': ['graph', 'sparkline', 'banner'],
+    'misc': ['graph', 'sparkline', 'banner', 'art'],
     'media': ['image', 'video'],
 }
 
@@ -1231,6 +1251,7 @@ EXPECTED_SCHEMAS = {
     'curve':      '{"points":[[x,y],...]}',
     'uniplot':    '[{"label":"A","x":[...],"y":[...]}] or {"label":"A","y":[...]}',
     'banner':      '{"text":"PROFIT","font":"big","color":"green"}',
+    'art':         'glyph-arts art TEXT --font slant --decor barcode --frame double --gradient sunset',
     'candlestick': '{"dates":["DD/MM/YYYY",...], "open":[...], "high":[...], "low":[...], "close":[...]}',
     'hires':       '[{"label":"Q5","y":[3.5,9.2,9.4],"color":[0,245,212]},{"label":"Q1","y":[3.1,5.1,4.5],"color":[255,107,107]}]',
     'radar':       '{"labels":["ATK","DEF","SPD","MGC","LCK"],"series":[{"label":"Hero","values":[80,60,90,70,50],"color":[0,245,212]}],"max":100}',
@@ -1279,6 +1300,8 @@ Examples:
     p.add_argument('type', choices=list(CMDS) + sorted(_MEDIA_TYPES), metavar='TYPE',
                    help='Chart type: ' + ' | '.join(CMDS) +
                         ' | image | video (media via chafa/ffmpeg)')
+    p.add_argument('art_text', nargs='*',
+                   help='Text for TYPE=art (example: glyph-arts art SHIP IT)')
     p.add_argument('--json',        dest='data', help='JSON data string')
     p.add_argument('--file',        metavar='PATH',
                    help='Read JSON from a file path')
@@ -1294,6 +1317,14 @@ Examples:
                    help='Chart height in terminal rows (ignored for table/tree/panel/graph/sparkline)')
     p.add_argument('--theme',       default='pro',
                    help='plotext theme: pro dark clear matrix retro elegant + brand palettes: claude linear tesla vercel (ignored for rich/graph/sparkline)')
+    p.add_argument('--font',        default='slant',
+                   help='TYPE=art figlet font (default: slant)')
+    p.add_argument('--decor',       choices=['barcode', 'snake', 'dna', 'random', 'wave'],
+                   default=None, help='TYPE=art optional art-lib decoration')
+    p.add_argument('--frame',       choices=['single', 'double', 'rounded', 'ascii', 'heavy', 'none'],
+                   default=None, help='TYPE=art optional Rich frame')
+    p.add_argument('--gradient',    choices=['sunset', 'viridis', 'ocean', 'rainbow', 'none'],
+                   default=None, help='TYPE=art optional text gradient')
     p.add_argument('--engine',      choices=['ascii', 'pixel', 'interactive'], default='ascii',
                    help='Render backend. ascii (default) = plotext/rich/drawille text art. '
                         'pixel = matplotlib + chafa true-color pixel chart (requires '
@@ -1394,6 +1425,23 @@ Examples:
             print(f'ERROR:render: chafa/ffmpeg exit {exc.returncode}', file=sys.stderr)
             sys.exit(4)
         return
+
+    if args.type == 'art':
+        from cli_charts.render.art_engine import render_art
+        no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
+        rc = render_art(
+            ' '.join(args.art_text),
+            args.font,
+            args.decor,
+            args.frame,
+            args.gradient,
+            args.theme,
+            args.width,
+            args.height,
+            no_color,
+            args.output,
+        )
+        sys.exit(rc)
 
     if args.animate:
         no_color = args.no_color or bool(os.environ.get('NO_COLOR'))

@@ -1,6 +1,6 @@
 ---
 name: glyph-arts
-description: glyph-arts -- terminal-visible chart toolkit. All chart types directly in the CLI -- no files, no GUI. plotext (kline/candlestick/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), rich (table/tree/panel/gauge/pie/dashboard/rich_live), drawille (curve/hires/radar), plotille (composable braille Figure), uniplot scientific line, media image/video (via chafa+ffmpeg, 2x4 braille sub-pixel with 24-bit truecolor), ASCII network graph, sparkline, pyfiglet banner. LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
+description: glyph-arts -- terminal-visible chart toolkit. All chart types directly in the CLI -- no files, no GUI. plotext (kline/candlestick/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), rich (table/tree/panel/gauge/pie/dashboard/rich_live), drawille (curve/hires/radar), plotille (composable braille Figure), uniplot scientific line, media image/video (via chafa+ffmpeg, 2x4 braille sub-pixel with 24-bit truecolor), ASCII network graph, sparkline, pyfiglet banner, composable art text. LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
 version: 3.0.1
 ---
 
@@ -80,6 +80,8 @@ What is your data shape?
 +-- Network / graph topology          -> graph
 |
 +-- Large ASCII label / banner        -> banner
+|
++-- Styled text art / framed wordmark -> art
 ```
 
 ---
@@ -158,12 +160,16 @@ blobs when fed pixel data. chafa is purpose-built and superset of
 timg/viu on Windows. HANDOFF 2026-04-14 records the full architectural
 decision.
 
-### Misc (3 types)
+### Misc (4 types)
 | Type | JSON keys |
 |------|-----------|
 | `graph` | `{"edges":[["A","B"]],"directed":true,"node_style":"ROUND"}` |
 | `sparkline` | `{"values":[1,3,5,2,8]}` -- single-row inline |
 | `banner` | `{"text":"PROFIT","font":"big","color":"green"}` |
+| `art` | positional text: `art SHIP IT --font slant --decor barcode --frame double --gradient sunset` |
+
+Trigger keywords for `art`: wordmark, figlet, framed text, gradient text,
+decorated ASCII, composable text art.
 
 ---
 
