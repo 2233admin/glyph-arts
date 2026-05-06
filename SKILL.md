@@ -1,6 +1,6 @@
 ---
 name: glyph-arts
-description: glyph-arts -- terminal-visible chart toolkit. 29 chart types directly in the CLI -- no files, no GUI. plotext (kline/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), rich (table/tree/panel/gauge/pie/dashboard), hires (24-bit braille Catmull-Rom+glow), radar (polar spider chart), plotille (composable braille Figure), drawille braille curve, uniplot scientific line, ASCII network graph, sparkline, pyfiglet banner, image/video (via chafa+ffmpeg, 2x4 braille sub-pixel with 24-bit truecolor). LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
+description: glyph-arts -- terminal-visible chart toolkit. All chart types directly in the CLI -- no files, no GUI. plotext (kline/candlestick/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), rich (table/tree/panel/gauge/pie/dashboard/rich_live), drawille (curve/hires/radar), plotille (composable braille Figure), uniplot scientific line, media image/video (via chafa+ffmpeg, 2x4 braille sub-pixel with 24-bit truecolor), ASCII network graph, sparkline, pyfiglet banner. LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
 version: 3.0.1
 ---
 

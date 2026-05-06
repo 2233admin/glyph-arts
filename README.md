@@ -2,12 +2,10 @@
 
 > When AI lives in the terminal, visualization must live there too.
 
-29 chart types rendered directly in your terminal — no browser, no generated files, no context switch.
+All chart types rendered natively in the terminal -- no browser, no generated files, no context switch.
 `pip install glyph-arts` and your AI agent has a native sense of sight inside the CLI.
 
-```
-demo.gif  <-- record with: python -m cli_charts.dashboard --demo --no-interactive
-```
+![demo](demo/chartex-demo.gif)
 
 ---
 
@@ -25,6 +23,20 @@ pip install "glyph-arts[tui]"
 # everything:
 pip install "glyph-arts[all]"
 ```
+
+## System dependencies (image / video charts only)
+
+The `image` and `video` chart types shell out to `chafa` and `ffmpeg`.
+Install them once before using those types:
+
+| OS | Command |
+|---|---|
+| Windows | `scoop install chafa ffmpeg` or `choco install chafa ffmpeg` |
+| macOS | `brew install chafa ffmpeg` |
+| Linux (Debian/Ubuntu) | `apt install chafa ffmpeg` |
+| Linux (Homebrew) | `brew install chafa ffmpeg` |
+
+All other chart types are pure-Python and work after `pip install glyph-arts` alone.
 
 ## Quick start
 
@@ -51,15 +63,19 @@ glyph-arts --check-deps
 glyph-arts --check-deps --all
 ```
 
-## Chart types (29)
+## Chart types
 
 | Engine | Types |
 |--------|-------|
 | plotext | `kline` `candlestick` `line` `scatter` `step` `bar` `multibar` `stackedbar` `hist` `heatmap` `box` `indicator` `event` `confusion` |
-| rich | `table` `tree` `panel` `gauge` `pie` `dashboard` |
-| drawille *(optional `[braille]`)* | `curve` |
+| rich | `table` `tree` `panel` `gauge` `pie` `dashboard` `rich_live` |
+| drawille *(optional `[braille]`)* | `curve` `hires` `radar` |
+| plotille | `plotille` |
 | uniplot | `uniplot` |
 | misc | `graph` `sparkline` `banner` |
+| media *(requires chafa + ffmpeg)* | `image` `video` |
+
+Total: **31 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
 
 ## All flags
 

@@ -2,14 +2,7 @@
 """glyph-arts: terminal-visible chart toolkit for Claude Code.
 
 Usage: python chart.py <type> [options]
-Types (29):
-  plotext  : kline line scatter step bar multibar stackedbar hist heatmap box indicator event confusion
-  rich     : table tree panel gauge pie dashboard rich_live
-  braille  : curve hires radar
-  plotille : plotille
-  uniplot  : uniplot
-  misc     : graph sparkline banner
-  media    : image video   (via chafa / ffmpeg -- requires --file PATH)
+See CHART_TYPES_BY_ENGINE for the authoritative chart type list.
 
 Animation (--animate):
   Stream values from stdin line-by-line; chart re-renders after each point.
@@ -1167,6 +1160,27 @@ CMDS = {
     'rich_live':   rich_live,
 }
 
+# Single source of truth for chart-type docs. Order is intentional.
+CHART_TYPES_BY_ENGINE: dict[str, list[str]] = {
+    'plotext': [
+        'kline', 'candlestick', 'line', 'scatter', 'step', 'bar', 'multibar',
+        'stackedbar', 'hist', 'heatmap', 'box', 'indicator', 'event',
+        'confusion',
+    ],
+    'rich': ['table', 'tree', 'panel', 'gauge', 'pie', 'dashboard', 'rich_live'],
+    'drawille': ['curve', 'hires', 'radar'],
+    'plotille': ['plotille'],
+    'uniplot': ['uniplot'],
+    'misc': ['graph', 'sparkline', 'banner'],
+    'media': ['image', 'video'],
+}
+
+_CHART_TYPE_KEYS = {t for ts in CHART_TYPES_BY_ENGINE.values() for t in ts}
+assert _CHART_TYPE_KEYS == set(CMDS) | _MEDIA_TYPES, \
+    "CHART_TYPES_BY_ENGINE drift vs CMDS/media types"
+
+CHART_TYPE_COUNT: int = len(_CHART_TYPE_KEYS)
+
 EXPECTED_SCHEMAS = {
     'kline':      '{"dates":["DD/MM/YYYY",...], "open":[...], "high":[...], "low":[...], "close":[...]}',
     'line':       '[{"label":"A","x":[...],"y":[...]}] or {"label":"A","y":[...]}',
@@ -1206,18 +1220,10 @@ _NO_SIZE_THEME = {'table', 'tree', 'panel', 'graph', 'sparkline', 'gauge', 'bann
 # -- main --------------------------------------------------------------------
 
 def main():
-    p = argparse.ArgumentParser(
-        description='glyph-arts -- terminal-visible charts for Claude Code',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Chart types (27):
-  plotext  : kline line scatter step bar multibar stackedbar hist heatmap box indicator event confusion
-  rich     : table tree panel gauge pie dashboard rich_live
-  braille  : curve hires radar
-  plotille : plotille
-  uniplot  : uniplot
-  misc     : graph sparkline banner
-
+    epilog_lines = [f'Chart types ({CHART_TYPE_COUNT}):']
+    for engine, types in CHART_TYPES_BY_ENGINE.items():
+        epilog_lines.append(f'  {engine:9}: {" ".join(types)}')
+    epilog_lines.append("""
 Examples:
   python chart.py kline --json '{"dates":["07/04/2026"],"open":[100],"high":[102],"low":[99],"close":[101]}'
   python chart.py scatter --json '[{"label":"A","x":[1,2,3],"y":[4,2,5]}]'
@@ -1237,6 +1243,11 @@ Examples:
   python chart.py line --duckdb "SELECT trade_date, close FROM stock_daily LIMIT 60" --db /path/to/data.duckdb
   cat data.json | python chart.py line
 """)
+    epilog = '\n'.join(epilog_lines)
+    p = argparse.ArgumentParser(
+        description='glyph-arts -- terminal-visible charts for Claude Code',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=epilog)
     p.add_argument('type', choices=list(CMDS) + sorted(_MEDIA_TYPES), metavar='TYPE',
                    help='Chart type: ' + ' | '.join(CMDS) +
                         ' | image | video (media via chafa/ffmpeg)')
