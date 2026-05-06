@@ -20,8 +20,8 @@ import shutil
 import subprocess
 import sys
 
-from .osc8 import link as _osc8_link
 from .font_tier import detect_font_tier
+from .osc8 import link as _osc8_link
 from .themes import get_palette as _get_palette
 
 try:
@@ -685,6 +685,33 @@ def gauge(d, title, w, h, theme, **kw):
     if kw.get('statusline'):
         _render_statusline('gauge', d, title)
         return
+    if kw.get('rich_progress'):
+        from rich.console import Console
+        from rich.progress import (
+            BarColumn,
+            MofNCompleteColumn,
+            Progress,
+            TaskProgressColumn,
+            TextColumn,
+            TimeRemainingColumn,
+        )
+        no_color = kw.get('no_color', False)
+        console = Console(no_color=no_color, force_terminal=not no_color, legacy_windows=False)
+        metrics = d if isinstance(d, list) else d.get('metrics', [d])
+        progress = Progress(
+            TextColumn("[bold]{task.description}"),
+            BarColumn(),
+            TaskProgressColumn(),
+            MofNCompleteColumn(),
+            TimeRemainingColumn(),
+            console=console,
+        )
+        with progress:
+            for m in metrics:
+                val = float(m['value'])
+                mx = float(m.get('max', 100))
+                progress.add_task(str(m.get('label', '')), total=mx, completed=val)
+        return
     from rich import box as richbox
     from rich.console import Console
     from rich.table import Table
@@ -1274,6 +1301,16 @@ def to_hyperframes_command(d, title, w, h, theme, **kw):
     raise RuntimeError("to-hyperframes is dispatched by main()")
 
 
+def code_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("code is dispatched by main()")
+
+
+def status_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("status is dispatched by main()")
+
+
 CMDS = {
     'kline':      kline,
     'line':       line,
@@ -1309,6 +1346,8 @@ CMDS = {
     'record':      record_command,
     'record-replay': record_replay_command,
     'to-hyperframes': to_hyperframes_command,
+    'code':        code_command,
+    'status':      status_command,
 }
 
 # Single source of truth for chart-type docs. Order is intentional.
@@ -1322,7 +1361,7 @@ CHART_TYPES_BY_ENGINE: dict[str, list[str]] = {
     'drawille': ['curve', 'hires', 'radar'],
     'plotille': ['plotille'],
     'uniplot': ['uniplot'],
-    'misc': ['graph', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes'],
+    'misc': ['graph', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'code', 'status'],
     'media': ['image', 'video'],
 }
 
@@ -1367,6 +1406,8 @@ EXPECTED_SCHEMAS = {
     'record':      "glyph-arts record demo.cast --cmd 'echo hi' --duration 1",
     'record-replay': 'glyph-arts record-replay demo.cast --output demo.gif',
     'to-hyperframes': "glyph-arts to-hyperframes --json '[{\"label\":\"x\",\"x\":[1,2],\"y\":[3,4]}]' --frames 30 --duration 5 --output-dir ./hf",
+    'code':        'glyph-arts code --file foo.py --lang python',
+    'status':      'glyph-arts status --kind ok --message "All tests green"',
 }
 
 # Types where --width/--height/--theme have no effect
@@ -1486,6 +1527,16 @@ Examples:
                    help='Auto-stop after SEC seconds (0=until EOF/Ctrl-C)')
     p.add_argument('--frames',     type=int, default=30, metavar='N',
                    help='TYPE=animate frame count (default: 30)')
+    p.add_argument('--spinner',    default='',
+                   help='TYPE=animate/status Rich spinner preset (dots, dots2, line, pong, ...)')
+    p.add_argument('--rich-progress', action='store_true',
+                   help='TYPE=gauge render with rich.progress Progress')
+    p.add_argument('--lang',       default='',
+                   help='TYPE=code syntax language (python, javascript, ...)')
+    p.add_argument('--kind',       default='info',
+                   help='TYPE=status kind: ok, warn, error, info, loading')
+    p.add_argument('--message',    default='',
+                   help='TYPE=status message text')
     p.add_argument('--link-data',  default='',
                    help='OSC 8 hyperlink URL for line/scatter data labels')
     p.add_argument('--link-title', default='',
@@ -1529,6 +1580,30 @@ Examples:
     args = p.parse_args()
     if args.font_tier is None:
         args.font_tier = detect_font_tier()
+
+    if args.type == 'code':
+        if not args.file:
+            print('ERROR:schema: code needs --file PATH', file=sys.stderr)
+            sys.exit(1)
+        if not args.lang:
+            print('ERROR:schema: code needs --lang LANG', file=sys.stderr)
+            sys.exit(1)
+        from cli_charts.render.code_engine import render_code
+        no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
+        code_theme = 'monokai' if args.theme == 'pro' else args.theme
+        rc = render_code(args.file, args.lang, theme=code_theme, no_color=no_color)
+        sys.exit(rc)
+
+    if args.type == 'status':
+        from cli_charts.render.status_engine import render_status
+        no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
+        rc = render_status(
+            args.kind,
+            args.message or args.title or args.kind,
+            spinner=args.spinner or 'dots',
+            no_color=no_color,
+        )
+        sys.exit(rc)
 
     # Media types (image/video) bypass JSON loading -- they take a filesystem path.
     if args.type in _MEDIA_TYPES:
@@ -1610,6 +1685,7 @@ Examples:
             yscale=args.yscale,
             orientation=args.orientation,
             no_color=no_color,
+            spinner=args.spinner,
         )
         sys.exit(rc)
 
@@ -1720,6 +1796,7 @@ Examples:
             link_data=args.link_data,
             link_title=args.link_title,
             statusline=args.statusline,
+            rich_progress=args.rich_progress,
         )
 
         try:

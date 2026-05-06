@@ -10,6 +10,9 @@ import sys
 import time
 from typing import Any
 
+from rich.console import Console
+from rich.spinner import SPINNERS, Spinner
+
 ANIMATE_SUPPORTED = {"line", "bar", "scatter", "sparkline"}
 
 
@@ -99,19 +102,28 @@ def render_animate(
     data: list[dict[str, Any]] | dict[str, Any],
     duration: float,
     frames: int,
+    spinner: str = "",
     **kwargs: Any,
 ) -> int:
     if chart_type not in ANIMATE_SUPPORTED:
         return 1
     if duration <= 0 or frames <= 0:
         return 1
+    if spinner and spinner not in SPINNERS:
+        print(f"ERROR:schema: unknown spinner: {spinner}", file=sys.stderr)
+        return 1
 
     interpolated = _interpolate_data(data, frames)
     interval = duration / frames
+    rich_spinner = Spinner(spinner) if spinner else None
+    console = Console(no_color=bool(kwargs.get("no_color", False)))
+    start = time.monotonic()
     sys.stdout.write("\x1b[?25l")
     try:
         for state in interpolated:
             sys.stdout.write("\x1b[H\x1b[2J")
+            if rich_spinner is not None:
+                console.print(rich_spinner.render(time.monotonic() - start))
             sys.stdout.write(_render_static(chart_type, state, **kwargs))
             sys.stdout.flush()
             time.sleep(interval)

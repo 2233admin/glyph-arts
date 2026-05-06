@@ -63,13 +63,39 @@ Default is `--art default` -- btop-like aesthetic, broad terminal compat.
 | `.txt` | default ASCII | Rendered chart text with ANSI escapes stripped |
 | `.ansi` | default ASCII | Rendered chart text with ANSI escapes preserved |
 | `.html` | default ASCII | `<pre>` snippet with ANSI foreground colors converted to inline spans |
+| `.md` | `table` | GitHub-Flavored Markdown table |
 
 ```bash
 glyph-arts bar --json '{"labels":["A","B"],"values":[1,2]}' --output chart.txt
 glyph-arts bar --json '{"labels":["A","B"],"values":[1,2]}' --output chart.ansi
 glyph-arts bar --json '{"labels":["A","B"],"values":[1,2]}' --output chart.html
 glyph-arts bar --engine pixel --json '{"labels":["A","B"],"values":[1,2]}' --output chart.png
+glyph-arts table --json '{"columns":["A","B"],"rows":[["x","1"]]}' --output table.md
 ```
+
+## Claude Code CLI compatible
+
+glyph-arts includes Claude Code terminal compatibility flags for statuslines,
+themes, hyperlinks, and markdown rendering:
+
+```bash
+glyph-arts sparkline --json '[1,2,3,4,5,6,7,8,9,10]' --statusline
+glyph-arts line --theme claude-dark-ansi --json '[{"label":"X","x":[1,2,3],"y":[10,20,15]}]'
+glyph-arts line --title Docs --link-title https://docs.anthropic.com --json '[{"label":"X","y":[1,2,3]}]'
+glyph-arts scatter --link-data https://example.com/point --json '[{"label":"A","x":[1,2],"y":[3,4]}]'
+glyph-arts line --theme subagent-rainbow --json '[{"label":"A","y":[1,2]},{"label":"B","y":[2,1]}]'
+```
+
+- `--theme claude-dark-ansi` and `--theme claude-light-ansi` read
+  `~/.claude/themes/{dark,light}-ansi.json` when present, with a 16-color ANSI
+  fallback.
+- `--theme subagent-rainbow` uses the Claude Code subagent named colors:
+  red, blue, green, yellow, purple, orange, pink, cyan.
+- `--statusline` on `sparkline`, `indicator`, and `gauge` emits one line,
+  capped at 80 chars, suitable for `~/.claude/settings.json` `statusLine.command`.
+- `--link-title` and `--link-data` opt into OSC 8 hyperlinks. If the terminal
+  capability is not detected, output falls back to `label (url)`.
+- `table --output *.md` writes a GFM table for Claude Code markdown rendering.
 
 ## Animation
 
@@ -180,7 +206,7 @@ glyph-arts --check-deps --all
 | misc | `graph` `sparkline` `banner` `art` `animate` `record` `record-replay` `to-hyperframes` |
 | media *(requires chafa + ffmpeg)* | `image` `video` |
 
-Total: **36 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
+Total: **38 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
 
 ## All flags
 
