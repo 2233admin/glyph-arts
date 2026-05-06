@@ -1241,6 +1241,8 @@ EXPECTED_SCHEMAS = {
 # Types where --width/--height/--theme have no effect
 _NO_SIZE_THEME = {'table', 'tree', 'panel', 'graph', 'sparkline', 'gauge', 'banner', 'pie', 'dashboard', 'rich_live'}
 
+PIXEL_SUPPORTED = frozenset({'bar', 'line', 'scatter'})
+
 
 # -- main --------------------------------------------------------------------
 
@@ -1291,6 +1293,11 @@ Examples:
                    help='Chart height in terminal rows (ignored for table/tree/panel/graph/sparkline)')
     p.add_argument('--theme',       default='pro',
                    help='plotext theme: pro dark clear matrix retro elegant + brand palettes: claude linear tesla vercel (ignored for rich/graph/sparkline)')
+    p.add_argument('--engine',      choices=['ascii', 'pixel'], default='ascii',
+                   help='Render backend. ascii (default) = plotext/rich/drawille text art. '
+                        'pixel = matplotlib + chafa true-color pixel chart (requires '
+                        '`pip install glyph-arts[pixel]` + chafa system binary). '
+                        'Phase A pixel support: bar/line/scatter only.')
     p.add_argument('--xlabel',      default='', help='X-axis label (plotext charts)')
     p.add_argument('--ylabel',      default='', help='Y-axis label (plotext charts)')
     p.add_argument('--xlim',        nargs=2, type=float, metavar=('MIN', 'MAX'),
@@ -1452,6 +1459,20 @@ Examples:
         )
 
         try:
+            if args.engine == 'pixel':
+                if args.type not in PIXEL_SUPPORTED:
+                    print(f'WARNING: --engine pixel does not yet support {args.type!r} '
+                          f'(Phase A: {sorted(PIXEL_SUPPORTED)}); falling back to ascii',
+                          file=sys.stderr)
+                else:
+                    from cli_charts.render.matplotlib_engine import render_pixel
+                    rc = render_pixel(
+                        args.type, data, args.width, args.height,
+                        title=args.title, theme=args.theme,
+                        output=args.output, no_color=no_color,
+                    )
+                    sys.exit(rc)
+
             CMDS[args.type](data, args.title, args.width, args.height, args.theme, **kw)
         except (KeyError, IndexError, TypeError, ValueError) as exc:
             print(f'ERROR:schema: Invalid {args.type} data schema: {exc}\n'
