@@ -4,7 +4,10 @@ Pipeline: raw data -> LTTB downsample -> step transform -> render
 The test confirms shape preservation and correct point count.
 N input points -> 2N-1 render points (each interior point appears twice, last only once).
 """
-import numpy as np
+import pytest
+
+np = pytest.importorskip('numpy', reason='test extra [test] not installed')
+lttb = pytest.importorskip('lttb', reason='optional [lttb] extra not installed')
 
 
 def step_transform(x, y):
@@ -20,14 +23,12 @@ def step_transform(x, y):
 
 
 def test_step_lttb_order():
-    from lttb import downsample
-
     rng = np.random.default_rng(42)
     x = np.linspace(0, 100, 1000)
     y = np.sin(x) * 50 + rng.normal(0, 2, 1000)
 
     data = np.column_stack([x, y])
-    sampled = downsample(data, n_out=50)
+    sampled = lttb.downsample(data, n_out=50)
 
     xs, ys = step_transform(sampled[:, 0].tolist(), sampled[:, 1].tolist())
 

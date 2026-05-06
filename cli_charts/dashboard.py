@@ -59,7 +59,8 @@ def render_gauge(data: dict | list) -> str:
     bar_w = 24
     for m in metrics:
         val = float(m.get("value", 0))
-        total = float(m.get("total", m.get("max", 100)) or 100)
+        total_raw = m.get("total", m.get("max", 100))
+        total = float(total_raw if total_raw is not None else 100)
         pct = max(0.0, min(1.0, val / total)) if total else 0.0
         filled = round(pct * bar_w)
         color = "green" if pct < 0.7 else ("yellow" if pct < 0.9 else "red")
@@ -97,10 +98,8 @@ def render_table(data: dict) -> str:
         cells = []
         for cell in row:
             s = str(cell)
-            color = _STATUS_COLORS.get(s)
-            cells.append(
-                f"[{color}]{s:<{col_w}}[/{color}]" if color else f"{s:<{col_w}}"
-            )
+            color = _STATUS_COLORS.get(s, "dim white")
+            cells.append(f"[{color}]{s:<{col_w}}[/{color}]")
         lines.append(" | ".join(cells))
     return "\n".join(lines)
 

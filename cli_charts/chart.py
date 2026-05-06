@@ -81,7 +81,13 @@ def _render_image(path, w, h, symbols='braille', no_color=False):
     if no_color:
         cmd += ['--colors', 'none']
     cmd.append(path)
-    subprocess.run(cmd, check=True)
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        lines = (result.stderr or '').strip().splitlines()
+        msg = lines[-1] if lines else 'chafa exited non-zero'
+        print(f'ERROR:render: {msg}', file=sys.stderr)
+        sys.exit(4)
+    sys.stdout.write(result.stdout)
 
 
 def _render_video(path, w, h, fps=12, symbols='braille', duration=0.0, no_color=False):
@@ -111,7 +117,12 @@ def _render_video(path, w, h, fps=12, symbols='braille', duration=0.0, no_color=
         if duration and duration > 0:
             ff += ['-t', str(duration)]
         ff.append(os.path.join(tmp, 'f_%05d.png'))
-        subprocess.run(ff, check=True)
+        result = subprocess.run(ff, capture_output=True, text=True)
+        if result.returncode != 0:
+            lines = (result.stderr or '').strip().splitlines()
+            msg = lines[-1] if lines else 'ffmpeg exited non-zero'
+            print(f'ERROR:render: {msg}', file=sys.stderr)
+            sys.exit(4)
 
         frames = sorted(glob.glob(os.path.join(tmp, 'f_*.png')))
         if not frames:
@@ -134,7 +145,13 @@ def _render_video(path, w, h, fps=12, symbols='braille', duration=0.0, no_color=
                 if is_tty:
                     sys.stdout.write('\x1b[H')  # cursor home (less flicker than \x1b[2J)
                     sys.stdout.flush()
-                subprocess.run(chafa_cmd + [frame], check=True)
+                result = subprocess.run(chafa_cmd + [frame], capture_output=True, text=True)
+                if result.returncode != 0:
+                    lines = (result.stderr or '').strip().splitlines()
+                    msg = lines[-1] if lines else 'chafa exited non-zero'
+                    print(f'ERROR:render: {msg}', file=sys.stderr)
+                    sys.exit(4)
+                sys.stdout.write(result.stdout)
                 elapsed = time.time() - t0
                 if elapsed < delay:
                     time.sleep(delay - elapsed)
@@ -654,13 +671,17 @@ def rich_live(d, title, w, h, theme, **kw):
 
     frames = max(1, int(d.get('frames', 1)))
     no_color = kw.get('no_color', False)
+    panel_failures = []
 
     def _render_panel_content(panel_spec):
         """Dispatch sub-chart and capture its stdout as a Rich-renderable Text."""
+        name = panel_spec.get('title') or panel_spec.get('name') or panel_spec.get('id') or panel_spec.get('type')
         ptype = panel_spec.get('type')
         if ptype not in CMDS:
+            panel_failures.append((name, -1))
             return Text(f'[unknown panel type: {ptype!r}]', style='red')
         if ptype in ('dashboard', 'rich_live'):
+            panel_failures.append((name, -1))
             return Text(f'[cannot nest {ptype!r} inside rich_live]', style='red')
         pdata = panel_spec.get('data', {})
         ptitle = panel_spec.get('title', '')
@@ -672,9 +693,10 @@ def rich_live(d, title, w, h, theme, **kw):
         try:
             try:
                 CMDS[ptype](pdata, ptitle, pw, ph, theme, no_color=no_color)
-            except SystemExit:
-                pass
+            except (SystemExit, KeyboardInterrupt):
+                raise
             except Exception as e:
+                panel_failures.append((name, -1))
                 return Text(f'[panel render failed: {type(e).__name__}: {e}]', style='red')
         finally:
             sys.stdout = saved_stdout
@@ -705,6 +727,10 @@ def rich_live(d, title, w, h, theme, **kw):
         if title:
             console.rule(title)
         console.print(layout)
+        if panel_failures:
+            print(f'ERROR:render: {len(panel_failures)} panel(s) failed: {panel_failures}',
+                  file=sys.stderr)
+            sys.exit(4)
         return
 
     from rich.live import Live
@@ -715,6 +741,10 @@ def rich_live(d, title, w, h, theme, **kw):
         for _ in range(frames):
             layout = _build_layout()
             time.sleep(frame_delay)
+    if panel_failures:
+        print(f'ERROR:render: {len(panel_failures)} panel(s) failed: {panel_failures}',
+              file=sys.stderr)
+        sys.exit(4)
 
 
 def confusion(d, title, w, h, theme, **kw):
@@ -979,6 +1009,16 @@ def _lttb(xs: list, ys: list, n: int) -> tuple:
         return xs[::step][:n], ys[::step][:n]
 
 
+def _sample_indices(length: int, n: int) -> list:
+    """Return ordered indices for sampling paired list fields together."""
+    if length <= n:
+        return list(range(length))
+    xs = list(range(length))
+    _, sampled = _lttb(xs, xs, n)
+    indices = [int(i) for i in sampled]
+    return sorted(dict.fromkeys(indices))
+
+
 def _sample_data(data, n, chart_type=None):
     """Downsample to at most n points with type-aware strategy.
 
@@ -1018,6 +1058,16 @@ def _sample_data(data, n, chart_type=None):
     if isinstance(data, list) and len(data) > n:
         return random.sample(data, n)
     if isinstance(data, dict):
+        list_keys = [k for k, v in data.items() if isinstance(v, list)]
+        list_lens = {len(data[k]) for k in list_keys}
+        if len(list_keys) >= 2 and len(list_lens) == 1:
+            length = next(iter(list_lens))
+            if length > n:
+                indices = _sample_indices(length, n)
+                return {
+                    k: ([v[i] for i in indices] if k in list_keys else v)
+                    for k, v in data.items()
+                }
         return {k: _sample_data(v, n) for k, v in data.items()}
     return data
 
@@ -1029,7 +1079,16 @@ def load_duckdb(sql, db_path, chart_type):
     df = duckdb.connect(db_path).execute(sql).df()
     if chart_type == 'kline':
         col0 = df.columns[0]
-        dates = [d.strftime('%d/%m/%Y') for d in df[col0]]
+        def _coerce_date(val):
+            if hasattr(val, 'strftime'):
+                return val.strftime('%d/%m/%Y')
+            if isinstance(val, str):
+                return val
+            print(f'ERROR:schema: kline col0 must be date-like, got {type(val).__name__}',
+                  file=sys.stderr)
+            sys.exit(1)
+
+        dates = [_coerce_date(d) for d in df[col0]]
         return {
             'dates': dates,
             'open':  df['open'].tolist(),
