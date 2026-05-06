@@ -53,6 +53,24 @@ Default is `--art default` -- btop-like aesthetic, broad terminal compat.
 
 ![art tiers](docs/art-tiers.png)
 
+## Output formats
+
+`--output PATH` chooses the export format from the file suffix:
+
+| Suffix | Engine | Result |
+|---|---|---|
+| `.png` | `--engine pixel` | Existing matplotlib PNG file output |
+| `.txt` | default ASCII | Rendered chart text with ANSI escapes stripped |
+| `.ansi` | default ASCII | Rendered chart text with ANSI escapes preserved |
+| `.html` | default ASCII | `<pre>` snippet with ANSI foreground colors converted to inline spans |
+
+```bash
+glyph-arts bar --json '{"labels":["A","B"],"values":[1,2]}' --output chart.txt
+glyph-arts bar --json '{"labels":["A","B"],"values":[1,2]}' --output chart.ansi
+glyph-arts bar --json '{"labels":["A","B"],"values":[1,2]}' --output chart.html
+glyph-arts bar --engine pixel --json '{"labels":["A","B"],"values":[1,2]}' --output chart.png
+```
+
 ## Art command (Phase 2)
 
 The `art` command renders composable terminal text art: figlet font,

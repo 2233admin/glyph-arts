@@ -10,7 +10,9 @@ Animation (--animate):
   Flags: --refresh FPS (default 10), --window N (default 50), --duration SEC
 """
 import argparse
+import contextlib
 import datetime
+import io
 import json
 import os
 import random
@@ -1345,7 +1347,7 @@ Examples:
     p.add_argument('--orientation', choices=['vertical', 'horizontal'],
                    default='vertical', help='Bar orientation (bar/multibar/stackedbar)')
     p.add_argument('--output',      default='',
-                   help='Save chart to file instead of displaying (plotext only)')
+                   help='Save chart to file (.png with pixel engine; .txt/.ansi/.html with ascii engine)')
     p.add_argument('--no-color',    action='store_true',
                    help='Disable ANSI colors (respects NO_COLOR env var)')
     p.add_argument('--symbols',     default='braille', metavar='SET',
@@ -1533,7 +1535,18 @@ Examples:
                 )
                 sys.exit(rc)
 
-            CMDS[args.type](data, args.title, args.width, args.height, args.theme, **kw)
+            if args.output:
+                from cli_charts.render.export_engine import export_to_path
+
+                kw["output"] = ""
+                buf = io.StringIO()
+                with contextlib.redirect_stdout(buf):
+                    CMDS[args.type](
+                        data, args.title, args.width, args.height, args.theme, **kw
+                    )
+                export_to_path(buf.getvalue(), args.output, no_color)
+            else:
+                CMDS[args.type](data, args.title, args.width, args.height, args.theme, **kw)
         except (KeyError, IndexError, TypeError, ValueError) as exc:
             print(f'ERROR:schema: Invalid {args.type} data schema: {exc}\n'
                   f'Expected: {EXPECTED_SCHEMAS.get(args.type, "?")}',
