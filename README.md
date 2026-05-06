@@ -71,6 +71,18 @@ glyph-arts bar --json '{"labels":["A","B"],"values":[1,2]}' --output chart.html
 glyph-arts bar --engine pixel --json '{"labels":["A","B"],"values":[1,2]}' --output chart.png
 ```
 
+## Animation
+
+`animate` redraws an ASCII chart in-place using a cursor-home loop. MVP support:
+`line`, `bar`, `scatter`, and `sparkline`.
+
+```bash
+glyph-arts animate line --duration 5 --frames 30 \
+  --json '[{"label":"DAU","x":[1,2,3,4,5,6,7,8,9,10],"y":[100,120,115,130,125,140,135,150,145,160]}]'
+```
+
+Ctrl-C exits cleanly and leaves the complete final chart on screen.
+
 ## Art command (Phase 2)
 
 The `art` command renders composable terminal text art: figlet font,
@@ -121,10 +133,10 @@ glyph-arts --check-deps --all
 | drawille *(optional `[braille]`)* | `curve` `hires` `radar` |
 | plotille | `plotille` |
 | uniplot | `uniplot` |
-| misc | `graph` `sparkline` `banner` `art` |
+| misc | `graph` `sparkline` `banner` `art` `animate` |
 | media *(requires chafa + ffmpeg)* | `image` `video` |
 
-Total: **32 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
+Total: **33 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
 
 ## All flags
 

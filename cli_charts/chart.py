@@ -1174,6 +1174,11 @@ def load_duckdb(sql, db_path, chart_type):
 
 # -- registry ----------------------------------------------------------------
 
+def animate_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("animate is dispatched by main()")
+
+
 CMDS = {
     'kline':      kline,
     'line':       line,
@@ -1205,6 +1210,7 @@ CMDS = {
     'radar':       radar,
     'plotille':    plotille_chart,
     'rich_live':   rich_live,
+    'animate':     animate_command,
 }
 
 # Single source of truth for chart-type docs. Order is intentional.
@@ -1218,7 +1224,7 @@ CHART_TYPES_BY_ENGINE: dict[str, list[str]] = {
     'drawille': ['curve', 'hires', 'radar'],
     'plotille': ['plotille'],
     'uniplot': ['uniplot'],
-    'misc': ['graph', 'sparkline', 'banner', 'art'],
+    'misc': ['graph', 'sparkline', 'banner', 'art', 'animate'],
     'media': ['image', 'video'],
 }
 
@@ -1259,6 +1265,7 @@ EXPECTED_SCHEMAS = {
     'radar':       '{"labels":["ATK","DEF","SPD","MGC","LCK"],"series":[{"label":"Hero","values":[80,60,90,70,50],"color":[0,245,212]}],"max":100}',
     'plotille':    '[{"label":"A","x":[1,2,3,4],"y":[2,4,3,6],"color":"bright_cyan"}]',
     'rich_live':   '{"panels":[{"type":"bar","title":"Left","data":{"labels":["A","B"],"values":[1,2]}},{"type":"sparkline","title":"Right","data":{"values":[1,3,5,2,8]}}],"layout":"row","frames":1}',
+    'animate':     'glyph-arts animate line --duration 5 --frames 30 --json \'[{"label":"DAU","x":[...],"y":[...]}]\'',
 }
 
 # Types where --width/--height/--theme have no effect
@@ -1370,6 +1377,8 @@ Examples:
                    help='Keep last N data points in view (0=unlimited, default: 50)')
     p.add_argument('--duration',   type=float, default=0, metavar='SEC',
                    help='Auto-stop after SEC seconds (0=until EOF/Ctrl-C)')
+    p.add_argument('--frames',     type=int, default=30, metavar='N',
+                   help='TYPE=animate frame count (default: 30)')
     if '--check-deps' in sys.argv:
         _CORE = ['plotext', 'rich', 'uniplot', 'pyfiglet',
                  'sparklines', 'duckdb', 'pandas', 'networkx', 'phart']
@@ -1442,6 +1451,50 @@ Examples:
             args.height,
             no_color,
             args.output,
+        )
+        sys.exit(rc)
+
+    if args.type == 'animate':
+        if not args.art_text:
+            print('ERROR:schema: animate needs a chart type '
+                  '(line, bar, scatter, sparkline)', file=sys.stderr)
+            sys.exit(1)
+        chart_type = args.art_text[0]
+        no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
+        if args.file:
+            with open(args.file) as _f:
+                raw = _f.read().strip()
+        elif args.data:
+            raw = args.data
+        else:
+            raw = sys.stdin.read().strip()
+        if not raw:
+            print('ERROR:schema: Provide --json, --file, or pipe JSON to stdin',
+                  file=sys.stderr)
+            sys.exit(1)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            print(f'ERROR:json: {exc}', file=sys.stderr)
+            sys.exit(1)
+        from cli_charts.render.animate_engine import render_animate
+        rc = render_animate(
+            chart_type,
+            data,
+            args.duration,
+            args.frames,
+            title=args.title,
+            width=args.width,
+            height=args.height,
+            theme=args.theme,
+            xlabel=args.xlabel,
+            ylabel=args.ylabel,
+            xlim=args.xlim,
+            ylim=args.ylim,
+            xscale=args.xscale,
+            yscale=args.yscale,
+            orientation=args.orientation,
+            no_color=no_color,
         )
         sys.exit(rc)
 

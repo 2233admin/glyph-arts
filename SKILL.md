@@ -1,6 +1,6 @@
 ---
 name: glyph-arts
-description: glyph-arts -- terminal-visible chart toolkit. All chart types directly in the CLI -- no files, no GUI. plotext (kline/candlestick/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), rich (table/tree/panel/gauge/pie/dashboard/rich_live), drawille (curve/hires/radar), plotille (composable braille Figure), uniplot scientific line, media image/video (via chafa+ffmpeg, 2x4 braille sub-pixel with 24-bit truecolor), ASCII network graph, sparkline, pyfiglet banner, composable art text. LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
+description: glyph-arts -- terminal-visible chart toolkit. All chart types directly in the CLI -- no files, no GUI. plotext (kline/candlestick/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), rich (table/tree/panel/gauge/pie/dashboard/rich_live), drawille (curve/hires/radar), plotille (composable braille Figure), uniplot scientific line, media image/video (via chafa+ffmpeg, 2x4 braille sub-pixel with 24-bit truecolor), ASCII network graph, sparkline, pyfiglet banner, composable art text, cursor-home animate for line/bar/scatter/sparkline. LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
 version: 3.0.1
 ---
 
@@ -23,6 +23,9 @@ python $SKILL/scripts/chart.py <type> [--json '<data>'] [--file path.json] \
   [--xlim MIN MAX] [--ylim MIN MAX] \
   [--xscale linear|log] [--yscale linear|log] \
   [--orientation vertical|horizontal] [--output FILE] [--no-color]
+
+python $SKILL/scripts/chart.py animate <line|bar|scatter|sparkline> \
+  --duration SEC --frames N --json '<data>'
 ```
 
 **stdin pipe (for large data):**
@@ -76,6 +79,8 @@ What is your data shape?
 +-- Multiple metrics at once          -> rich dashboard
 |
 +-- Inline sparkline (1 row)          -> sparkline
+|
++-- Progressive reveal in terminal    -> animate line/bar/scatter/sparkline
 |
 +-- Network / graph topology          -> graph
 |
@@ -167,9 +172,13 @@ decision.
 | `sparkline` | `{"values":[1,3,5,2,8]}` -- single-row inline |
 | `banner` | `{"text":"PROFIT","font":"big","color":"green"}` |
 | `art` | positional text: `art SHIP IT --font slant --decor barcode --frame double --gradient sunset` |
+| `animate` | `animate line --duration 5 --frames 30 --json '[{"label":"A","x":[...],"y":[...]}]'` |
 
 Trigger keywords for `art`: wordmark, figlet, framed text, gradient text,
 decorated ASCII, composable text art.
+
+Trigger keywords for `animate`: animation, animated chart, progressive reveal,
+terminal playback, cursor-home redraw.
 
 ---
 
