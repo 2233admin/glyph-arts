@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import os
 import shutil
 import subprocess
 import sys
@@ -116,23 +117,43 @@ def _figure_to_png(fig):
 
 
 def _pipe_to_chafa(png_bytes, w, h, no_color):
+    """Pipe PNG to chafa, write its stdout, return 0 on success / 4 on failure."""
     cmd = ['chafa', '--size', f'{w}x{h}'] + (['--colors', 'none'] if no_color else []) + ['-']
-    result = subprocess.run(cmd, input=png_bytes, capture_output=True, timeout=10)
-    sys.stdout.buffer.write(result.stdout)
+    try:
+        result = subprocess.run(cmd, input=png_bytes, capture_output=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        print(f'ERROR:render: chafa invocation failed: {e}', file=sys.stderr)
+        return 4
+    if result.returncode != 0:
+        last = (result.stderr or b'').decode('utf-8', errors='replace').strip().splitlines()
+        msg = last[-1] if last else f'chafa exit {result.returncode}'
+        print(f'ERROR:render: {msg}', file=sys.stderr)
+        return 4
+    # Use os.write(fd=1) instead of sys.stdout.buffer.write — the package's
+    # cli_charts/__init__.py calls sys.stdout.reconfigure(encoding='utf-8',
+    # errors='replace') for Windows cp1252 safety, which on some Python
+    # versions detaches the old BufferedWriter so `sys.stdout.buffer.write`
+    # silently no-ops. Writing to fd 1 directly bypasses any TextIOWrapper.
     sys.stdout.flush()
-    return result.returncode == 0
+    os.write(1, result.stdout)
+    return 0
 
 
 def render_pixel(chart_type, data, w, h, *, title='', theme='pro', output=None, no_color=False, **_unused):
     if chart_type not in PIXEL_SUPPORTED:
+        print(f'ERROR:render: --engine pixel does not support {chart_type!r} '
+              f'(Phase A: bar/line/scatter)', file=sys.stderr)
         return 1
 
     try:
         _validate_data(chart_type, data)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError) as e:
+        print(f'ERROR:schema: pixel engine input invalid: {e}', file=sys.stderr)
         return 1
 
     if shutil.which('chafa') is None:
+        print('ERROR:dep: chafa not in PATH (install: scoop install chafa | '
+              'brew install chafa | apt install chafa)', file=sys.stderr)
         return 2
 
     try:
@@ -141,23 +162,32 @@ def render_pixel(chart_type, data, w, h, *, title='', theme='pro', output=None, 
         matplotlib.use('Agg')
         import matplotlib.pyplot as plt
     except ImportError:
+        print('ERROR:dep: matplotlib not installed (pip install glyph-arts[pixel])',
+              file=sys.stderr)
         return 2
 
     fig = None
     try:
         _apply_theme(matplotlib, theme, no_color)
         fig = _build_figure(plt, chart_type, data, w, h, title)
-        if output is not None:
+        # Note: argparse passes default='' (empty string), not None. Use
+        # truthy check so unspecified --output falls through to chafa path.
+        if output:
             fig.savefig(output)
             return 0
 
         png_bytes = _figure_to_png(fig)
-        return 0 if _pipe_to_chafa(png_bytes, w, h, no_color) else 4
-    except (TypeError, ValueError):
+        return _pipe_to_chafa(png_bytes, w, h, no_color)
+    except (TypeError, ValueError) as e:
+        print(f'ERROR:schema: pixel engine input invalid: {e}', file=sys.stderr)
         return 1
-    except (ImportError, FileNotFoundError):
+    except (ImportError, FileNotFoundError) as e:
+        print(f'ERROR:dep: {e}', file=sys.stderr)
         return 2
     except Exception:
+        import traceback
+        last = traceback.format_exc().strip().splitlines()[-1]
+        print(f'ERROR:render: matplotlib failed: {last}', file=sys.stderr)
         return 4
     finally:
         if fig is not None:

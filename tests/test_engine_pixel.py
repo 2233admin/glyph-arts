@@ -19,13 +19,18 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def _run(args):
+    """Run chart.py CLI. stdout is binary because chafa kitty graphics
+    protocol output is not utf-8 decodable; stderr stays text for greps."""
     return subprocess.run(
         [sys.executable, '-m', 'cli_charts.chart', *args],
         capture_output=True,
-        text=True,
         timeout=30,
         cwd=str(ROOT),
     )
+
+
+def _stderr_text(result):
+    return (result.stderr or b'').decode('utf-8', errors='replace')
 
 
 def test_render_pixel_signature():
@@ -45,7 +50,7 @@ def test_bar_pixel_exit0():
         '--width', '40', '--height', '12',
     ])
 
-    assert result.returncode == 0, f'stderr={result.stderr}'
+    assert result.returncode == 0, f'stderr={_stderr_text(result)}'
     assert len(result.stdout) > 100
 
 
@@ -56,7 +61,7 @@ def test_line_pixel_exit0():
         '--width', '40', '--height', '12',
     ])
 
-    assert result.returncode == 0, f'stderr={result.stderr}'
+    assert result.returncode == 0, f'stderr={_stderr_text(result)}'
     assert len(result.stdout) > 100
 
 
@@ -67,7 +72,7 @@ def test_scatter_pixel_exit0():
         '--width', '40', '--height', '12',
     ])
 
-    assert result.returncode == 0, f'stderr={result.stderr}'
+    assert result.returncode == 0, f'stderr={_stderr_text(result)}'
     assert len(result.stdout) > 100
 
 
@@ -78,8 +83,9 @@ def test_heatmap_unsupported_fallback():
         '--width', '40', '--height', '8',
     ])
 
-    assert result.returncode == 0, f'stderr={result.stderr}'
-    assert 'fallback' in result.stderr.lower() or 'ascii' in result.stderr.lower()
+    assert result.returncode == 0, f'stderr={_stderr_text(result)}'
+    err = _stderr_text(result).lower()
+    assert 'fallback' in err or 'ascii' in err
 
 
 def test_output_file_png(tmp_path):
@@ -91,7 +97,7 @@ def test_output_file_png(tmp_path):
         '--output', str(output),
     ])
 
-    assert result.returncode == 0, f'stderr={result.stderr}'
+    assert result.returncode == 0, f'stderr={_stderr_text(result)}'
     assert output.exists()
     assert output.stat().st_size > 0
 
@@ -103,6 +109,7 @@ def test_no_color_no_truecolor():
         '--width', '40', '--height', '10',
     ])
 
-    assert result.returncode == 0, f'stderr={result.stderr}'
-    assert '\x1b[38;2;' not in result.stdout
-    assert '\x1b[38;2;' not in result.stderr
+    assert result.returncode == 0, f'stderr={_stderr_text(result)}'
+    # chafa --colors none -> no truecolor escape (\x1b[38;2; = SGR truecolor fg)
+    assert b'\x1b[38;2;' not in result.stdout
+    assert b'\x1b[38;2;' not in (result.stderr or b'')
