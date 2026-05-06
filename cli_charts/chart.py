@@ -20,6 +20,8 @@ import shutil
 import subprocess
 import sys
 
+from .osc8 import link as _osc8_link
+from .font_tier import detect_font_tier
 from .themes import get_palette as _get_palette
 
 try:
@@ -161,6 +163,8 @@ def _render_video(path, w, h, fps=12, symbols='braille', duration=0.0, no_color=
 def _plt_finalize(plt, title, w, h, theme, kw):
     """Apply common plotext settings and render."""
     if title:
+        if kw.get('link_title'):
+            title = _osc8_link(title, kw['link_title'])
         plt.title(title)
     plt.plotsize(w, h)
     _palette = _get_palette(theme)
@@ -196,6 +200,62 @@ def _plt_finalize(plt, title, w, h, theme, kw):
         sys.stdout.write('\n')
     else:
         plt.show()
+
+
+def _series_color(theme, index, explicit=None):
+    if explicit:
+        return explicit
+    palette = _get_palette(theme)
+    if not palette:
+        return None
+    series = palette.get('series') or []
+    if not series:
+        return None
+    return series[index % len(series)]
+
+
+def _statusline_values(d):
+    if isinstance(d, list):
+        if d and isinstance(d[0], dict):
+            if 'y' in d[0]:
+                return d[0]['y']
+            if 'values' in d[0]:
+                return d[0]['values']
+        return d
+    if isinstance(d, dict):
+        if 'values' in d:
+            return d['values']
+        if 'y' in d:
+            return d['y']
+    return []
+
+
+def _render_statusline(chart_type, d, title=''):
+    import sparklines as sl
+    text = ''
+    if chart_type == 'sparkline':
+        values = _statusline_values(d)
+        spark = ''.join(sl.sparklines(values)) if values else ''
+        label = title or (d.get('label', '') if isinstance(d, dict) else '')
+        value = values[-1] if values else ''
+        suffix = f' {label}: {value}' if label else ''
+        text = f'{spark}{suffix}'
+    elif chart_type == 'indicator':
+        label = d.get('label', title or '')
+        value = d.get('value', '')
+        unit = d.get('unit', '')
+        text = f'{label}: {value}{unit}' if label else f'{value}{unit}'
+    elif chart_type == 'gauge':
+        metrics = d if isinstance(d, list) else d.get('metrics', [d])
+        parts = []
+        for m in metrics:
+            val = float(m['value'])
+            mx = float(m.get('max', 100))
+            pct = max(0.0, min(1.0, val / mx)) if mx else 0.0
+            filled = round(pct * 10)
+            parts.append(f"{m.get('label', '')} [{'█' * filled}{'░' * (10 - filled)}] {pct:.0%}")
+        text = ' '.join(parts)
+    print(text.replace('\n', ' ')[:80])
 
 
 # ── 24-bit Braille engine (hires / radar) ────────────────────────────────────
@@ -331,10 +391,13 @@ def line(d, title, w, h, theme, **kw):
     """plotext multi-series line chart."""
     import plotext as plt
     series = d if isinstance(d, list) else [d]
-    for s in series:
+    for i, s in enumerate(series):
         x = s.get('x', list(range(len(s['y']))))
-        plt.plot(x, s['y'], label=s.get('label', ''),
-                 marker=s.get('marker'), color=s.get('color'))
+        label = s.get('label', '')
+        if kw.get('link_data'):
+            label = _osc8_link(label or f'S{i}', kw['link_data'])
+        plt.plot(x, s['y'], label=label,
+                 marker=s.get('marker'), color=_series_color(theme, i, s.get('color')))
     _plt_finalize(plt, title, w, h, theme, kw)
 
 
@@ -342,10 +405,13 @@ def scatter(d, title, w, h, theme, **kw):
     """plotext scatter plot. Same schema as line."""
     import plotext as plt
     series = d if isinstance(d, list) else [d]
-    for s in series:
+    for i, s in enumerate(series):
         x = s.get('x', list(range(len(s['y']))))
-        plt.scatter(x, s['y'], label=s.get('label', ''),
-                    marker=s.get('marker'), color=s.get('color'))
+        label = s.get('label', '')
+        if kw.get('link_data'):
+            label = _osc8_link(label or f'S{i}', kw['link_data'])
+        plt.scatter(x, s['y'], label=label,
+                    marker=s.get('marker'), color=_series_color(theme, i, s.get('color')))
     _plt_finalize(plt, title, w, h, theme, kw)
 
 
@@ -464,6 +530,9 @@ def box(d, title, w, h, theme, **kw):
 
 def indicator(d, title, w, h, theme, **kw):
     """plotext big-number KPI display."""
+    if kw.get('statusline'):
+        _render_statusline('indicator', d, title)
+        return
     import plotext as plt
     plt.indicator(d['value'], d.get('label', title or ''))
     _plt_finalize(plt, None, w, h, theme, kw)  # title already baked into label
@@ -481,6 +550,9 @@ def event(d, title, w, h, theme, **kw):
 
 def sparkline(d, title, w, h, theme, **kw):
     """sparklines unicode block chart -- single line."""
+    if kw.get('statusline'):
+        _render_statusline('sparkline', d, title)
+        return
     import sparklines as sl
     if title:
         print(title)
@@ -490,6 +562,11 @@ def sparkline(d, title, w, h, theme, **kw):
 
 def table(d, title, w, h, theme, **kw):
     """rich double-edge formatted table."""
+    output = kw.get('output')
+    if output and str(output).lower().endswith('.md'):
+        from cli_charts.render.markdown_export import export_table
+        export_table(d, output)
+        return
     from rich import box as richbox
     from rich.console import Console
     from rich.table import Table
@@ -605,6 +682,9 @@ def gauge(d, title, w, h, theme, **kw):
     """rich multi-metric progress bars (static gauge).
     Auto-colors: green <70%, yellow <90%, red >=90%.
     """
+    if kw.get('statusline'):
+        _render_statusline('gauge', d, title)
+        return
     from rich import box as richbox
     from rich.console import Console
     from rich.table import Table
@@ -1347,6 +1427,8 @@ Examples:
                    help='Chart height in terminal rows (ignored for table/tree/panel/graph/sparkline)')
     p.add_argument('--theme',       default='pro',
                    help='plotext theme: pro dark clear matrix retro elegant + brand palettes: claude linear tesla vercel (ignored for rich/graph/sparkline)')
+    p.add_argument('--font-tier',   choices=['ascii', 'unicode', 'unicode-extended', 'nerd'],
+                   default=None, help='Terminal font capability tier (default: auto-detect)')
     p.add_argument('--font',        default='slant',
                    help='TYPE=art figlet font (default: slant)')
     p.add_argument('--decor',       choices=['barcode', 'snake', 'dna', 'random', 'wave'],
@@ -1375,7 +1457,7 @@ Examples:
     p.add_argument('--orientation', choices=['vertical', 'horizontal'],
                    default='vertical', help='Bar orientation (bar/multibar/stackedbar)')
     p.add_argument('--output',      default='',
-                   help='Save chart to file (.png with pixel engine; .txt/.ansi/.html with ascii engine)')
+                   help='Save chart to file (.png with pixel engine; .txt/.ansi/.html with ascii engine; .md for table)')
     p.add_argument('--output-dir',  default='',
                    help='TYPE=to-hyperframes output directory for PNG frames + HyperFrames metadata')
     p.add_argument('--cmd',         default='',
@@ -1404,6 +1486,12 @@ Examples:
                    help='Auto-stop after SEC seconds (0=until EOF/Ctrl-C)')
     p.add_argument('--frames',     type=int, default=30, metavar='N',
                    help='TYPE=animate frame count (default: 30)')
+    p.add_argument('--link-data',  default='',
+                   help='OSC 8 hyperlink URL for line/scatter data labels')
+    p.add_argument('--link-title', default='',
+                   help='OSC 8 hyperlink URL for the chart title')
+    p.add_argument('--statusline', action='store_true',
+                   help='Single-line ANSI-safe output for Claude Code statusLine.command')
     if '--check-deps' in sys.argv:
         _CORE = ['plotext', 'rich', 'uniplot', 'pyfiglet',
                  'sparklines', 'duckdb', 'pandas', 'networkx', 'phart']
@@ -1439,6 +1527,8 @@ Examples:
         sys.exit(0)
 
     args = p.parse_args()
+    if args.font_tier is None:
+        args.font_tier = detect_font_tier()
 
     # Media types (image/video) bypass JSON loading -- they take a filesystem path.
     if args.type in _MEDIA_TYPES:
@@ -1627,6 +1717,9 @@ Examples:
             orientation=args.orientation,
             output=args.output,
             no_color=no_color,
+            link_data=args.link_data,
+            link_title=args.link_title,
+            statusline=args.statusline,
         )
 
         try:
@@ -1651,7 +1744,9 @@ Examples:
                 )
                 sys.exit(rc)
 
-            if args.output:
+            if args.output and args.type == 'table' and args.output.lower().endswith('.md'):
+                CMDS[args.type](data, args.title, args.width, args.height, args.theme, **kw)
+            elif args.output:
                 from cli_charts.render.export_engine import export_to_path
 
                 kw["output"] = ""
