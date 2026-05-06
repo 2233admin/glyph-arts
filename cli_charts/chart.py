@@ -1189,6 +1189,11 @@ def record_replay_command(d, title, w, h, theme, **kw):
     raise RuntimeError("record-replay is dispatched by main()")
 
 
+def to_hyperframes_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("to-hyperframes is dispatched by main()")
+
+
 CMDS = {
     'kline':      kline,
     'line':       line,
@@ -1223,6 +1228,7 @@ CMDS = {
     'animate':     animate_command,
     'record':      record_command,
     'record-replay': record_replay_command,
+    'to-hyperframes': to_hyperframes_command,
 }
 
 # Single source of truth for chart-type docs. Order is intentional.
@@ -1236,7 +1242,7 @@ CHART_TYPES_BY_ENGINE: dict[str, list[str]] = {
     'drawille': ['curve', 'hires', 'radar'],
     'plotille': ['plotille'],
     'uniplot': ['uniplot'],
-    'misc': ['graph', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay'],
+    'misc': ['graph', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes'],
     'media': ['image', 'video'],
 }
 
@@ -1280,6 +1286,7 @@ EXPECTED_SCHEMAS = {
     'animate':     'glyph-arts animate line --duration 5 --frames 30 --json \'[{"label":"DAU","x":[...],"y":[...]}]\'',
     'record':      "glyph-arts record demo.cast --cmd 'echo hi' --duration 1",
     'record-replay': 'glyph-arts record-replay demo.cast --output demo.gif',
+    'to-hyperframes': "glyph-arts to-hyperframes --json '[{\"label\":\"x\",\"x\":[1,2],\"y\":[3,4]}]' --frames 30 --duration 5 --output-dir ./hf",
 }
 
 # Types where --width/--height/--theme have no effect
@@ -1369,6 +1376,8 @@ Examples:
                    default='vertical', help='Bar orientation (bar/multibar/stackedbar)')
     p.add_argument('--output',      default='',
                    help='Save chart to file (.png with pixel engine; .txt/.ansi/.html with ascii engine)')
+    p.add_argument('--output-dir',  default='',
+                   help='TYPE=to-hyperframes output directory for PNG frames + HyperFrames metadata')
     p.add_argument('--cmd',         default='',
                    help='TYPE=record command to run inside asciinema')
     p.add_argument('--no-color',    action='store_true',
@@ -1528,6 +1537,28 @@ Examples:
             sys.exit(1)
         from cli_charts.render.record_engine import record_replay
         rc = record_replay(args.art_text[0], args.output)
+        sys.exit(rc)
+
+    if args.type == 'to-hyperframes':
+        if not args.data:
+            print('ERROR:schema: to-hyperframes needs --json SERIES_JSON', file=sys.stderr)
+            sys.exit(1)
+        if not args.output_dir:
+            print('ERROR:schema: to-hyperframes needs --output-dir DIR', file=sys.stderr)
+            sys.exit(1)
+        from cli_charts.adapters.hyperframes import to_hyperframes
+        no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
+        rc = to_hyperframes(
+            args.data,
+            args.frames,
+            args.duration,
+            args.output_dir,
+            width=args.width,
+            height=args.height,
+            title=args.title,
+            theme=args.theme,
+            no_color=no_color,
+        )
         sys.exit(rc)
 
     if args.animate:

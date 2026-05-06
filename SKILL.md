@@ -29,6 +29,10 @@ python $SKILL/scripts/chart.py animate <line|bar|scatter|sparkline> \
 
 python $SKILL/scripts/chart.py record demo.cast --cmd 'glyph-arts art DEMO' --duration 10
 python $SKILL/scripts/chart.py record-replay demo.cast --output demo.gif
+
+python $SKILL/scripts/chart.py to-hyperframes \
+  --json '[{"label":"x","x":[1,2,3,4,5],"y":[10,20,15,30,25]}]' \
+  --frames 30 --duration 5 --output-dir ./hf-demo
 ```
 
 **stdin pipe (for large data):**
@@ -84,6 +88,8 @@ What is your data shape?
 +-- Inline sparkline (1 row)          -> sparkline
 |
 +-- Progressive reveal in terminal    -> animate line/bar/scatter/sparkline
+|
++-- MP4/WebM/high-quality video       -> to-hyperframes, then npx hyperframes render
 |
 +-- Network / graph topology          -> graph
 |
@@ -178,6 +184,7 @@ decision.
 | `animate` | `animate line --duration 5 --frames 30 --json '[{"label":"A","x":[...],"y":[...]}]'` |
 | `record` | `record demo.cast --cmd 'glyph-arts art DEMO' --duration 10` |
 | `record-replay` | `record-replay demo.cast --output demo.gif` -- `.gif` via agg, `.svg` via svg-term, `.html` snippet, `.cast` passthrough |
+| `to-hyperframes` | `to-hyperframes --json '[{"label":"A","x":[...],"y":[...]}]' --frames 30 --duration 5 --output-dir ./hf` -- writes PNG frame sequence, `manifest.json`, and `composition.html`; requires HyperFrames installed separately with `npx hyperframes init` |
 
 Trigger keywords for `art`: wordmark, figlet, framed text, gradient text,
 decorated ASCII, composable text art.
@@ -187,6 +194,15 @@ terminal playback, cursor-home redraw.
 
 Trigger keywords for `record`: record terminal, asciinema, cast file,
 terminal recording, replay export, gif export, svg export.
+
+Trigger keywords for `to-hyperframes`: 视频, video, mp4, webm, 动画, motion,
+GSAP, launch, demo, hyperframes.
+
+Video output decision tree:
+- User wants GIF + short demo -> use `glyph-arts record` + `glyph-arts record-replay`
+- User wants MP4 + high quality video -> use `glyph-arts to-hyperframes` + `npx hyperframes render`
+- User wants embed README -> use `record-replay --output .gif` because GIF auto-plays in GitHub README
+- User wants embed blog HTML -> use `record-replay --output .svg` for vector scaling
 
 ---
 

@@ -104,6 +104,29 @@ glyph-arts record-replay demo.cast --output demo.cast
 
 Missing tools fail with `ERROR:dep:` and an OS-specific install hint.
 
+## HyperFrames Integration
+
+`to-hyperframes` generates a progressive line-chart PNG sequence plus
+`manifest.json` and `composition.html` for HyperFrames. HyperFrames is not a
+Python dependency; install and render it separately:
+
+```bash
+npx hyperframes init
+
+glyph-arts to-hyperframes \
+  --json '[{"label":"x","x":[1,2,3,4,5],"y":[10,20,15,30,25]}]' \
+  --frames 30 \
+  --duration 5 \
+  --output-dir ./hf-demo
+
+# Then render with HyperFrames, for example:
+npx hyperframes render ./hf-demo/composition.html
+```
+
+The output directory contains `frame_001.png` through `frame_NNN.png`,
+`manifest.json`, and `composition.html`. Each frame reveals a larger slice of
+the input series.
+
 ## Art command (Phase 2)
 
 The `art` command renders composable terminal text art: figlet font,
@@ -154,10 +177,10 @@ glyph-arts --check-deps --all
 | drawille *(optional `[braille]`)* | `curve` `hires` `radar` |
 | plotille | `plotille` |
 | uniplot | `uniplot` |
-| misc | `graph` `sparkline` `banner` `art` `animate` `record` `record-replay` |
+| misc | `graph` `sparkline` `banner` `art` `animate` `record` `record-replay` `to-hyperframes` |
 | media *(requires chafa + ffmpeg)* | `image` `video` |
 
-Total: **35 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
+Total: **36 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
 
 ## All flags
 
