@@ -83,6 +83,27 @@ glyph-arts animate line --duration 5 --frames 30 \
 
 Ctrl-C exits cleanly and leaves the complete final chart on screen.
 
+## Recording
+
+`record` and `record-replay` wrap optional system tools for terminal session
+capture and replay export. Install only the tools for the formats you need:
+
+| Tool | Used for | Windows install |
+|---|---|---|
+| `asciinema` | `.cast` recording | `scoop install asciinema` or `choco install asciinema` or `pip install asciinema` |
+| `agg` | `.cast` to `.gif` | `scoop install agg` or `cargo install --git https://github.com/asciinema/agg` |
+| `svg-term` | `.cast` to `.svg` | `npm install -g svg-term-cli` |
+
+```bash
+glyph-arts record demo.cast --cmd 'glyph-arts art "DEMO" --gradient sunset' --duration 10
+glyph-arts record-replay demo.cast --output demo.gif
+glyph-arts record-replay demo.cast --output demo.svg
+glyph-arts record-replay demo.cast --output demo.html
+glyph-arts record-replay demo.cast --output demo.cast
+```
+
+Missing tools fail with `ERROR:dep:` and an OS-specific install hint.
+
 ## Art command (Phase 2)
 
 The `art` command renders composable terminal text art: figlet font,
@@ -133,10 +154,10 @@ glyph-arts --check-deps --all
 | drawille *(optional `[braille]`)* | `curve` `hires` `radar` |
 | plotille | `plotille` |
 | uniplot | `uniplot` |
-| misc | `graph` `sparkline` `banner` `art` `animate` |
+| misc | `graph` `sparkline` `banner` `art` `animate` `record` `record-replay` |
 | media *(requires chafa + ffmpeg)* | `image` `video` |
 
-Total: **33 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
+Total: **35 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
 
 ## All flags
 

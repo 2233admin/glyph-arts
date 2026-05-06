@@ -1179,6 +1179,16 @@ def animate_command(d, title, w, h, theme, **kw):
     raise RuntimeError("animate is dispatched by main()")
 
 
+def record_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("record is dispatched by main()")
+
+
+def record_replay_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("record-replay is dispatched by main()")
+
+
 CMDS = {
     'kline':      kline,
     'line':       line,
@@ -1211,6 +1221,8 @@ CMDS = {
     'plotille':    plotille_chart,
     'rich_live':   rich_live,
     'animate':     animate_command,
+    'record':      record_command,
+    'record-replay': record_replay_command,
 }
 
 # Single source of truth for chart-type docs. Order is intentional.
@@ -1224,7 +1236,7 @@ CHART_TYPES_BY_ENGINE: dict[str, list[str]] = {
     'drawille': ['curve', 'hires', 'radar'],
     'plotille': ['plotille'],
     'uniplot': ['uniplot'],
-    'misc': ['graph', 'sparkline', 'banner', 'art', 'animate'],
+    'misc': ['graph', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay'],
     'media': ['image', 'video'],
 }
 
@@ -1266,6 +1278,8 @@ EXPECTED_SCHEMAS = {
     'plotille':    '[{"label":"A","x":[1,2,3,4],"y":[2,4,3,6],"color":"bright_cyan"}]',
     'rich_live':   '{"panels":[{"type":"bar","title":"Left","data":{"labels":["A","B"],"values":[1,2]}},{"type":"sparkline","title":"Right","data":{"values":[1,3,5,2,8]}}],"layout":"row","frames":1}',
     'animate':     'glyph-arts animate line --duration 5 --frames 30 --json \'[{"label":"DAU","x":[...],"y":[...]}]\'',
+    'record':      "glyph-arts record demo.cast --cmd 'echo hi' --duration 1",
+    'record-replay': 'glyph-arts record-replay demo.cast --output demo.gif',
 }
 
 # Types where --width/--height/--theme have no effect
@@ -1355,6 +1369,8 @@ Examples:
                    default='vertical', help='Bar orientation (bar/multibar/stackedbar)')
     p.add_argument('--output',      default='',
                    help='Save chart to file (.png with pixel engine; .txt/.ansi/.html with ascii engine)')
+    p.add_argument('--cmd',         default='',
+                   help='TYPE=record command to run inside asciinema')
     p.add_argument('--no-color',    action='store_true',
                    help='Disable ANSI colors (respects NO_COLOR env var)')
     p.add_argument('--symbols',     default='braille', metavar='SET',
@@ -1496,6 +1512,22 @@ Examples:
             orientation=args.orientation,
             no_color=no_color,
         )
+        sys.exit(rc)
+
+    if args.type == 'record':
+        if not args.art_text:
+            print('ERROR:schema: record needs an output .cast path', file=sys.stderr)
+            sys.exit(1)
+        from cli_charts.render.record_engine import record
+        rc = record(args.art_text[0], args.cmd, args.duration)
+        sys.exit(rc)
+
+    if args.type == 'record-replay':
+        if not args.art_text:
+            print('ERROR:schema: record-replay needs an input .cast path', file=sys.stderr)
+            sys.exit(1)
+        from cli_charts.render.record_engine import record_replay
+        rc = record_replay(args.art_text[0], args.output)
         sys.exit(rc)
 
     if args.animate:
