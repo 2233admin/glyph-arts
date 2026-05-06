@@ -184,6 +184,14 @@ def _plt_finalize(plt, title, w, h, theme, kw):
         plt.yscale('log')
     if kw.get('output'):
         plt.save_fig(kw['output'], keep_colors=False)
+    elif kw.get('no_color'):
+        # plotext theme() must be set before plot calls to take effect; by the
+        # time _plt_finalize runs, plot data is already buffered. Build the
+        # output string and strip ANSI escapes ourselves -- works for any theme.
+        import re as _re
+        _ansi = _re.compile(r'\x1b\[[0-9;]*m')
+        sys.stdout.write(_ansi.sub('', plt.build()))
+        sys.stdout.write('\n')
     else:
         plt.show()
 
@@ -747,8 +755,20 @@ def confusion(d, title, w, h, theme, **kw):
     actual/predicted must be lists of class labels (int or str).
     """
     import plotext as plt
+    actual_raw, predicted_raw = d['actual'], d['predicted']
+    # plotext treats string xticks as dates and rejects them with a
+    # %d/%m/%Y validation error. Map string labels to int indices and
+    # synthesize a labels=[...] list so the user sees the original strings.
+    if any(isinstance(v, str) for v in actual_raw) or any(isinstance(v, str) for v in predicted_raw):
+        labels_in = d.get('labels') or sorted({str(v) for v in (*actual_raw, *predicted_raw)})
+        index = {v: i for i, v in enumerate(labels_in)}
+        actual = [index[str(v)] for v in actual_raw]
+        predicted = [index[str(v)] for v in predicted_raw]
+        labels = labels_in
+    else:
+        actual, predicted, labels = actual_raw, predicted_raw, d.get('labels')
     try:
-        plt.confusion_matrix(d['actual'], d['predicted'], labels=d.get('labels'))
+        plt.confusion_matrix(actual, predicted, labels=labels)
     except ZeroDivisionError:  # plotext bug: M==m when all matrix cells are equal
         from collections import Counter
 
