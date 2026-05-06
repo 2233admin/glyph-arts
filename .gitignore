@@ -1,3 +1,4 @@
+# Python build artifacts
 __pycache__/
 *.py[cod]
 *.pyo
@@ -5,5 +6,30 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+# Virtualenvs
 .venv/
+venv/
+.venv-*-backup/
+.venv.bak/
+
+# Test / lint / type-check caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+*.cover
+coverage.xml
+.coverage
+.coverage.*
+
+# Editor / OS
+.env
+.env.local
+.DS_Store
+.idea/
+.vscode/
+
+# Local recording / handoff artifacts
 *.tape
+progress.txt

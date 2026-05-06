@@ -1,2 +1,0 @@
-[console_scripts]
-cli-charts = cli_charts.chart:main
