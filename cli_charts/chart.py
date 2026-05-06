@@ -35,7 +35,7 @@ except Exception:
         from pathlib import Path as _Path
         _VERSION = (_Path(__file__).parent.parent / "VERSION").read_text().strip()
     except Exception:
-        _VERSION = "2.4.1"
+        _VERSION = "unknown"
 
 
 # -- helpers -----------------------------------------------------------------

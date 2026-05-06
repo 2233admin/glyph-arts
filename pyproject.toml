@@ -18,28 +18,33 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Terminals",
 ]
 dependencies = [
-    "plotext>=5.2",
-    "rich>=13.0",
-    "phart>=0.4",
-    "networkx>=3.0",
-    "sparklines>=0.4",
-    "pandas>=2.0",
     "duckdb>=0.10",
+    "networkx>=3.0",
+    "pandas>=2.0",
+    "phart>=0.4",
+    "plotext>=5.2",
+    "plotille>=0.5",
     "pyfiglet>=0.8",
+    "rich>=13.0",
+    "sparklines>=0.4",
     "uniplot>=0.5",
 ]
 
 [project.optional-dependencies]
 braille = ["drawille>=0.2"]
 lttb    = ["lttb>=0.3"]
+test    = ["pytest>=7", "numpy>=1.24"]
 tui     = ["textual>=0.50"]
 all     = ["drawille>=0.2", "lttb>=0.3", "textual>=0.50"]
 
 [project.scripts]
 glyph-arts = "cli_charts.chart:main"
+glyph-arts-dashboard = "cli_charts.dashboard:main"
 
 [project.urls]
 Homepage = "https://github.com/2233admin/glyph-arts"
