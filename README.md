@@ -24,6 +24,19 @@ pip install "glyph-arts[tui]"
 pip install "glyph-arts[all]"
 ```
 
+## See it in action
+
+```bash
+glyph-arts demo              # 30s auto reel
+glyph-arts demo --speed fast # 10s for impatient viewers
+glyph-arts gallery           # browse 25 renderable charts interactively
+glyph-arts gallery --output gallery.html  # static HTML demo
+```
+
+![demo](docs/demo.gif)
+<!-- TODO: record actual demo.gif via asciinema/agg, see
+     docs/recording-demo.md (P13). -->
+
 ## System dependencies (image / video charts only)
 
 The `image` and `video` chart types shell out to `chafa` and `ffmpeg`.
@@ -206,7 +219,7 @@ glyph-arts --check-deps --all
 | misc | `graph` `sparkline` `banner` `art` `animate` `record` `record-replay` `to-hyperframes` |
 | media *(requires chafa + ffmpeg)* | `image` `video` |
 
-Total: **38 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
+Total: **41 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
 
 ## All flags
 

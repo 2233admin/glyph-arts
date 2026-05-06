@@ -1509,6 +1509,7 @@ INTERACTIVE_SUPPORTED = frozenset({'line'})
 # -- main --------------------------------------------------------------------
 
 def main(argv=None):
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
     epilog_lines = [f'Chart types ({CHART_TYPE_COUNT}):']
     for engine, types in CHART_TYPES_BY_ENGINE.items():
         epilog_lines.append(f'  {engine:9}: {" ".join(types)}')
@@ -1692,7 +1693,7 @@ Examples:
         from cli_charts.gallery_engine import run_gallery
         sys.exit(run_gallery(output=args.output or None,
                              chart=args.chart or None,
-                             theme=args.theme or None))
+                             theme=args.theme if '--theme' in raw_argv else None))
 
     if args.type == 'splash':
         from cli_charts.splash import main as splash_main

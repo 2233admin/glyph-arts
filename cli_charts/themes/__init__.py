@@ -12,13 +12,19 @@ Each palette dict has the keys:
 """
 
 from .claude import PALETTE as _CLAUDE
+from .claude_ansi import CLAUDE_DARK_ANSI as _CLAUDE_DARK_ANSI
+from .claude_ansi import CLAUDE_LIGHT_ANSI as _CLAUDE_LIGHT_ANSI
 from .linear import PALETTE as _LINEAR
+from .subagent_rainbow import PALETTE as _SUBAGENT_RAINBOW
 from .tesla import PALETTE as _TESLA
 from .vercel import PALETTE as _VERCEL
 
 CUSTOM_THEMES: dict[str, dict] = {
     "claude": _CLAUDE,
+    "claude-dark-ansi": _CLAUDE_DARK_ANSI,
+    "claude-light-ansi": _CLAUDE_LIGHT_ANSI,
     "linear": _LINEAR,
+    "subagent-rainbow": _SUBAGENT_RAINBOW,
     "tesla":  _TESLA,
     "vercel": _VERCEL,
 }

@@ -22,7 +22,8 @@ python $SKILL/scripts/chart.py <type> [--json '<data>'] [--file path.json] \
   [--sample N] [--xlabel X] [--ylabel Y] \
   [--xlim MIN MAX] [--ylim MIN MAX] \
   [--xscale linear|log] [--yscale linear|log] \
-  [--orientation vertical|horizontal] [--output FILE] [--no-color]
+  [--orientation vertical|horizontal] [--output FILE] [--no-color] \
+  [--link-data URL] [--link-title URL] [--statusline]
 
 python $SKILL/scripts/chart.py animate <line|bar|scatter|sparkline> \
   --duration SEC --frames N --json '<data>'
@@ -86,6 +87,7 @@ What is your data shape?
 +-- Multiple metrics at once          -> rich dashboard
 |
 +-- Inline sparkline (1 row)          -> sparkline
+|   +-- Claude Code statusLine        -> sparkline --statusline
 |
 +-- Progressive reveal in terminal    -> animate line/bar/scatter/sparkline
 |
@@ -96,6 +98,29 @@ What is your data shape?
 +-- Large ASCII label / banner        -> banner
 |
 +-- Styled text art / framed wordmark -> art
+```
+
+## Claude Code CLI Compatibility
+
+Trigger keywords:
+
+- `Claude Code statusline`, `statusLine.command`, `single-line metric` -> use `sparkline`, `indicator`, or `gauge` with `--statusline`.
+- `OSC 8`, `terminal hyperlink`, `clickable title` -> add `--link-title URL`; for line/scatter series labels add `--link-data URL`.
+- `Claude theme`, `dark-ansi`, `light-ansi`, `~/.claude/themes` -> use `--theme claude-dark-ansi` or `--theme claude-light-ansi`.
+- `subagent colors`, `agent rainbow`, `red blue green yellow purple orange pink cyan` -> use `--theme subagent-rainbow` for multi-series charts.
+- `markdown table`, `GFM`, `Claude markdown render` -> use `table --output table.md`.
+
+Claude decision tree:
+
+```
+Need output inside Claude Code?
+|
++-- Status line shell command         -> sparkline/indicator/gauge --statusline
++-- Clickable terminal reference      -> --link-title URL or --link-data URL
++-- Match current Claude ANSI theme   -> --theme claude-dark-ansi or claude-light-ansi
++-- Match subagent color names        -> --theme subagent-rainbow
++-- Render table as markdown          -> table --output result.md
++-- Fullscreen TUI requested          -> dashboard/rich_live only when the user accepts TUI behavior
 ```
 
 ---
