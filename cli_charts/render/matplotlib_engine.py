@@ -116,9 +116,45 @@ def _figure_to_png(fig):
     return png.getvalue()
 
 
+def _detect_chafa_format() -> str:
+    """Pick best chafa --format for the current terminal.
+
+    Priority: kitty (Kitty Graphics Protocol) -> iterm (iTerm2 inline)
+    -> sixel (WezTerm / mintty) -> symbols (universal Unicode fallback).
+    Always returns 'symbols' when stdout is not a TTY (piping, Claude
+    Code UI text panel, redirect to file) so output is greppable text.
+
+    Override via GLYPH_ARTS_FORMAT env var (kitty|iterm|sixel|symbols).
+    """
+    override = os.environ.get('GLYPH_ARTS_FORMAT', '').strip().lower()
+    if override in {'kitty', 'iterm', 'sixel', 'symbols'}:
+        return override
+    if not os.isatty(1):
+        return 'symbols'
+    term = os.environ.get('TERM', '').lower()
+    term_program = os.environ.get('TERM_PROGRAM', '').lower()
+    if 'kitty' in term or os.environ.get('KITTY_WINDOW_ID'):
+        return 'kitty'
+    if term_program == 'iterm.app':
+        return 'iterm'
+    if term_program == 'wezterm' or os.environ.get('WEZTERM_EXECUTABLE'):
+        return 'sixel'
+    # Warp graphics support is flag-gated and version-specific; symbols
+    # is the safe default (still uses truecolor + Unicode block chars).
+    # Windows Terminal also lacks native kitty/sixel — same default.
+    return 'symbols'
+
+
 def _pipe_to_chafa(png_bytes, w, h, no_color):
     """Pipe PNG to chafa, write its stdout, return 0 on success / 4 on failure."""
-    cmd = ['chafa', '--size', f'{w}x{h}'] + (['--colors', 'none'] if no_color else []) + ['-']
+    fmt = _detect_chafa_format()
+    cmd = ['chafa', '--size', f'{w}x{h}', '--format', fmt]
+    if fmt == 'symbols':
+        # block chars give the closest-to-pixel look on text-mode terminals
+        cmd += ['--symbols', 'block']
+    if no_color:
+        cmd += ['--colors', 'none']
+    cmd += ['-']
     try:
         result = subprocess.run(cmd, input=png_bytes, capture_output=True, timeout=10)
     except (OSError, subprocess.TimeoutExpired) as e:
