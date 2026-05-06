@@ -166,6 +166,18 @@ The output directory contains `frame_001.png` through `frame_NNN.png`,
 `manifest.json`, and `composition.html`. Each frame reveals a larger slice of
 the input series.
 
+## Phase 8: ASCII Motion integration
+
+glyph-arts can use ascii-motion-mcp as a stdio MCP backend to polish rendered ASCII charts with palette remapping and levels, then export animated output formats such as HTML, MP4, GIF, React, and SVG while also saving an editable `.asciimtn` project. Install both sides first:
+
+```bash
+pip install "glyph-arts[ai-motion]"
+npm i -g ascii-motion-mcp
+
+glyph-arts bar --json '{"labels":["A","B"],"values":[1,2]}' --polish ascii-motion --polish-style retro --output chart.html
+glyph-arts to-ascii-motion bar --json '{"labels":["A","B"],"values":[1,2]}' --formats html,mp4,svg --output-dir ./out
+```
+
 ## Art command (Phase 2)
 
 The `art` command renders composable terminal text art: figlet font,
@@ -216,10 +228,10 @@ glyph-arts --check-deps --all
 | drawille *(optional `[braille]`)* | `curve` `hires` `radar` |
 | plotille | `plotille` |
 | uniplot | `uniplot` |
-| misc | `graph` `sparkline` `banner` `art` `animate` `record` `record-replay` `to-hyperframes` |
+| misc | `graph` `sparkline` `banner` `art` `animate` `record` `record-replay` `to-hyperframes` `to-ascii-motion` |
 | media *(requires chafa + ffmpeg)* | `image` `video` |
 
-Total: **41 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
+Total: **42 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
 
 ## All flags
 

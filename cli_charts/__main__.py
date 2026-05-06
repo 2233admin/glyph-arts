@@ -1,4 +1,4 @@
-"""Entry point for `python -m cli_charts`."""
-from cli_charts.chart import main
+from cli_charts.cli import main
 
-main()
+if __name__ == "__main__":
+    main()
