@@ -21,10 +21,9 @@ def _is_numeric_sequence(value):
 
 
 def _validate_data(chart_type, data):
-    if not isinstance(data, dict):
-        raise ValueError('data must be a dict')
-
     if chart_type == 'bar':
+        if not isinstance(data, dict):
+            raise ValueError('bar data must be a dict with labels + values')
         labels = data.get('labels')
         values = data.get('values')
         if (
@@ -37,17 +36,26 @@ def _validate_data(chart_type, data):
             raise ValueError('bar data must include equal-length labels and values lists')
         return labels, values
 
-    x_values = data.get('x')
-    y_values = data.get('y')
-    if (
-        not isinstance(x_values, list)
-        or not isinstance(y_values, list)
-        or not _is_numeric_sequence(x_values)
-        or not _is_numeric_sequence(y_values)
-        or len(x_values) != len(y_values)
-    ):
-        raise ValueError(f'{chart_type} data must include equal-length numeric x and y lists')
-    return x_values, y_values
+    # line / scatter accept list-of-series OR single-series dict
+    series = data if isinstance(data, list) else [data] if isinstance(data, dict) else None
+    if not series:
+        raise ValueError(f'{chart_type} data must be a list of series or a single series dict')
+    out = []
+    for s in series:
+        if not isinstance(s, dict):
+            raise ValueError(f'{chart_type} each series must be a dict with x + y lists')
+        x_values = s.get('x')
+        y_values = s.get('y')
+        if (
+            not isinstance(x_values, list)
+            or not isinstance(y_values, list)
+            or not _is_numeric_sequence(x_values)
+            or not _is_numeric_sequence(y_values)
+            or len(x_values) != len(y_values)
+        ):
+            raise ValueError(f'{chart_type} each series needs equal-length numeric x and y lists')
+        out.append((s.get('label', ''), x_values, y_values))
+    return out
 
 
 def _apply_theme(matplotlib, theme, no_color):
@@ -96,12 +104,13 @@ def _build_figure(plt, chart_type, data, w, h, title):
         ax.bar(positions, values)
         ax.set_xticks(list(positions))
         ax.set_xticklabels(labels)
-    elif chart_type == 'line':
-        x_values, y_values = _validate_data(chart_type, data)
-        ax.plot(x_values, y_values)
-    elif chart_type == 'scatter':
-        x_values, y_values = _validate_data(chart_type, data)
-        ax.scatter(x_values, y_values)
+    elif chart_type in ('line', 'scatter'):
+        series = _validate_data(chart_type, data)
+        plotter = ax.plot if chart_type == 'line' else ax.scatter
+        for label, x_values, y_values in series:
+            plotter(x_values, y_values, label=label)
+        if any(s[0] for s in series):
+            ax.legend()
     else:
         raise ValueError(f'unsupported chart_type: {chart_type!r}')
 
