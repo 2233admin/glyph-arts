@@ -508,13 +508,13 @@ def tree(d, title, w, h, theme, **kw):
     c = Console(no_color=no_color)
 
     def _build(node, parent):
-        label = node.get('label', str(node))
+        label = node.get('label') or node.get('name') or str(node)
         style = node.get('style', '')
         branch = parent.add(f'[{style}]{label}[/{style}]' if style else label)
         for child in node.get('children', []):
             _build(child, branch)
 
-    root_label = d.get('label', title or 'root')
+    root_label = d.get('label') or d.get('name') or title or 'root'
     t = RichTree(root_label)
     for child in d.get('children', []):
         _build(child, t)
