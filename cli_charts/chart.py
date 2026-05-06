@@ -22,6 +22,7 @@ import sys
 
 from .font_tier import detect_font_tier
 from .osc8 import link as _osc8_link
+from .symbols import BLOCK, BRAILLE_ALL, get_symbol
 from .themes import get_palette as _get_palette
 
 try:
@@ -36,6 +37,38 @@ except Exception:
 
 
 # -- helpers -----------------------------------------------------------------
+
+_MARKER_SYMBOLS = {
+    'circle': 'circle',
+    'triangle': 'triangle_up',
+    'diamond': 'diamond',
+    'star': 'star',
+    'square': 'square',
+}
+
+
+def _symbol_tier(kw):
+    tier = kw.get('font_tier') or detect_font_tier()
+    return 'unicode' if tier == 'unicode-extended' else tier
+
+
+def _bar_symbols(name, tier):
+    if name == 'progress':
+        return BLOCK['progress_full'], BLOCK['progress_empty']
+    if name == 'braille':
+        return BRAILLE_ALL[255], BRAILLE_ALL[0]
+    if name == 'arrows':
+        return get_symbol('arrow_up', tier=tier), get_symbol('arrow_down', tier=tier)
+    if name == 'block':
+        return BLOCK['eighth_low_8'], ' '
+    raise ValueError(f"unknown symbol set: {name!r}")
+
+
+def _capture_stdout(func):
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        func()
+    return buf.getvalue()
 
 def _canvas_line(canvas, x0, y0, x1, y1):
     """Bresenham's line algorithm -- drawille Canvas has no built-in line()."""
@@ -379,7 +412,17 @@ def _normalize_kline_dates(dates):
 
 def kline(d, title, w, h, theme, **kw):
     """plotext candlestick K-line. Accepts DD/MM/YYYY or YYYY-MM-DD dates."""
+    candle_style = kw.get('candle_style')
+    if candle_style and candle_style != 'default':
+        tier = _symbol_tier(kw)
+        up = get_symbol('triangle_up', tier=tier)
+        down = get_symbol('triangle_down', tier=tier)
+        for date, open_, close in zip(d['dates'], d['open'], d['close'], strict=False):
+            marker = up if close >= open_ else down
+            print(f"{date} {marker} {open_} -> {close}")
+        return
     import plotext as plt
+    plt.clear_figure()
     plt.candlestick(_normalize_kline_dates(d['dates']), {
         'Open': d['open'], 'High': d['high'],
         'Low': d['low'],   'Close': d['close'],
@@ -390,6 +433,7 @@ def kline(d, title, w, h, theme, **kw):
 def line(d, title, w, h, theme, **kw):
     """plotext multi-series line chart."""
     import plotext as plt
+    plt.clear_figure()
     series = d if isinstance(d, list) else [d]
     for i, s in enumerate(series):
         x = s.get('x', list(range(len(s['y']))))
@@ -404,14 +448,17 @@ def line(d, title, w, h, theme, **kw):
 def scatter(d, title, w, h, theme, **kw):
     """plotext scatter plot. Same schema as line."""
     import plotext as plt
+    plt.clear_figure()
     series = d if isinstance(d, list) else [d]
+    marker_name = kw.get('marker')
+    marker = get_symbol(_MARKER_SYMBOLS[marker_name], tier=_symbol_tier(kw)) if marker_name else None
     for i, s in enumerate(series):
         x = s.get('x', list(range(len(s['y']))))
         label = s.get('label', '')
         if kw.get('link_data'):
             label = _osc8_link(label or f'S{i}', kw['link_data'])
         plt.scatter(x, s['y'], label=label,
-                    marker=s.get('marker'), color=_series_color(theme, i, s.get('color')))
+                    marker=marker or s.get('marker'), color=_series_color(theme, i, s.get('color')))
     _plt_finalize(plt, title, w, h, theme, kw)
 
 
@@ -439,8 +486,16 @@ def step(d, title, w, h, theme, **kw):
 def bar(d, title, w, h, theme, **kw):
     """plotext vertical/horizontal bar chart."""
     import plotext as plt
+    plt.clear_figure()
     plt.bar(d['labels'], d['values'],
             orientation=kw.get('orientation', 'vertical'))
+    symbol_set = kw.get('symbol_set')
+    if symbol_set:
+        full, empty = _bar_symbols(symbol_set, _symbol_tier(kw))
+        default_full = BLOCK['eighth_low_8']
+        output = _capture_stdout(lambda: _plt_finalize(plt, title, w, h, theme, kw))
+        sys.stdout.write(output.replace(default_full, full).replace(' ', empty if symbol_set == 'braille' else ' '))
+        return
     _plt_finalize(plt, title, w, h, theme, kw)
 
 
@@ -722,6 +777,19 @@ def gauge(d, title, w, h, theme, **kw):
     t.add_column('Label', style='bold', min_width=12)
     t.add_column('Bar', min_width=32)
     t.add_column('Value', justify='right', min_width=10)
+    style = kw.get('gauge_style') or 'bar'
+    if style == 'bar':
+        full, empty = BLOCK['eighth_low_8'], BLOCK['shade_light']
+    elif style == 'half-circle':
+        tier = _symbol_tier(kw)
+        full = get_symbol('half_circle_left', tier=tier)
+        empty = get_symbol('half_circle_right', tier=tier)
+    elif style == 'full-circle':
+        full, empty = get_symbol('circle', tier=_symbol_tier(kw)), ' '
+    elif style == 'braille':
+        full, empty = BRAILLE_ALL[255], BRAILLE_ALL[0]
+    else:
+        raise ValueError(f"unknown gauge style: {style!r}")
     for m in metrics:
         val = float(m['value'])
         mx  = float(m.get('max', 100))
@@ -730,7 +798,7 @@ def gauge(d, title, w, h, theme, **kw):
         filled = round(pct * bar_w)
         auto_color = 'green' if pct < 0.7 else ('yellow' if pct < 0.9 else 'red')
         color = m.get('color', auto_color)
-        bar = f'[{color}]{"█" * filled}{"░" * (bar_w - filled)}[/{color}]'
+        bar = f'[{color}]{full * filled}{empty * (bar_w - filled)}[/{color}]'
         t.add_row(m.get('label', ''), bar, f'{val:.1f} / {mx:.0f}')
     c.print(t)
 
@@ -1311,6 +1379,21 @@ def status_command(d, title, w, h, theme, **kw):
     raise RuntimeError("status is dispatched by main()")
 
 
+def splash_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("splash is dispatched by main()")
+
+
+def demo_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("demo is dispatched by main()")
+
+
+def gallery_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("gallery is dispatched by main()")
+
+
 CMDS = {
     'kline':      kline,
     'line':       line,
@@ -1348,6 +1431,9 @@ CMDS = {
     'to-hyperframes': to_hyperframes_command,
     'code':        code_command,
     'status':      status_command,
+    'splash':      splash_command,
+    'demo':        demo_command,
+    'gallery':     gallery_command,
 }
 
 # Single source of truth for chart-type docs. Order is intentional.
@@ -1361,7 +1447,7 @@ CHART_TYPES_BY_ENGINE: dict[str, list[str]] = {
     'drawille': ['curve', 'hires', 'radar'],
     'plotille': ['plotille'],
     'uniplot': ['uniplot'],
-    'misc': ['graph', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'code', 'status'],
+    'misc': ['graph', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'code', 'status', 'splash', 'demo', 'gallery'],
     'media': ['image', 'video'],
 }
 
@@ -1408,6 +1494,9 @@ EXPECTED_SCHEMAS = {
     'to-hyperframes': "glyph-arts to-hyperframes --json '[{\"label\":\"x\",\"x\":[1,2],\"y\":[3,4]}]' --frames 30 --duration 5 --output-dir ./hf",
     'code':        'glyph-arts code --file foo.py --lang python',
     'status':      'glyph-arts status --kind ok --message "All tests green"',
+    'splash':      'glyph-arts splash',
+    'demo':        'glyph-arts demo --speed fast',
+    'gallery':     'glyph-arts gallery --output gallery.html',
 }
 
 # Types where --width/--height/--theme have no effect
@@ -1419,7 +1508,7 @@ INTERACTIVE_SUPPORTED = frozenset({'line'})
 
 # -- main --------------------------------------------------------------------
 
-def main():
+def main(argv=None):
     epilog_lines = [f'Chart types ({CHART_TYPE_COUNT}):']
     for engine, types in CHART_TYPES_BY_ENGINE.items():
         epilog_lines.append(f'  {engine:9}: {" ".join(types)}')
@@ -1505,9 +1594,15 @@ Examples:
                    help='TYPE=record command to run inside asciinema')
     p.add_argument('--no-color',    action='store_true',
                    help='Disable ANSI colors (respects NO_COLOR env var)')
-    p.add_argument('--symbols',     default='braille', metavar='SET',
-                   help='chafa --symbols value for image/video (default: braille; '
-                        'e.g. block, ascii, all, half)')
+    p.add_argument('--marker',      choices=list(_MARKER_SYMBOLS), default=None,
+                   help='TYPE=scatter marker symbol set')
+    p.add_argument('--symbols',     default=None, metavar='SET',
+                   help='TYPE=bar symbol set (block, progress, braille, arrows); '
+                        'image/video chafa --symbols value (default: braille)')
+    p.add_argument('--candle-style', choices=['default', 'geom'], default='default',
+                   help='TYPE=kline candle glyph style')
+    p.add_argument('--style',       choices=['bar', 'half-circle', 'full-circle', 'braille'],
+                   default='bar', help='TYPE=gauge glyph style')
     p.add_argument('--fps',         type=int, default=12, metavar='N',
                    help='Video playback frames/sec for type=video (default: 12)')
     p.add_argument('--version',     action='version', version=f'glyph-arts {_VERSION}')
@@ -1543,6 +1638,14 @@ Examples:
                    help='OSC 8 hyperlink URL for the chart title')
     p.add_argument('--statusline', action='store_true',
                    help='Single-line ANSI-safe output for Claude Code statusLine.command')
+    p.add_argument('--no-splash',  action='store_true',
+                   help='Skip the first-run mascot splash')
+    p.add_argument('--speed', choices=['fast', 'normal', 'slow'], default='normal',
+                   help='TYPE=demo speed: fast=10s, normal=30s, slow=60s')
+    p.add_argument('--no-clear', action='store_true',
+                   help='TYPE=demo do not clear the terminal between sections')
+    p.add_argument('--chart', default='',
+                   help='TYPE=gallery pre-select chart type')
     if '--check-deps' in sys.argv:
         _CORE = ['plotext', 'rich', 'uniplot', 'pyfiglet',
                  'sparklines', 'duckdb', 'pandas', 'networkx', 'phart']
@@ -1577,9 +1680,26 @@ Examples:
                 print(f'  {pkg:<13} {status}  ({purpose}){hint}')
         sys.exit(0)
 
-    args = p.parse_args()
+    args = p.parse_args(argv)
     if args.font_tier is None:
         args.font_tier = detect_font_tier()
+
+    if args.type == 'demo':
+        from cli_charts.demo_engine import run_demo
+        sys.exit(run_demo(speed=args.speed, clear=not args.no_clear))
+
+    if args.type == 'gallery':
+        from cli_charts.gallery_engine import run_gallery
+        sys.exit(run_gallery(output=args.output or None,
+                             chart=args.chart or None,
+                             theme=args.theme or None))
+
+    if args.type == 'splash':
+        from cli_charts.splash import main as splash_main
+        sys.exit(splash_main(['--no-splash'] if args.no_splash else []))
+
+    from cli_charts.splash import maybe_play_first_run
+    maybe_play_first_run(no_splash=args.no_splash)
 
     if args.type == 'code':
         if not args.file:
@@ -1618,10 +1738,10 @@ Examples:
         no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
         try:
             if args.type == 'image':
-                _render_image(path, args.width, args.height, args.symbols, no_color)
+                _render_image(path, args.width, args.height, args.symbols or 'braille', no_color)
             else:
                 _render_video(path, args.width, args.height, args.fps,
-                              args.symbols, args.duration, no_color)
+                              args.symbols or 'braille', args.duration, no_color)
         except subprocess.CalledProcessError as exc:
             print(f'ERROR:render: chafa/ffmpeg exit {exc.returncode}', file=sys.stderr)
             sys.exit(4)
@@ -1797,6 +1917,11 @@ Examples:
             link_title=args.link_title,
             statusline=args.statusline,
             rich_progress=args.rich_progress,
+            font_tier=args.font_tier,
+            marker=args.marker if args.type == 'scatter' else None,
+            symbol_set=args.symbols if args.type == 'bar' else None,
+            candle_style=args.candle_style if args.type == 'kline' else 'default',
+            gauge_style=args.style if args.type == 'gauge' else 'bar',
         )
 
         try:
