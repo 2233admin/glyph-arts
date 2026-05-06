@@ -12,7 +12,6 @@ from pathlib import Path
 
 import pytest
 
-
 SCRIPT = Path(__file__).parent.parent / 'scripts' / 'chart.py'
 
 
@@ -91,7 +90,7 @@ def test_invalid_layout_errors_with_schema_tag():
 def test_registered_in_cmd_dispatcher():
     """Guard against accidental drop from the CMDS/schema registries."""
     sys.path.insert(0, str(SCRIPT.parent.parent))
-    from cli_charts.chart import CMDS, EXPECTED_SCHEMAS, _NO_SIZE_THEME
+    from cli_charts.chart import _NO_SIZE_THEME, CMDS, EXPECTED_SCHEMAS
 
     assert 'rich_live' in CMDS
     assert 'rich_live' in EXPECTED_SCHEMAS

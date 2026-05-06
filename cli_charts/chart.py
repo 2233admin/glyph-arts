@@ -9,14 +9,14 @@ Animation (--animate):
   Supported types: line, scatter, sparkline
   Flags: --refresh FPS (default 10), --window N (default 50), --duration SEC
 """
-import sys
-import os
-import json
 import argparse
-import shutil
-import random
 import datetime
+import json
+import os
+import random
+import shutil
 import subprocess
+import sys
 
 from .themes import get_palette as _get_palette
 
@@ -91,10 +91,10 @@ def _render_video(path, w, h, fps=12, symbols='braille', duration=0.0, no_color=
     on exit or Ctrl-C. Not suitable for hours-long input -- prefer clipping
     first with ffmpeg -ss/-t.
     """
+    import glob
     import subprocess
     import tempfile
     import time
-    import glob
 
     if not shutil.which('chafa'):
         print('ERROR:dep: chafa not found', file=sys.stderr)
@@ -370,9 +370,9 @@ def bar(d, title, w, h, theme, **kw):
 
 def pie(d, title, w, h, theme, **kw):
     """Rich percentage-bar pie breakdown. labels + values arrays of equal length."""
+    from rich import box as rich_box
     from rich.console import Console
     from rich.table import Table
-    from rich import box as rich_box
     total = sum(d['values']) or 1
     bar_w = 36
     colors = ['red', 'green', 'blue', 'yellow', 'magenta', 'cyan',
@@ -382,7 +382,7 @@ def pie(d, title, w, h, theme, **kw):
     tbl.add_column('Pct', justify='right')
     tbl.add_column('Distribution', min_width=bar_w)
     tbl.add_column('Value', justify='right')
-    for i, (label, val) in enumerate(zip(d['labels'], d['values'])):
+    for i, (label, val) in enumerate(zip(d['labels'], d['values'], strict=False)):
         pct = val / total * 100
         filled = round(pct / 100 * bar_w)
         color = colors[i % len(colors)]
@@ -427,8 +427,8 @@ def heatmap(d, title, w, h, theme, **kw):
     """plotext heatmap / correlation matrix.
     plotext.heatmap() requires a pandas DataFrame.
     """
-    import plotext as plt
     import pandas as pd
+    import plotext as plt
     df = pd.DataFrame(
         d['matrix'],
         columns=d.get('xlabels'),
@@ -480,9 +480,9 @@ def sparkline(d, title, w, h, theme, **kw):
 
 def table(d, title, w, h, theme, **kw):
     """rich double-edge formatted table."""
+    from rich import box as richbox
     from rich.console import Console
     from rich.table import Table
-    from rich import box as richbox
     no_color = kw.get('no_color', False)
     c = Console(no_color=no_color)
     box_style = getattr(richbox, d.get('box', 'DOUBLE_EDGE'), richbox.DOUBLE_EDGE)
@@ -523,9 +523,9 @@ def tree(d, title, w, h, theme, **kw):
 
 def panel(d, title, w, h, theme, **kw):
     """rich Panel -- bordered text / callout box."""
+    from rich import box as richbox
     from rich.console import Console
     from rich.panel import Panel as RichPanel
-    from rich import box as richbox
     no_color = kw.get('no_color', False)
     c = Console(no_color=no_color)
     box_style = getattr(richbox, d.get('box', 'ROUNDED'), richbox.ROUNDED)
@@ -538,8 +538,8 @@ def panel(d, title, w, h, theme, **kw):
 
 def graph(d, title, w, h, theme, **kw):
     """PHART ASCII network graph."""
-    from phart import ASCIIRenderer, LayoutOptions, NodeStyle
     import networkx as nx
+    from phart import ASCIIRenderer, LayoutOptions, NodeStyle
     G = nx.DiGraph() if d.get('directed', True) else nx.Graph()
     for node in d.get('nodes', []):
         G.add_node(node['id'] if isinstance(node, dict) else node)
@@ -595,9 +595,9 @@ def gauge(d, title, w, h, theme, **kw):
     """rich multi-metric progress bars (static gauge).
     Auto-colors: green <70%, yellow <90%, red >=90%.
     """
+    from rich import box as richbox
     from rich.console import Console
     from rich.table import Table
-    from rich import box as richbox
     no_color = kw.get('no_color', False)
     c = Console(no_color=no_color)
     metrics = d if isinstance(d, list) else d.get('metrics', [d])
@@ -646,11 +646,12 @@ def rich_live(d, title, w, h, theme, **kw):
     and replayed inside a Rich Panel so ANSI colors from plotext/hires/etc. survive.
     """
     from io import StringIO
+
+    from rich import box as richbox
     from rich.console import Console
     from rich.layout import Layout
     from rich.panel import Panel
     from rich.text import Text
-    from rich import box as richbox
 
     panels_spec = d.get('panels') or []
     if not panels_spec:
@@ -726,8 +727,9 @@ def rich_live(d, title, w, h, theme, **kw):
             sys.exit(4)
         return
 
-    from rich.live import Live
     import time
+
+    from rich.live import Live
     refresh = float(d.get('refresh_per_second', 4))
     frame_delay = 1.0 / max(1.0, refresh)
     with Live(layout, refresh_per_second=refresh, console=console, transient=False):
@@ -749,15 +751,18 @@ def confusion(d, title, w, h, theme, **kw):
         plt.confusion_matrix(d['actual'], d['predicted'], labels=d.get('labels'))
     except ZeroDivisionError:  # plotext bug: M==m when all matrix cells are equal
         from collections import Counter
+
         from rich.console import Console
         from rich.table import Table
         actual, predicted = d['actual'], d['predicted']
         labs = d.get('labels') or sorted(set(actual) | set(predicted))
-        counts = Counter(zip(actual, predicted))
+        counts = Counter(zip(actual, predicted, strict=False))
         t = Table(title=title or 'Confusion Matrix')
         t.add_column('actual \\ predicted')
-        for p in labs: t.add_column(str(p))
-        for a in labs: t.add_row(str(a), *[str(counts.get((a, p), 0)) for p in labs])
+        for p in labs:
+            t.add_column(str(p))
+        for a in labs:
+            t.add_row(str(a), *[str(counts.get((a, p), 0)) for p in labs])
         Console().print(t)
         return
     _plt_finalize(plt, title, w, h, theme, kw)
@@ -1108,7 +1113,7 @@ def load_duckdb(sql, db_path, chart_type):
                 'ylabels': list(df.index.astype(str))}
     if chart_type == 'curve':
         cols = list(df.columns)
-        return {'points': list(zip(df[cols[0]].tolist(), df[cols[1]].tolist()))}
+        return {'points': list(zip(df[cols[0]].tolist(), df[cols[1]].tolist(), strict=False))}
     if chart_type == 'sparkline':
         return {'values': df.iloc[:, 0].tolist()}
     if chart_type == 'confusion':
@@ -1122,7 +1127,7 @@ def load_duckdb(sql, db_path, chart_type):
     if chart_type == 'graph':
         cols = list(df.columns)
         return {'edges': list(zip(df[cols[0]].astype(str),
-                                  df[cols[1]].astype(str)))}
+                                  df[cols[1]].astype(str), strict=False))}
     return df.to_dict(orient='list')
 
 
@@ -1372,9 +1377,12 @@ Examples:
     _default_width = shutil.get_terminal_size((70, 20)).columns
     if args.type in _NO_SIZE_THEME:
         ignored = []
-        if args.width != _default_width: ignored.append('--width')
-        if args.height != 20:            ignored.append('--height')
-        if args.theme != 'pro':          ignored.append('--theme')
+        if args.width != _default_width:
+            ignored.append('--width')
+        if args.height != 20:
+            ignored.append('--height')
+        if args.theme != 'pro':
+            ignored.append('--theme')
         if ignored:
             print(f"warning: {', '.join(ignored)} ignored for {args.type} charts",
                   file=sys.stderr)
@@ -1449,7 +1457,7 @@ Examples:
         sys.exit(2)
     except SystemExit:
         raise
-    except Exception as exc:
+    except Exception:
         import traceback
         last = traceback.format_exc().strip().splitlines()[-1]
         print(f'ERROR:render: {last}', file=sys.stderr)
@@ -1471,9 +1479,10 @@ def _animate_stdin(chart_type, title, w, h, theme, refresh, window, duration, kw
     """
     import collections
     import time
+
     import plotext as plt
-    from rich.live import Live
     from rich.console import Console
+    from rich.live import Live
     from rich.text import Text
 
     if chart_type not in _ANIMATE_TYPES:

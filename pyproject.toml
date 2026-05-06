@@ -62,3 +62,17 @@ testpaths = ["tests"]
 markers = [
     "slow: marks tests that require a real TTY or subprocess (deselect with '-m \"not slow\"')",
 ]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501", "E402"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true

@@ -16,7 +16,6 @@ import json
 import sys
 from typing import Any
 
-
 DEMO_CONFIG = {
     "title": "System Monitor",
     "panels": [
@@ -127,7 +126,7 @@ def render_bar(data: dict) -> str:
     mx = max(values) if values else 1
     bar_w = 20
     lines = []
-    for label, val in zip(labels, values):
+    for label, val in zip(labels, values, strict=False):
         filled = round(val / mx * bar_w) if mx else 0
         color = "green" if val == 0 else ("yellow" if val < mx * 0.5 else "red")
         bar = f"[{color}]{'█' * filled}{'░' * (bar_w - filled)}[/{color}]"
@@ -184,11 +183,11 @@ def build_layout(panels: list) -> list:
 # ---------------------------------------------------------------------------
 
 def render_static(config: dict) -> None:
-    from rich.console import Console
+    from rich import box as richbox
     from rich.columns import Columns
+    from rich.console import Console
     from rich.panel import Panel as RichPanel
     from rich.rule import Rule
-    from rich import box as richbox
 
     c = Console()
     title = config.get("title", "")
@@ -210,8 +209,8 @@ def render_static(config: dict) -> None:
 
 def run_tui(config: dict) -> None:
     from textual.app import App, ComposeResult
-    from textual.widgets import Static, Header, Footer
     from textual.containers import Horizontal, ScrollableContainer
+    from textual.widgets import Footer, Header, Static
 
     title = config.get("title", "Dashboard")
     rows = build_layout(config.get("panels", []))

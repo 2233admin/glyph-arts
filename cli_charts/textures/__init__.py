@@ -10,10 +10,10 @@ Each texture dict has the keys:
     description   str   -- human-readable one-liner
 """
 
-from .block   import TEXTURE as _BLOCK
+from .block import TEXTURE as _BLOCK
 from .braille import TEXTURE as _BRAILLE
-from .shade   import TEXTURE as _SHADE
-from .hatch   import TEXTURE as _HATCH
+from .hatch import TEXTURE as _HATCH
+from .shade import TEXTURE as _SHADE
 
 CUSTOM_TEXTURES: dict[str, dict] = {
     "block":   _BLOCK,

@@ -2,12 +2,11 @@
 import re
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parent.parent
 
 
 def test_canonical_count_matches_cli_choices():
-    from cli_charts.chart import CMDS, CHART_TYPES_BY_ENGINE, CHART_TYPE_COUNT, _MEDIA_TYPES
+    from cli_charts.chart import _MEDIA_TYPES, CHART_TYPE_COUNT, CHART_TYPES_BY_ENGINE, CMDS
 
     flat = {t for ts in CHART_TYPES_BY_ENGINE.values() for t in ts}
     expected = set(CMDS) | _MEDIA_TYPES
@@ -22,7 +21,7 @@ def test_argparse_epilog_uses_dynamic_count():
     from cli_charts.chart import CHART_TYPE_COUNT
 
     src = (ROOT / 'cli_charts' / 'chart.py').read_text(encoding='utf-8')
-    assert f"Chart types ({{CHART_TYPE_COUNT}})" in src
+    assert "Chart types ({CHART_TYPE_COUNT})" in src
     matches = re.findall(r'Chart types \((\d+)\)', src)
     for match in matches:
         assert int(match) == CHART_TYPE_COUNT, (

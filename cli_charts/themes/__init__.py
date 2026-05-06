@@ -13,7 +13,7 @@ Each palette dict has the keys:
 
 from .claude import PALETTE as _CLAUDE
 from .linear import PALETTE as _LINEAR
-from .tesla  import PALETTE as _TESLA
+from .tesla import PALETTE as _TESLA
 from .vercel import PALETTE as _VERCEL
 
 CUSTOM_THEMES: dict[str, dict] = {

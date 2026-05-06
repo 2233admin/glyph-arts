@@ -27,6 +27,21 @@ jobs:
       github.event.workflow_run.head_branch == 'master'
     runs-on: ubuntu-latest
     steps:
+      - name: Fetch failed job names
+        id: failed-jobs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          JOBS_URL: ${{ github.event.workflow_run.jobs_url }}
+        run: |
+          set -euo pipefail
+          FAILED_JOBS=$(curl -sL -H "Authorization: Bearer $GITHUB_TOKEN" "$JOBS_URL" | \
+            jq -r '.jobs[] | select(.conclusion == "failure") | .name' | \
+            paste -sd ", ")
+          if [ -z "$FAILED_JOBS" ]; then
+            FAILED_JOBS="unknown"
+          fi
+          echo "failed_jobs=${FAILED_JOBS}" >> "$GITHUB_OUTPUT"
+
       - name: Create Linear issue for the failure
         env:
           LINEAR_API_KEY: ${{ secrets.LINEAR_API_KEY }}
@@ -34,6 +49,7 @@ jobs:
           LINEAR_TEAM_ID: d87f5bad-c6df-4eb1-8fa8-2f16558ac0c7
           RUN_URL: ${{ github.event.workflow_run.html_url }}
           RUN_ID: ${{ github.event.workflow_run.id }}
+          FAILED_JOBS: ${{ steps.failed-jobs.outputs.failed_jobs }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
           HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
           ACTOR: ${{ github.event.workflow_run.actor.login }}
@@ -57,6 +73,7 @@ jobs:
           - **Pushed by:** @${ACTOR}
           - **Run:** ${RUN_URL}
           - **Run id:** \`${RUN_ID}\`
+          - **Failed jobs:** ${FAILED_JOBS}
 
           ## Triage checklist
           - [ ] Reproduce locally: \`git checkout ${SHORT_SHA} && pytest tests/\`

@@ -8,20 +8,59 @@ on:
 
 jobs:
   test:
-    name: pytest (${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    name: pytest (${{ matrix.os }}, ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        exclude:
+          - os: windows-latest
+            python-version: "3.10"
+          - os: windows-latest
+            python-version: "3.11"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install package + test deps
-        run: pip install -e ".[all]" lttb pytest
+        run: pip install -e ".[all,test]"
       - name: Run tests
         run: pytest tests/ -v
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install ruff mypy
+      - name: Ruff
+        run: ruff check cli_charts tests
+      - name: Mypy
+        run: mypy cli_charts --ignore-missing-imports
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install coverage deps
+        run: pip install pytest pytest-cov
+      - name: Install package
+        run: pip install -e ".[all,test]"
+      - name: Test with coverage
+        run: pytest --cov=cli_charts --cov-report=xml
+      - uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   check-deps:
     name: check-deps smoke test
