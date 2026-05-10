@@ -698,6 +698,61 @@ def graph(d, title, w, h, theme, **kw):
     print(ASCIIRenderer(G, options=opts).render())
 
 
+def mermaid(d, title, w, h, theme, **kw):
+    """Render a Mermaid diagram via mmdflux subprocess.
+
+    Data dict shape: d['source'] = Mermaid DSL string
+    Supported formats: 'text' (Unicode box-drawing, default), 'ascii', 'svg'
+
+    mmdflux flags (--theme/--width/--height are SVG-only):
+      --format text|ascii|svg|mmds
+      --color off|auto|always  (terminal color policy; 'auto' = respect NO_COLOR)
+      --layout-engine flux-layered|mermaid-layered
+      --node-spacing, --rank-spacing, --edge-spacing
+      --svg-theme-auto=light:...,dark:...  (SVG dark mode)
+    """
+    source = d.get('source', '') if isinstance(d, dict) else str(d or '')
+    if not source.strip():
+        print('ERROR:input: mermaid source is empty', file=sys.stderr)
+        sys.exit(1)
+
+    if not shutil.which('mmdflux'):
+        print('ERROR:dep: mmdflux not found', file=sys.stderr)
+        print('  Install: cargo install mmdflux', file=sys.stderr)
+        print('  Or download: https://github.com/kevinswiber/mmdflux/releases', file=sys.stderr)
+        sys.exit(2)
+
+    fmt = kw.get('format', 'text')
+    if fmt not in ('text', 'ascii', 'svg', 'mmds'):
+        fmt = 'text'
+
+    cmd = ['mmdflux', '--format', fmt]
+
+    # Color policy: 'auto' respects NO_COLOR env var; 'always' forces color
+    color = kw.get('color', 'auto')
+    if color in ('off', 'auto', 'always'):
+        cmd += ['--color', color]
+
+    # Layout tuning via kw args
+    if kw.get('layout_engine') in ('flux-layered', 'mermaid-layered'):
+        cmd += ['--layout-engine', kw['layout_engine']]
+    if kw.get('node_spacing'):
+        cmd += ['--node-spacing', str(kw['node_spacing'])]
+    if kw.get('rank_spacing'):
+        cmd += ['--rank-spacing', str(kw['rank_spacing'])]
+
+    result = subprocess.run(cmd, input=source, capture_output=True,
+                           text=True, timeout=30)
+    if result.returncode != 0:
+        err = result.stderr.strip() or 'mmdflux exited non-zero'
+        print(f'ERROR:render: {err}', file=sys.stderr)
+        sys.exit(4)
+
+    if title:
+        print(title)
+    sys.stdout.write(result.stdout)
+
+
 def curve(d, title, w, h, theme, **kw):
     """drawille braille pixel canvas -- connected high-res curves.
     Points are auto-scaled to fit --width x --height.
@@ -1423,6 +1478,7 @@ CMDS = {
     'gauge':      gauge,
     'dashboard':  dashboard,
     'graph':      graph,
+    'mermaid':    mermaid,
     'curve':      curve,
     'uniplot':    uniplot,
     'banner':      banner,
@@ -1455,7 +1511,7 @@ CHART_TYPES_BY_ENGINE: dict[str, list[str]] = {
     'drawille': ['curve', 'hires', 'radar'],
     'plotille': ['plotille'],
     'uniplot': ['uniplot'],
-    'misc': ['graph', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery'],
+    'misc': ['graph', 'mermaid', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery'],
     'media': ['image', 'video'],
 }
 
@@ -1487,6 +1543,7 @@ EXPECTED_SCHEMAS = {
     'gauge':      '[{"label":"CPU","value":75,"max":100,"color":"red"}, ...] or {"metrics":[...]}',
     'dashboard':  '{"panels":[{"type":"gauge","data":{"label":"CPU","value":72,"max":100},"title":"CPU"},{"type":"sparkline","data":{"values":[1,3,5,2,8]},"title":"Load"}]}',
     'graph':      '{"edges":[["A","B"],...], "directed":true, "node_style":"ROUND"}',
+    'mermaid':    '{"source":"flowchart LR; A --> B --> C"}',
     'curve':      '{"points":[[x,y],...]}',
     'uniplot':    '[{"label":"A","x":[...],"y":[...]}] or {"label":"A","y":[...]}',
     'banner':      '{"text":"PROFIT","font":"big","color":"green"}',
