@@ -710,6 +710,10 @@ def mermaid(d, title, w, h, theme, **kw):
       --layout-engine flux-layered|mermaid-layered
       --node-spacing, --rank-spacing, --edge-spacing
       --svg-theme-auto=light:...,dark:...  (SVG dark mode)
+
+    SVG output:
+      --format svg --output FILE  →  write SVG to file, print "Saved: FILE"
+      --format svg              →  SVG XML to stdout (pipe/redirect)
     """
     source = d.get('source', '') if isinstance(d, dict) else str(d or '')
     if not source.strip():
@@ -748,9 +752,20 @@ def mermaid(d, title, w, h, theme, **kw):
         print(f'ERROR:render: {err}', file=sys.stderr)
         sys.exit(4)
 
-    if title:
-        print(title)
-    sys.stdout.write(result.stdout)
+    content = result.stdout
+
+    if fmt == 'svg':
+        output_path = kw.get('output')
+        if output_path:
+            import pathlib
+            pathlib.Path(output_path).write_text(content, encoding='utf-8')
+            print(f'Saved: {output_path}')
+        else:
+            sys.stdout.write(content)
+    else:
+        if title:
+            print(title)
+        sys.stdout.write(content)
 
 
 def curve(d, title, w, h, theme, **kw):
@@ -1707,6 +1722,8 @@ Examples:
                    default='vertical', help='Bar orientation (bar/multibar/stackedbar)')
     p.add_argument('--output',      default='',
                    help='Save chart to file (.png with pixel engine; .txt/.ansi/.html with ascii engine; .md for table)')
+    p.add_argument('--format',      default=None,
+                   help="Output format for TYPE=mermaid: text (Unicode), ascii, svg")
     p.add_argument('--output-dir',  default='',
                    help='TYPE=to-hyperframes/to-ascii-motion output directory')
     p.add_argument('--out-dir',     dest='output_dir',
@@ -2072,6 +2089,7 @@ Examples:
             yscale=args.yscale,
             orientation=args.orientation,
             output=args.output,
+            format=args.format,
             no_color=no_color,
             link_data=args.link_data,
             link_title=args.link_title,
@@ -2121,6 +2139,9 @@ Examples:
                 return
 
             if args.output and args.type == 'table' and args.output.lower().endswith('.md'):
+                CMDS[args.type](data, args.title, args.width, args.height, args.theme, **kw)
+            elif args.output and args.type == 'mermaid' and kw.get('format') == 'svg':
+                # mermaid SVG writes to file directly inside the cmd
                 CMDS[args.type](data, args.title, args.width, args.height, args.theme, **kw)
             elif args.output:
                 from cli_charts.render.export_engine import export_to_path

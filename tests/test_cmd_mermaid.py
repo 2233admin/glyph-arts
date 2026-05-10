@@ -87,3 +87,30 @@ def test_mermaid_ascii_format():
     assert result.returncode == 0
     # Output should have box chars (either Unicode or ASCII)
     assert any(c in result.stdout for c in ["┌", "+", "│", "|"])
+
+
+def test_mermaid_svg_to_stdout():
+    result = _run([
+        "mermaid",
+        "--format", "svg",
+        "--json", '{"source": "flowchart LR; A --> B"}',
+    ])
+    assert result.returncode == 0, result.stderr
+    assert "<svg" in result.stdout
+    assert "xmlns=" in result.stdout
+
+
+def test_mermaid_svg_to_file(tmp_path):
+    out = tmp_path / "diagram.svg"
+    result = _run([
+        "mermaid",
+        "--format", "svg",
+        "--output", str(out),
+        "--json", '{"source": "flowchart LR; A --> B --> C"}',
+    ])
+    assert result.returncode == 0, result.stderr
+    assert "Saved:" in result.stdout
+    assert out.exists()
+    content = out.read_text(encoding="utf-8")
+    assert "<svg" in content
+    assert "xmlns=" in content
