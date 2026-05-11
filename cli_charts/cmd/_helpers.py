@@ -24,6 +24,7 @@ import tempfile
 
 from cli_charts.font_tier import detect_font_tier
 from cli_charts.osc8 import link as _osc8_link
+from cli_charts.registry import STYLES as _STYLES, STYLE_ROUTES, STYLE_ENGINES, DEFAULT_STYLE, styles_for, resolve_engine
 from cli_charts.symbols import BLOCK, BRAILLE_ALL, get_symbol
 from cli_charts.themes import get_palette as _get_palette
 
@@ -487,6 +488,9 @@ def step(d, title, w, h, theme, **kw):
 
 def bar(d, title, w, h, theme, **kw):
     """plotext vertical/horizontal bar chart."""
+    # Use textgraph for horizontal bars when orientation is horizontal
+    if kw.get('orientation') == 'horizontal':
+        return hbar(d, title, w, h, theme, **kw)
     import plotext as plt
     plt.clear_figure()
     plt.bar(d['labels'], d['values'],
@@ -499,6 +503,45 @@ def bar(d, title, w, h, theme, **kw):
         sys.stdout.write(output.replace(default_full, full).replace(' ', empty if symbol_set == 'braille' else ' '))
         return
     _plt_finalize(plt, title, w, h, theme, kw)
+
+
+def hbar(d, title, w, h, theme, **kw):
+    """Horizontal bar chart using textgraph/ascii-graph.
+
+    Uses textgraph.horizontal() for enhanced horizontal bars with labels.
+    Falls back to ascii-graph or plotext.
+    """
+    labels = d.get('labels', [f'[{i}]' for i in range(len(d['values']))])
+    values = d['values']
+
+    if title:
+        print(title)
+
+    # Try textgraph.horizontal() first
+    try:
+        from textgraph import horizontal as textgraph_hbar
+        data = list(zip(labels, values))
+        print(textgraph_hbar(data))
+        return
+    except ImportError:
+        pass
+
+    # Try ascii-graph
+    try:
+        from ascii_graph import Pyasciigraph
+        g = Pyasciigraph()
+        data = list(zip(labels, values))
+        for line in g.graph(title or 'bar', data):
+            print(line)
+        return
+    except ImportError:
+        pass
+
+    # Fallback to plotext
+    import plotext as plt
+    plt.clear_figure()
+    plt.bar(labels, values, orientation='horizontal')
+    _plt_finalize(plt, '', w, h, theme, kw)
 
 
 def pie(d, title, w, h, theme, **kw):
@@ -606,14 +649,29 @@ def event(d, title, w, h, theme, **kw):
 
 
 def sparkline(d, title, w, h, theme, **kw):
-    """sparklines unicode block chart -- single line."""
+    """sparklines unicode block chart -- single line.
+
+    Uses textgraph.spark() for enhanced sparklines with multiple styles.
+    Falls back to sparklines library if textgraph is unavailable.
+    """
     if kw.get('statusline'):
         _render_statusline('sparkline', d, title)
         return
-    import sparklines as sl
     if title:
         print(title)
-    for ln in sl.sparklines(d['values']):
+    values = d['values']
+
+    # Try textgraph.spark() first (better sparklines)
+    try:
+        from textgraph import spark as textgraph_spark
+        print(textgraph_spark(values))
+        return
+    except ImportError:
+        pass
+
+    # Fallback to sparklines library
+    import sparklines as sl
+    for ln in sl.sparklines(values):
         print(ln)
 
 
@@ -698,74 +756,275 @@ def graph(d, title, w, h, theme, **kw):
     print(ASCIIRenderer(G, options=opts).render())
 
 
-def mermaid(d, title, w, h, theme, **kw):
-    """Render a Mermaid diagram via mmdflux subprocess.
+# -- textcharts integration ---------------------------------------------------
 
-    Data dict shape: d['source'] = Mermaid DSL string
-    Supported formats: 'text' (Unicode box-drawing, default), 'ascii', 'svg'
+def comparison(d, title, w, h, theme, **kw):
+    """textcharts comparison bar chart -- side-by-side bars for A/B testing.
 
-    mmdflux flags (--theme/--width/--height are SVG-only):
-      --format text|ascii|svg|mmds
-      --color off|auto|always  (terminal color policy; 'auto' = respect NO_COLOR)
-      --layout-engine flux-layered|mermaid-layered
-      --node-spacing, --rank-spacing, --edge-spacing
-      --svg-theme-auto=light:...,dark:...  (SVG dark mode)
-
-    SVG output:
-      --format svg --output FILE  →  write SVG to file, print "Saved: FILE"
-      --format svg              →  SVG XML to stdout (pipe/redirect)
+    JSON: {"data":[{"label":"Python","baseline":85,"comparison":89.5}, ...]}
     """
-    source = d.get('source', '') if isinstance(d, dict) else str(d or '')
-    if not source.strip():
-        print('ERROR:input: mermaid source is empty', file=sys.stderr)
-        sys.exit(1)
-
-    if not shutil.which('mmdflux'):
-        print('ERROR:dep: mmdflux not found', file=sys.stderr)
-        print('  Install: cargo install mmdflux', file=sys.stderr)
-        print('  Or download: https://github.com/kevinswiber/mmdflux/releases', file=sys.stderr)
+    try:
+        from textcharts import ComparisonBar, ComparisonBarData
+        data = [
+            ComparisonBarData(
+                label=str(item['label']),
+                baseline_value=item.get('baseline', 0),
+                comparison_value=item.get('comparison', item.get('value', 0)),
+                baseline_name=str(item.get('baseline_name', 'Baseline')),
+                comparison_name=str(item.get('comparison_name', 'Comparison'))
+            )
+            for item in d.get('data', [])
+        ]
+        chart = ComparisonBar(data=data, title=title, options=_textcharts_options(kw))
+        print(chart.render())
+    except ImportError:
+        print("ERROR:dep: pip install textcharts", file=sys.stderr)
         sys.exit(2)
 
-    fmt = kw.get('format', 'text')
-    if fmt not in ('text', 'ascii', 'svg', 'mmds'):
-        fmt = 'text'
 
-    cmd = ['mmdflux', '--format', fmt]
+def diverging(d, title, w, h, theme, **kw):
+    """textcharts diverging bar chart -- positive/negative comparison.
 
-    # Color policy: 'auto' respects NO_COLOR env var; 'always' forces color
-    color = kw.get('color', 'auto')
-    if color in ('off', 'auto', 'always'):
-        cmd += ['--color', color]
+    JSON: {"data":[{"label":"Product A","pct_change":25},{"label":"Product B","pct_change":-15}]}
+    """
+    try:
+        from textcharts import DivergingBar, DivergingBarData
+        data = [
+            DivergingBarData(label=str(item['label']), pct_change=item.get('pct_change', item.get('value', 0)))
+            for item in d.get('data', [])
+        ]
+        chart = DivergingBar(data=data, title=title, options=_textcharts_options(kw))
+        print(chart.render())
+    except ImportError:
+        print("ERROR:dep: pip install textcharts", file=sys.stderr)
+        sys.exit(2)
 
-    # Layout tuning via kw args
-    if kw.get('layout_engine') in ('flux-layered', 'mermaid-layered'):
-        cmd += ['--layout-engine', kw['layout_engine']]
-    if kw.get('node_spacing'):
-        cmd += ['--node-spacing', str(kw['node_spacing'])]
-    if kw.get('rank_spacing'):
-        cmd += ['--rank-spacing', str(kw['rank_spacing'])]
 
-    result = subprocess.run(cmd, input=source, capture_output=True,
-                           text=True, timeout=30)
-    if result.returncode != 0:
-        err = result.stderr.strip() or 'mmdflux exited non-zero'
-        print(f'ERROR:render: {err}', file=sys.stderr)
-        sys.exit(4)
+def summary(d, title, w, h, theme, **kw):
+    """textcharts summary box -- key statistics at a glance."""
+    try:
+        from textcharts import SummaryBox, SummaryStats, ChartOptions
+        stats = SummaryStats()
+        for key, value in d.get('stats', {}).items():
+            setattr(stats, key, value)
+        chart = SummaryBox(stats=stats, subject=title, options=_textcharts_options(kw))
+        print(chart.render())
+    except ImportError:
+        print("ERROR:dep: pip install textcharts", file=sys.stderr)
+        sys.exit(2)
 
-    content = result.stdout
 
-    if fmt == 'svg':
-        output_path = kw.get('output')
-        if output_path:
-            import pathlib
-            pathlib.Path(output_path).write_text(content, encoding='utf-8')
-            print(f'Saved: {output_path}')
+def sparkline_table(d, title, w, h, theme, **kw):
+    """textcharts sparkline table -- multiple rows with inline mini charts.
+
+    JSON: {"columns":["Revenue"],"values":{"Jan":[100],"Feb":[120],"Mar":[110]}}
+    Note: Use 'sparkline' command for simpler sparkline charts.
+    """
+    try:
+        from textcharts import SparklineTable, SparklineTableData, SparklineColumn
+
+        columns_data = d.get('columns', ['Value'])
+        values = d.get('values', {})
+
+        # Build columns with values dict
+        columns = [SparklineColumn(name=str(col), values={}) for col in columns_data]
+
+        # Build rows (labels) and populate column values
+        rows = list(values.keys())
+
+        for col_idx, col_name in enumerate(columns_data):
+            for row_label in rows:
+                if col_name in values and row_label in values[col_name]:
+                    if col_idx < len(columns):
+                        columns[col_idx].values[row_label] = values[col_name][row_label]
+
+        data = SparklineTableData(rows=rows, columns=columns)
+        chart = SparklineTable(data=data, title=title, options=_textcharts_options(kw))
+        print(chart.render())
+    except ImportError:
+        print("ERROR:dep: pip install textcharts", file=sys.stderr)
+        sys.exit(2)
+
+
+def cdf_chart(d, title, w, h, theme, **kw):
+    """textcharts CDF chart -- cumulative distribution function.
+
+    JSON: {"series":[{"name":"A","values":[1,2,3,4,5]}]}
+    """
+    try:
+        from textcharts import CDFChart, CDFSeriesData
+
+        series = []
+        for s in d.get('series', [{'name': 'data', 'values': d.get('values', [])}]):
+            if isinstance(s, dict):
+                series.append(CDFSeriesData(name=str(s.get('name', 'data')), values=s.get('values', [])))
+            else:
+                series.append(CDFSeriesData(name='data', values=s))
+
+        if series:
+            chart = CDFChart(data=series, title=title, options=_textcharts_options(kw))
+            print(chart.render())
         else:
-            sys.stdout.write(content)
+            print("(no data)", file=sys.stderr)
+    except ImportError:
+        print("ERROR:dep: pip install textcharts", file=sys.stderr)
+        sys.exit(2)
+
+
+def rank_table(d, title, w, h, theme, **kw):
+    """Sorted ranking table with Rich.
+
+    JSON: {"items":[{"label":"Python","value":89},{"label":"Rust","value":95}]}
+    or {"values":{"Python":89,"Rust":95}} (items auto-generated from values keys)
+    """
+    from rich.console import Console
+    from rich.table import Table
+
+    no_color = kw.get('no_color', False)
+    c = Console(no_color=no_color)
+    t = Table(title=title)
+
+    if d.get('items'):
+        # Format 1: items with label/value pairs
+        t.add_column("Rank", justify="center")
+        t.add_column("Item")
+        t.add_column("Value", justify="right")
+        sorted_items = sorted(d.get('items', []), key=lambda x: x.get('value', 0), reverse=True)
+        for idx, item in enumerate(sorted_items, 1):
+            t.add_row(str(idx), str(item.get('label', item)), f"{item.get('value', 0):.1f}")
     else:
-        if title:
-            print(title)
-        sys.stdout.write(content)
+        # Format 2: values dict {"Name": score}
+        values = d.get('values', {})
+        t.add_column("Rank", justify="center")
+        t.add_column("Item")
+        t.add_column("Score", justify="right")
+        sorted_items = sorted(values.items(), key=lambda x: x[1], reverse=True)
+        for idx, (name, score) in enumerate(sorted_items, 1):
+            t.add_row(str(idx), str(name), f"{score:.1f}")
+
+    c.print(t)
+
+
+def percentile(d, title, w, h, theme, **kw):
+    """textcharts percentile ladder -- show value distribution.
+
+    JSON: {"data":[{"name":"Response Time","p50":50,"p90":90,"p95":95,"p99":99}]}
+    or {"series":[{"name":"A","values":[...]}]} to auto-calculate.
+    """
+    try:
+        from textcharts import PercentileLadder, PercentileData
+        import statistics
+
+        if 'data' in d:
+            # Direct percentile data
+            data = [PercentileData(
+                name=str(item['name']),
+                p50=item.get('p50', 0),
+                p90=item.get('p90', 0),
+                p95=item.get('p95', 0),
+                p99=item.get('p99', 0)
+            ) for item in d.get('data', [])]
+        elif 'series' in d:
+            # Auto-calculate from values
+            data = []
+            for s in d.get('series', []):
+                values = s.get('values', [])
+                if values:
+                    import numpy as np
+                    arr = np.array(values)
+                    data.append(PercentileData(
+                        name=str(s.get('name', 'data')),
+                        p50=np.percentile(arr, 50),
+                        p90=np.percentile(arr, 90),
+                        p95=np.percentile(arr, 95),
+                        p99=np.percentile(arr, 99)
+                    ))
+        else:
+            print("ERROR:schema: percentile requires 'data' or 'series'", file=sys.stderr)
+            sys.exit(1)
+            return
+
+        chart = PercentileLadder(data=data, title=title, options=_textcharts_options(kw))
+        print(chart.render())
+    except ImportError as e:
+        print("ERROR:dep: pip install textcharts", file=sys.stderr)
+        sys.exit(2)
+
+
+def boxplot_comparison(d, title, w, h, theme, **kw):
+    """textcharts box plot -- statistical distribution comparison.
+
+    JSON: {"series":[{"name":"A","values":[10,20,30,40,50]}]}
+    """
+    try:
+        from textcharts import BoxPlot, BoxPlotSeries, BoxPlotStats
+        import statistics
+
+        series = []
+        for s in d.get('series', []):
+            values = s.get('values', [])
+            if values:
+                sorted_vals = sorted(values)
+                n = len(sorted_vals)
+                stats = BoxPlotStats(
+                    min_val=min(values), max_val=max(values),
+                    median=statistics.median(values),
+                    q1=sorted_vals[n // 4] if n > 0 else 0,
+                    q3=sorted_vals[3 * n // 4] if n > 0 else 0,
+                    mean=statistics.mean(values),
+                    std=statistics.stdev(values) if n > 1 else 0,
+                    outliers=[]
+                )
+                series.append(BoxPlotSeries(name=str(s.get('name', 'data')), values=values))
+            else:
+                series.append(BoxPlotSeries(name=str(s.get('name', 'data')), values=[0]))
+
+        if series:
+            chart = BoxPlot(series=series, title=title, options=_textcharts_options(kw))
+            print(chart.render())
+        else:
+            print("(no data)", file=sys.stderr)
+    except ImportError:
+        print("ERROR:dep: pip install textcharts", file=sys.stderr)
+        sys.exit(2)
+
+
+def stacked_bar_text(d, title, w, h, theme, **kw):
+    """textcharts stacked bar chart -- composition over categories.
+
+    JSON: {"data":[{"label":"Project A","segments":[{"label":"Backend","value":30},{"label":"Frontend","value":20}]}]}
+    """
+    try:
+        from textcharts import StackedBar, StackedBarData, StackedBarSegment
+
+        data = []
+        for item in d.get('data', []):
+            segments = [
+                StackedBarSegment(phase_name=str(seg.get('label', 'Segment')), value=seg.get('value', 0))
+                for seg in item.get('segments', [])
+            ]
+            data.append(StackedBarData(label=str(item.get('label', '')), segments=segments))
+
+        if data:
+            chart = StackedBar(data=data, title=title, options=_textcharts_options(kw))
+            print(chart.render())
+        else:
+            print("(no data)", file=sys.stderr)
+    except ImportError:
+        print("ERROR:dep: pip install textcharts", file=sys.stderr)
+        sys.exit(2)
+
+
+def _textcharts_options(kw):
+    """Build textcharts ChartOptions from keyword args."""
+    try:
+        from textcharts import ChartOptions
+        return ChartOptions(
+            width=kw.get('width'),
+            use_color=not kw.get('no_color', False),
+        )
+    except ImportError:
+        return None
 
 
 def curve(d, title, w, h, theme, **kw):
@@ -1054,7 +1313,13 @@ def banner(d, title, w, h, theme, **kw):
 def art_command(d, title, w, h, theme, **kw):
     """Composable text art command (argparse dispatch only)."""
     del d, title
-    from cli_charts.render.art_engine import render_art
+    from cli_charts.render.art_engine import render_art, list_fonts, list_decors
+    if kw.get('list_fonts'):
+        list_fonts()
+        sys.exit(0)
+    if kw.get('list_decors'):
+        list_decors()
+        sys.exit(0)
     rc = render_art(
         kw.get('text', ''),
         kw.get('font', 'slant'),
@@ -1066,6 +1331,8 @@ def art_command(d, title, w, h, theme, **kw):
         h,
         kw.get('no_color', False),
         kw.get('output', ''),
+        kw.get('justify'),
+        kw.get('anim', False),
     )
     sys.exit(rc)
 
@@ -1082,12 +1349,13 @@ def uniplot(d, title, w, h, theme, **kw):
     labels = [s.get('label', f'S{i}') for i, s in enumerate(series)]
     lines = all(s.get('lines', True) for s in series)
     plot_kw = dict(
-        title=title or '',
         legend_labels=labels,
         lines=lines,
         width=w,
         height=h,
     )
+    if title:
+        plot_kw['title'] = title
     if kw.get('xlim'):
         plot_kw['x_min'], plot_kw['x_max'] = kw['xlim']
     if kw.get('ylim'):
@@ -1477,6 +1745,7 @@ CMDS = {
     'scatter':    scatter,
     'step':       step,
     'bar':        bar,
+    'hbar':       hbar,
     'pie':        pie,
     'multibar':   multibar,
     'stackedbar': stackedbar,
@@ -1493,7 +1762,6 @@ CMDS = {
     'gauge':      gauge,
     'dashboard':  dashboard,
     'graph':      graph,
-    'mermaid':    mermaid,
     'curve':      curve,
     'uniplot':    uniplot,
     'banner':      banner,
@@ -1503,6 +1771,16 @@ CMDS = {
     'radar':       radar,
     'plotille':    plotille_chart,
     'rich_live':   rich_live,
+    # textcharts types
+    'comparison':      comparison,
+    'diverging':       diverging,
+    'summary':         summary,
+    'sparkline-table': sparkline_table,
+    'cdf':             cdf_chart,
+    'rank':            rank_table,
+    'percentile':       percentile,
+    'boxplot':         boxplot_comparison,
+    'stacked-text':    stacked_bar_text,
     'animate':     animate_command,
     'record':      record_command,
     'record-replay': record_replay_command,
@@ -1518,7 +1796,7 @@ CMDS = {
 # Single source of truth for chart-type docs. Order is intentional.
 CHART_TYPES_BY_ENGINE: dict[str, list[str]] = {
     'plotext': [
-        'kline', 'candlestick', 'line', 'scatter', 'step', 'bar', 'multibar',
+        'kline', 'candlestick', 'line', 'scatter', 'step', 'bar', 'hbar', 'multibar',
         'stackedbar', 'hist', 'heatmap', 'box', 'indicator', 'event',
         'confusion',
     ],
@@ -1526,7 +1804,8 @@ CHART_TYPES_BY_ENGINE: dict[str, list[str]] = {
     'drawille': ['curve', 'hires', 'radar'],
     'plotille': ['plotille'],
     'uniplot': ['uniplot'],
-    'misc': ['graph', 'mermaid', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery'],
+    'textcharts': ['comparison', 'diverging', 'summary', 'sparkline-table', 'cdf', 'rank', 'percentile', 'boxplot', 'stacked-text'],
+    'misc': ['graph', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery'],
     'media': ['image', 'video'],
 }
 
@@ -1558,7 +1837,6 @@ EXPECTED_SCHEMAS = {
     'gauge':      '[{"label":"CPU","value":75,"max":100,"color":"red"}, ...] or {"metrics":[...]}',
     'dashboard':  '{"panels":[{"type":"gauge","data":{"label":"CPU","value":72,"max":100},"title":"CPU"},{"type":"sparkline","data":{"values":[1,3,5,2,8]},"title":"Load"}]}',
     'graph':      '{"edges":[["A","B"],...], "directed":true, "node_style":"ROUND"}',
-    'mermaid':    '{"source":"flowchart LR; A --> B --> C"}',
     'curve':      '{"points":[[x,y],...]}',
     'uniplot':    '[{"label":"A","x":[...],"y":[...]}] or {"label":"A","y":[...]}',
     'banner':      '{"text":"PROFIT","font":"big","color":"green"}',
@@ -1633,7 +1911,7 @@ def _render_ascii_motion_frames(chart_type, data, args, adapter, no_color=False)
         marker=args.marker if chart_type == 'scatter' else None,
         symbol_set=args.symbols if chart_type == 'bar' else None,
         candle_style=args.candle_style if chart_type == 'kline' else 'default',
-        gauge_style=args.style if chart_type == 'gauge' else 'bar',
+        gauge_style=args.gauge_style if chart_type == 'gauge' else 'bar',
     )
     text = _capture_stdout(lambda: CMDS[chart_type](data, args.title, args.width, args.height, args.theme, **kw))
     return [adapter.text_to_cells(text)]
@@ -1694,13 +1972,21 @@ Examples:
     p.add_argument('--font-tier',   choices=['ascii', 'unicode', 'unicode-extended', 'nerd'],
                    default=None, help='Terminal font capability tier (default: auto-detect)')
     p.add_argument('--font',        default='slant',
-                   help='TYPE=art figlet font (default: slant)')
-    p.add_argument('--decor',       choices=['barcode', 'snake', 'dna', 'random', 'wave'],
-                   default=None, help='TYPE=art optional art-lib decoration')
+                   help='TYPE=art figlet font (default: slant). Use --list-fonts to see all.')
+    p.add_argument('--decor',       default=None,
+                   help='TYPE=art optional decoration (barcode/snake/dna/wave + 200+ from art lib). Use --list-decors to see all.')
     p.add_argument('--frame',       choices=['single', 'double', 'rounded', 'ascii', 'heavy', 'none'],
                    default=None, help='TYPE=art optional Rich frame')
     p.add_argument('--gradient',    choices=['sunset', 'viridis', 'ocean', 'rainbow', 'none'],
                    default=None, help='TYPE=art optional text gradient')
+    p.add_argument('--justify',     choices=['left', 'center', 'right'],
+                   default=None, help='TYPE=art figlet text alignment')
+    p.add_argument('--anim',        action='store_true',
+                   help='TYPE=art animation mode (requires art library; pip install glyph-arts[art])')
+    p.add_argument('--list-fonts',  action='store_true',
+                   help='TYPE=art: list all available figlet fonts')
+    p.add_argument('--list-decors', action='store_true',
+                   help='TYPE=art: list all available decorations')
     p.add_argument('--engine',      choices=['ascii', 'pixel', 'interactive'], default='ascii',
                    help='Render backend. ascii (default) = plotext/rich/drawille text art. '
                         'pixel = matplotlib + chafa true-color pixel chart (requires '
@@ -1723,7 +2009,7 @@ Examples:
     p.add_argument('--output',      default='',
                    help='Save chart to file (.png with pixel engine; .txt/.ansi/.html with ascii engine; .md for table)')
     p.add_argument('--format',      default=None,
-                   help="Output format for TYPE=mermaid: text (Unicode), ascii, svg")
+                   help="Output format (reserved for future use)")
     p.add_argument('--output-dir',  default='',
                    help='TYPE=to-hyperframes/to-ascii-motion output directory')
     p.add_argument('--out-dir',     dest='output_dir',
@@ -1745,8 +2031,12 @@ Examples:
                         'image/video chafa --symbols value (default: braille)')
     p.add_argument('--candle-style', choices=['default', 'geom'], default='default',
                    help='TYPE=kline candle glyph style')
-    p.add_argument('--style',       choices=['bar', 'half-circle', 'full-circle', 'braille'],
+    p.add_argument('--gauge-style', choices=['bar', 'half-circle', 'full-circle', 'braille'],
                    default='bar', help='TYPE=gauge glyph style')
+    p.add_argument('--style',       choices=list(_STYLES) + ['auto'],
+                   default=None, help='Rendering style (fast/smooth/science/rgb/clean/retro/rich/art)')
+    p.add_argument('--list-styles', action='store_true',
+                   help='Show available styles for each chart type and exit')
     p.add_argument('--fps',         type=int, default=12, metavar='N',
                    help='Video playback frames/sec for type=video (default: 12)')
     p.add_argument('--version',     action='version', version=f'glyph-arts {_VERSION}')
@@ -1824,9 +2114,24 @@ Examples:
                 print(f'  {pkg:<13} {status}  ({purpose}){hint}')
         sys.exit(0)
 
+    if '--list-styles' in sys.argv:
+        print('Available styles per chart type:\n')
+        for ctype in sorted(STYLE_ROUTES):
+            engines = STYLE_ROUTES[ctype]
+            parts = [f'{s} ({eng})' for s, eng in engines.items()]
+            print(f'  {ctype:<12} {", ".join(parts)}')
+        print(f'\nDefault style: {DEFAULT_STYLE}')
+        print(f'Override: --style <name> or GLYPH_ARTS_STYLE=<name>')
+        sys.exit(0)
+
     args = p.parse_args(argv)
     if args.font_tier is None:
         args.font_tier = detect_font_tier()
+
+    if args.style is None:
+        env_style = os.environ.get('GLYPH_ARTS_STYLE', '').strip().lower()
+        if env_style and env_style in _STYLES:
+            args.style = env_style
 
     if args.type == 'demo':
         from cli_charts.demo_engine import run_demo
@@ -1892,8 +2197,14 @@ Examples:
         return
 
     if args.type == 'art':
-        from cli_charts.render.art_engine import render_art
+        from cli_charts.render.art_engine import render_art, list_fonts, list_decors
         no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
+        if args.list_fonts:
+            list_fonts()
+            sys.exit(0)
+        if args.list_decors:
+            list_decors()
+            sys.exit(0)
         rc = render_art(
             ' '.join(args.art_text),
             args.font,
@@ -1905,6 +2216,8 @@ Examples:
             args.height,
             no_color,
             args.output,
+            args.justify,
+            args.anim,
         )
         sys.exit(rc)
 
@@ -2099,8 +2412,20 @@ Examples:
             marker=args.marker if args.type == 'scatter' else None,
             symbol_set=args.symbols if args.type == 'bar' else None,
             candle_style=args.candle_style if args.type == 'kline' else 'default',
-            gauge_style=args.style if args.type == 'gauge' else 'bar',
+            gauge_style=args.gauge_style if args.type == 'gauge' else 'bar',
         )
+
+        # Style routing: redirect to alternate engine if --style is set
+        _resolved_engine = resolve_engine(args.type, args.style) if args.style else None
+        if _resolved_engine and args.engine == 'ascii':
+            from cli_charts.render.style_router import render_styled
+            rc = render_styled(
+                args.type, _resolved_engine, args.style,
+                data, args.title, args.width, args.height, args.theme, **kw
+            )
+            if rc is not None:
+                sys.exit(rc)
+            # rc=None means engine not yet implemented, fall through to default
 
         try:
             if args.engine == 'pixel':
@@ -2139,9 +2464,6 @@ Examples:
                 return
 
             if args.output and args.type == 'table' and args.output.lower().endswith('.md'):
-                CMDS[args.type](data, args.title, args.width, args.height, args.theme, **kw)
-            elif args.output and args.type == 'mermaid' and kw.get('format') == 'svg':
-                # mermaid SVG writes to file directly inside the cmd
                 CMDS[args.type](data, args.title, args.width, args.height, args.theme, **kw)
             elif args.output:
                 from cli_charts.render.export_engine import export_to_path

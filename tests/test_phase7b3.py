@@ -72,7 +72,7 @@ def test_bar_symbols_arrows_renders_arrow_symbols() -> None:
 
 
 def test_gauge_style_half_circle_renders_half_circle_style() -> None:
-    code, out, err = _run(["gauge", "--style", "half-circle", "--no-color", "--json", GAUGE_DATA])
+    code, out, err = _run(["gauge", "--gauge-style", "half-circle", "--no-color", "--json", GAUGE_DATA])
 
     assert code == 0, err
     assert get_symbol("half_circle_left") in out
@@ -80,7 +80,7 @@ def test_gauge_style_half_circle_renders_half_circle_style() -> None:
 
 
 def test_gauge_style_full_circle_renders_full_circle_style() -> None:
-    code, out, err = _run(["gauge", "--style", "full-circle", "--no-color", "--json", GAUGE_DATA])
+    code, out, err = _run(["gauge", "--gauge-style", "full-circle", "--no-color", "--json", GAUGE_DATA])
 
     assert code == 0, err
     assert get_symbol("circle") in out
@@ -93,7 +93,7 @@ def test_ascii_tier_fallback_for_marker_symbols_candle_and_gauge(monkeypatch: py
         (["scatter", "--marker", "triangle", "--no-color", "--width", "40", "--height", "12", "--json", SCATTER_DATA], get_symbol("triangle_up", "ascii")),
         (["bar", "--symbols", "arrows", "--no-color", "--width", "40", "--height", "12", "--json", BAR_DATA], get_symbol("arrow_up", "ascii")),
         (["kline", "--candle-style", "geom", "--no-color", "--width", "40", "--height", "12", "--json", CANDLE_DATA], get_symbol("triangle_up", "ascii")),
-        (["gauge", "--style", "half-circle", "--no-color", "--json", GAUGE_DATA], get_symbol("half_circle_left", "ascii")),
+        (["gauge", "--gauge-style", "half-circle", "--no-color", "--json", GAUGE_DATA], get_symbol("half_circle_left", "ascii")),
     ]
     for args, expected in cases:
         code, out, err = _run(args)
