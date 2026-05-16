@@ -4,6 +4,20 @@ All notable changes to glyph-arts are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+- **textcharts engine (9 types)**: zero-dependency charts with ANSI colors.
+  New types: `comparison`, `diverging`, `summary`, `sparkline-table`, `cdf`,
+  `rank`, `percentile`, `boxplot`, `stacked-text`. Install via
+  `pip install "glyph-arts[textcharts]"` or `pip install textcharts`.
+- **52 total chart types** (was 43).
+
+## [3.1.0] - 2026-05-11
+
+### Removed
+- **`mermaid` chart type**: removed due to positioning conflict with "no browser, no generated files" philosophy and limited diagram type coverage (4/9 types via mmdflux). Users needing full Mermaid support should use `mmdc` (mermaid-cli) directly or browser-based tools.
+
 ## [3.0.1] - 2026-04-15
 
 ### Fixed

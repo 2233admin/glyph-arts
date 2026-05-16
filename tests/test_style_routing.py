@@ -3,11 +3,12 @@ import os
 import subprocess
 import sys
 
-import pytest
-
 from cli_charts.registry import (
-    STYLES, STYLE_ROUTES, STYLE_ENGINES, DEFAULT_STYLE,
-    styles_for, resolve_engine,
+    DEFAULT_STYLE,
+    STYLE_ROUTES,
+    STYLES,
+    resolve_engine,
+    styles_for,
 )
 
 
@@ -15,7 +16,11 @@ def _run(args, env=None):
     full_env = {**os.environ, **(env or {}), "NO_COLOR": "1"}
     result = subprocess.run(
         [sys.executable, "-m", "cli_charts"] + args,
-        capture_output=True, text=True, env=full_env,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        env=full_env,
     )
     return result.returncode, result.stdout, result.stderr
 

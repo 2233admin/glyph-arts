@@ -79,7 +79,7 @@ def _render_clean(chart_type, data, title, w, h, theme, **kw):
         items = []
         for s in series:
             if "categories" in s and "values" in s:
-                for cat, val in zip(s["categories"], s["values"]):
+                for cat, val in zip(s["categories"], s["values"], strict=False):
                     items.append(BarData(str(cat), val))
             elif "label" in s and "y" in s:
                 items.append(BarData(s["label"], sum(s["y"]) / len(s["y"])))
@@ -126,7 +126,7 @@ def _render_retro(chart_type, data, title, w, h, theme, **kw):
         items = {}
         for s in series:
             if "categories" in s and "values" in s:
-                for cat, val in zip(s["categories"], s["values"]):
+                for cat, val in zip(s["categories"], s["values"], strict=False):
                     items[cat] = val
             elif "label" in s and "y" in s:
                 items[s["label"]] = sum(s["y"]) / len(s["y"])

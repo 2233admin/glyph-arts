@@ -24,7 +24,8 @@ import tempfile
 
 from cli_charts.font_tier import detect_font_tier
 from cli_charts.osc8 import link as _osc8_link
-from cli_charts.registry import STYLES as _STYLES, STYLE_ROUTES, STYLE_ENGINES, DEFAULT_STYLE, styles_for, resolve_engine
+from cli_charts.registry import DEFAULT_STYLE, STYLE_ROUTES, resolve_engine
+from cli_charts.registry import STYLES as _STYLES
 from cli_charts.symbols import BLOCK, BRAILLE_ALL, get_symbol
 from cli_charts.themes import get_palette as _get_palette
 
@@ -520,7 +521,7 @@ def hbar(d, title, w, h, theme, **kw):
     # Try textgraph.horizontal() first
     try:
         from textgraph import horizontal as textgraph_hbar
-        data = list(zip(labels, values))
+        data = list(zip(labels, values, strict=False))
         print(textgraph_hbar(data))
         return
     except ImportError:
@@ -530,7 +531,7 @@ def hbar(d, title, w, h, theme, **kw):
     try:
         from ascii_graph import Pyasciigraph
         g = Pyasciigraph()
-        data = list(zip(labels, values))
+        data = list(zip(labels, values, strict=False))
         for line in g.graph(title or 'bar', data):
             print(line)
         return
@@ -803,7 +804,7 @@ def diverging(d, title, w, h, theme, **kw):
 def summary(d, title, w, h, theme, **kw):
     """textcharts summary box -- key statistics at a glance."""
     try:
-        from textcharts import SummaryBox, SummaryStats, ChartOptions
+        from textcharts import SummaryBox, SummaryStats
         stats = SummaryStats()
         for key, value in d.get('stats', {}).items():
             setattr(stats, key, value)
@@ -821,7 +822,7 @@ def sparkline_table(d, title, w, h, theme, **kw):
     Note: Use 'sparkline' command for simpler sparkline charts.
     """
     try:
-        from textcharts import SparklineTable, SparklineTableData, SparklineColumn
+        from textcharts import SparklineColumn, SparklineTable, SparklineTableData
 
         columns_data = d.get('columns', ['Value'])
         values = d.get('values', {})
@@ -912,8 +913,7 @@ def percentile(d, title, w, h, theme, **kw):
     or {"series":[{"name":"A","values":[...]}]} to auto-calculate.
     """
     try:
-        from textcharts import PercentileLadder, PercentileData
-        import statistics
+        from textcharts import PercentileData, PercentileLadder
 
         if 'data' in d:
             # Direct percentile data
@@ -946,7 +946,7 @@ def percentile(d, title, w, h, theme, **kw):
 
         chart = PercentileLadder(data=data, title=title, options=_textcharts_options(kw))
         print(chart.render())
-    except ImportError as e:
+    except ImportError:
         print("ERROR:dep: pip install textcharts", file=sys.stderr)
         sys.exit(2)
 
@@ -957,24 +957,12 @@ def boxplot_comparison(d, title, w, h, theme, **kw):
     JSON: {"series":[{"name":"A","values":[10,20,30,40,50]}]}
     """
     try:
-        from textcharts import BoxPlot, BoxPlotSeries, BoxPlotStats
-        import statistics
+        from textcharts import BoxPlot, BoxPlotSeries
 
         series = []
         for s in d.get('series', []):
             values = s.get('values', [])
             if values:
-                sorted_vals = sorted(values)
-                n = len(sorted_vals)
-                stats = BoxPlotStats(
-                    min_val=min(values), max_val=max(values),
-                    median=statistics.median(values),
-                    q1=sorted_vals[n // 4] if n > 0 else 0,
-                    q3=sorted_vals[3 * n // 4] if n > 0 else 0,
-                    mean=statistics.mean(values),
-                    std=statistics.stdev(values) if n > 1 else 0,
-                    outliers=[]
-                )
                 series.append(BoxPlotSeries(name=str(s.get('name', 'data')), values=values))
             else:
                 series.append(BoxPlotSeries(name=str(s.get('name', 'data')), values=[0]))
@@ -1313,7 +1301,7 @@ def banner(d, title, w, h, theme, **kw):
 def art_command(d, title, w, h, theme, **kw):
     """Composable text art command (argparse dispatch only)."""
     del d, title
-    from cli_charts.render.art_engine import render_art, list_fonts, list_decors
+    from cli_charts.render.art_engine import list_decors, list_fonts, render_art
     if kw.get('list_fonts'):
         list_fonts()
         sys.exit(0)
@@ -2121,7 +2109,7 @@ Examples:
             parts = [f'{s} ({eng})' for s, eng in engines.items()]
             print(f'  {ctype:<12} {", ".join(parts)}')
         print(f'\nDefault style: {DEFAULT_STYLE}')
-        print(f'Override: --style <name> or GLYPH_ARTS_STYLE=<name>')
+        print('Override: --style <name> or GLYPH_ARTS_STYLE=<name>')
         sys.exit(0)
 
     args = p.parse_args(argv)
@@ -2197,7 +2185,7 @@ Examples:
         return
 
     if args.type == 'art':
-        from cli_charts.render.art_engine import render_art, list_fonts, list_decors
+        from cli_charts.render.art_engine import list_decors, list_fonts, render_art
         no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
         if args.list_fonts:
             list_fonts()

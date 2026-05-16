@@ -137,6 +137,7 @@ def test_invalid_symbol_set_key_returns_argparse_error() -> None:
         capture_output=True,
         text=True,
         encoding="utf-8",
+        errors="replace",
         timeout=10,
         cwd=ROOT,
     )

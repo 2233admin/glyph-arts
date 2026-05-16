@@ -181,6 +181,21 @@ Need output inside Claude Code?
 |------|-----------|
 | `uniplot` | `[{"label":"A","x":[...],"y":[...]}]` -- scientific axis formatting |
 
+### Engine: textcharts (9 types)
+Zero-dependency, 15 chart types with ANSI colors. Install: `pip install "glyph-arts[textcharts]"` or `pip install textcharts`.
+
+| Type | JSON keys | Notes |
+|------|-----------|-------|
+| `comparison` | `{"data":[{"label":"A","baseline":85,"comparison":89.5}]}` | A/B comparison bars with % change |
+| `diverging` | `{"data":[{"label":"A","pct_change":25}]}` | positive/negative diverging bars |
+| `summary` | `{"stats":{"cpu":73.5,"memory":58.2}}` | key statistics summary box |
+| `sparkline-table` | `{"columns":[],"values":{}}` | table with inline sparklines |
+| `cdf` | `{"series":[{"name":"A","values":[...]}]}` | cumulative distribution function |
+| `rank` | `{"items":[{"label":"A","value":89}]}` or `{"values":{"A":89}}` | sorted ranking table (Rich) |
+| `percentile` | `{"data":[{"name":"A","p50":50,"p90":90}]}` | percentile ladder |
+| `boxplot` | `{"series":[{"name":"A","values":[...]}]}` | statistical box plots |
+| `stacked-text` | `{"data":[{"label":"A","segments":[{"label":"X","value":30}]}]}` | stacked composition bars |
+
 ### Engine: media (chafa + ffmpeg) -- 2 types
 Charts use a native Python engine. Media (image/video) shells out to
 `chafa` (pre-installed via `scoop install chafa` on Windows, distro

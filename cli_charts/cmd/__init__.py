@@ -9,7 +9,7 @@ _MODULES = [
     "curve", "hires", "radar", "plotille", "uniplot", "banner", "art",
     "candlestick", "rich_live", "image", "video", "demo", "gallery",
     "splash", "status", "code", "animate", "record", "record_replay",
-    "to_hyperframes", "to_ascii_motion", "step", "mermaid",
+    "to_hyperframes", "to_ascii_motion", "step",
 ]
 
 for _module in _MODULES:

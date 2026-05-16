@@ -15,6 +15,7 @@ def _run(args):
         capture_output=True,
         text=True,
         encoding="utf-8",
+        errors="replace",
         timeout=10,
         cwd=ROOT,
     )
@@ -38,6 +39,8 @@ def test_render_art_signature():
         "h",
         "no_color",
         "output",
+        "justify",
+        "anim",
     ]
 
 
@@ -63,7 +66,8 @@ def test_art_dep_missing_returns_2(monkeypatch):
     import cli_charts.render.art_engine as art_engine
 
     monkeypatch.setattr(art_engine, "_HAS_ART", False)
-    rc = art_engine.render_art("HI", "slant", None, None, None, "pro", 80, 20, False, "")
+    # Use an art library decor (heart1 is in art.DECORATION_NAMES)
+    rc = art_engine.render_art("HI", "slant", "heart1", None, None, "pro", 80, 20, False, "", None, False)
     assert rc == 2
 
 

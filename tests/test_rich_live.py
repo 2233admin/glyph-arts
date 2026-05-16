@@ -19,7 +19,7 @@ def _run(payload: dict, extra_args: list[str] | None = None) -> subprocess.Compl
     args = [sys.executable, str(SCRIPT), 'rich_live', '--json', json.dumps(payload)]
     if extra_args:
         args.extend(extra_args)
-    return subprocess.run(args, capture_output=True, text=True, encoding='utf-8')
+    return subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace")
 
 
 @pytest.fixture
