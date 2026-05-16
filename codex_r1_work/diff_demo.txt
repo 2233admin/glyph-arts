@@ -1,0 +1,43 @@
+Comparing files CODEX_R1_WORK\baseline_demo.txt and CODEX_R1_WORK\REFACTOR_DEMO.TXT
+***** CODEX_R1_WORK\baseline_demo.txt
+    1:  usage: -c [-h] [--json DATA] [--file PATH] [--duckdb SQL] [--db DB] [--title TITLE] [--width WIDTH] [--height HEIGHT] [--theme 
+    2:  THEME]
+    3:            [--font-tier {ascii,unicode,unicode-extended,nerd}] [--font FONT] [--decor {barcode,snake,dna,random,wave}]
+    4:            [--frame {single,double,rounded,ascii,heavy,none}] [--gradient {sunset,viridis,ocean,rainbow,none}] [--engine {ascii,
+    5:  pixel,interactive}]
+    6:            [--art {low,default,high}] [--xlabel XLABEL] [--ylabel YLABEL] [--xlim MIN MAX] [--ylim MIN MAX] [--xscale {linear,lo
+    7:  g}] [--yscale {linear,log}]
+    8:            [--orientation {vertical,horizontal}] [--output OUTPUT] [--output-dir OUTPUT_DIR] [--out-dir OUTPUT_DIR] [--formats F
+    9:  ORMATS] [--polish {ascii-motion}]
+   10:            [--polish-style POLISH_STYLE] [--cmd CMD] [--no-color] [--marker {circle,triangle,diamond,star,square}] [--symbols SE
+   11:  T] [--candle-style {default,geom}]
+   12:            [--style {bar,half-circle,full-circle,braille}] [--fps N] [--version] [--check-deps] [--all] [--sample N] [--animate]
+   13:   [--refresh FPS] [--window N]
+   14:            [--duration SEC] [--frames N] [--spinner SPINNER] [--rich-progress] [--lang LANG] [--kind KIND] [--message MESSAGE] [
+   15:  --link-data LINK_DATA]
+   16:            [--link-title LINK_TITLE] [--statusline] [--no-splash] [--speed {fast,normal,slow}] [--no-clear] [--chart CHART]
+   17:            TYPE [art_text ...]
+   18:  
+***** CODEX_R1_WORK\REFACTOR_DEMO.TXT
+    1:  usage: glyph-arts [-h] [--json DATA] [--file PATH] [--duckdb SQL] [--db DB] [--title TITLE] [--width WIDTH] [--height HEIGHT] [
+    2:  --theme THEME]
+    3:                    [--font-tier {ascii,unicode,unicode-extended,nerd}] [--font FONT] [--decor {barcode,snake,dna,random,wave}]
+    4:                    [--frame {single,double,rounded,ascii,heavy,none}] [--gradient {sunset,viridis,ocean,rainbow,none}] [--engine
+    5:   {ascii,pixel,interactive}]
+    6:                    [--art {low,default,high}] [--xlabel XLABEL] [--ylabel YLABEL] [--xlim MIN MAX] [--ylim MIN MAX] [--xscale {l
+    7:  inear,log}] [--yscale {linear,log}]
+    8:                    [--orientation {vertical,horizontal}] [--output OUTPUT] [--output-dir OUTPUT_DIR] [--out-dir OUTPUT_DIR] [--f
+    9:  ormats FORMATS]
+   10:                    [--polish {ascii-motion}] [--polish-style POLISH_STYLE] [--cmd CMD] [--no-color] [--marker {circle,triangle,d
+   11:  iamond,star,square}] [--symbols SET]
+   12:                    [--candle-style {default,geom}] [--style {bar,half-circle,full-circle,braille}] [--fps N] [--version] [--chec
+   13:  k-deps] [--all] [--sample N]
+   14:                    [--animate] [--refresh FPS] [--window N] [--duration SEC] [--frames N] [--spinner SPINNER] [--rich-progress] 
+   15:  [--lang LANG] [--kind KIND]
+   16:                    [--message MESSAGE] [--link-data LINK_DATA] [--link-title LINK_TITLE] [--statusline] [--no-splash] [--speed {
+   17:  fast,normal,slow}] [--no-clear]
+   18:                    [--chart CHART]
+   19:                    TYPE [art_text ...]
+   20:  
+*****
+

@@ -1,0 +1,3 @@
+Comparing files CODEX_R1_WORK\baseline_equal_hist.txt and CODEX_R1_WORK\FINAL_HIST.TXT
+FC: no differences encountered
+

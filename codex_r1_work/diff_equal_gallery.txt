@@ -1,0 +1,3 @@
+Comparing files CODEX_R1_WORK\baseline_equal_gallery.txt and CODEX_R1_WORK\FINAL_GALLERY.TXT
+FC: no differences encountered
+

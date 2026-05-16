@@ -1,0 +1,3 @@
+Comparing files CODEX_R1_WORK\baseline_equal_pie.txt and CODEX_R1_WORK\FINAL_PIE.TXT
+FC: no differences encountered
+

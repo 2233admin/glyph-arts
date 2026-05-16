@@ -1,0 +1,3 @@
+Comparing files CODEX_R1_WORK\baseline_equal_kline.txt and CODEX_R1_WORK\FINAL_KLINE.TXT
+FC: no differences encountered
+

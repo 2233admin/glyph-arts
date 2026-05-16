@@ -1,0 +1,3 @@
+Comparing files CODEX_R1_WORK\baseline_equal_splash.txt and CODEX_R1_WORK\FINAL_SPLASH.TXT
+FC: no differences encountered
+
