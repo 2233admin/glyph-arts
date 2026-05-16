@@ -806,12 +806,12 @@ def gauge(d, title, w, h, theme, **kw):
 
 
 def dashboard(d, title, w, h, theme, **kw):
-    """Delegates to scripts/dashboard.py via subprocess (Textual TUI or Rich static)."""
+    """Delegates to cli_charts/dashboard.py via subprocess (Textual TUI or Rich static)."""
     import subprocess
     config = dict(d)
     if title:
         config['title'] = title
-    dash_script = os.path.join(os.path.dirname(__file__), 'dashboard.py')
+    dash_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'dashboard.py')
     cmd = [sys.executable, dash_script, '--json', json.dumps(config)]
     if not sys.stdout.isatty():
         cmd.append('--no-interactive')

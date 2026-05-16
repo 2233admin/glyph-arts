@@ -16,6 +16,13 @@ import json
 import sys
 from typing import Any
 
+for _stream in (sys.stdout, sys.stderr):
+    if hasattr(_stream, "reconfigure") and getattr(_stream, "encoding", "").lower() != "utf-8":
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError):
+            pass
+
 DEMO_CONFIG = {
     "title": "System Monitor",
     "panels": [
@@ -189,7 +196,7 @@ def render_static(config: dict) -> None:
     from rich.panel import Panel as RichPanel
     from rich.rule import Rule
 
-    c = Console()
+    c = Console(legacy_windows=False)
     title = config.get("title", "")
     if title:
         c.print(Rule(f"[bold]{title}[/bold]"))
