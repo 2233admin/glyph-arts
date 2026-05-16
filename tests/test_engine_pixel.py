@@ -8,12 +8,13 @@ from pathlib import Path
 
 import pytest
 
+if shutil.which('chafa') is None:
+    pytest.skip('chafa not in PATH', allow_module_level=True)
+
 pytest.importorskip(
     'matplotlib',
     reason='matplotlib not installed',
 )
-
-pytestmark = pytest.mark.skipif(shutil.which('chafa') is None, reason='chafa not in PATH')
 
 ROOT = Path(__file__).resolve().parent.parent
 
