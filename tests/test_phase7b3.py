@@ -101,7 +101,9 @@ def test_ascii_tier_fallback_for_marker_symbols_candle_and_gauge(monkeypatch: py
         assert expected in out
 
 
-def test_default_no_flag_scatter_output_matches_p7b2_baseline() -> None:
+def test_default_no_flag_scatter_output_matches_p7b2_baseline(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(chart, "detect_font_tier", lambda: "unicode")
+
     base_args = ["scatter", "--no-color", "--width", "40", "--height", "12", "--json", SCATTER_DATA]
     code, out, err = _run(base_args)
 
