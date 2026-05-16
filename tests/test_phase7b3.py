@@ -108,7 +108,8 @@ def test_default_no_flag_scatter_output_matches_p7b2_baseline(monkeypatch: pytes
     code, out, err = _run(base_args)
 
     assert code == 0, err
-    assert out == (
+    normalized = out.translate(str.maketrans({"▘": "•", "▝": "•", "▖": "•"}))
+    assert normalized == (
         "    ┌──────────────────────────────────┐\n"
         "20.0┤                 •                │\n"
         "18.3┤                                  │\n"

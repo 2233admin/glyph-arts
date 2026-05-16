@@ -82,15 +82,24 @@ jobs:
   deepsource:
     name: DeepSource Analysis
     runs-on: ubuntu-latest
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - name: Run DeepSource
+        env:
+          DEEPSOURCE_TOKEN: ${{ secrets.DEEPSOURCE_TOKEN }}
         run: |
           pip install deepsource
-          deepsource init --token ${{ secrets.DEEPSOURCE_TOKEN }}
+          if ! command -v deepsource >/dev/null 2>&1; then
+            echo "::warning::DeepSource CLI unavailable after install; skipping optional analysis."
+            exit 0
+          fi
+          if [ -z "${DEEPSOURCE_TOKEN:-}" ]; then
+            echo "::warning::DEEPSOURCE_TOKEN is not set; skipping optional analysis."
+            exit 0
+          fi
+          deepsource init --token "$DEEPSOURCE_TOKEN"
           deepsource test
           deepsource analyze
