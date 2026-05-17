@@ -20,6 +20,8 @@ jobs:
           - os: windows-latest
             python-version: "3.11"
           - os: windows-latest
+            python-version: "3.13"
+          - os: windows-latest
             python-version: "3.14"
     steps:
       - uses: actions/checkout@v4
