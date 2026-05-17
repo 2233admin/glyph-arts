@@ -2,8 +2,10 @@
 
 > When AI lives in the terminal, visualization must live there too.
 
-All chart types rendered natively in the terminal -- no browser, no generated files, no context switch.
-`pip install glyph-arts` and your AI agent has a native sense of sight inside the CLI.
+glyph-arts is terminal-first by default: core charts render directly in the
+CLI, with optional export and media adapters when you need files, images, or
+recordings. `pip install glyph-arts` gives your AI agent a native sense of
+sight inside the terminal.
 
 ![demo](demo/chartex-demo.gif)
 
@@ -23,6 +25,26 @@ pip install "glyph-arts[tui]"
 # everything:
 pip install "glyph-arts[all]"
 ```
+
+## Product layers
+
+glyph-arts is intentionally layered so the default install stays useful and
+the heavier integrations remain opt-in.
+
+| Layer | What belongs here | Examples |
+|---|---|---|
+| Core charts | Pure-Python terminal rendering that works after `pip install glyph-arts` | bar, line, scatter, pie, table, sparkline, gauge, indicator |
+| Optional engines | Better fidelity or interaction when extra Python packages are installed | LTTB downsampling, Textual dashboard, pixel engine |
+| Media/export adapters | File, image, video, and recording workflows that may need system tools | `.txt`, `.ansi`, `.html`, `.md`, `.png`, `record`, `record-replay` |
+| Experimental/agent integrations | Integrations for agent, motion, or external rendering workflows | Claude Code flags, HyperFrames, ASCII Motion |
+
+## Windows support
+
+Core chart rendering is supported on Windows. CI gates Windows on Python 3.12
+for the default supported path; Linux and macOS cover Python 3.10 through 3.14.
+Optional Windows combinations involving Python 3.13/3.14 plus numpy,
+matplotlib, or lttb are useful when they work, but they are not release gates
+until their upstream wheels are consistently available.
 
 ## See it in action
 
