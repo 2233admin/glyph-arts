@@ -1540,6 +1540,9 @@ def _lttb(xs: list, ys: list, n: int) -> tuple:
     """Largest-Triangle-Three-Buckets -- shape-preserving time-series downsample.
     Falls back to uniform stride if lttb package is not installed.
     """
+    if sys.platform == "win32" and sys.version_info >= (3, 13):
+        step = max(1, len(xs) // n)
+        return xs[::step][:n], ys[::step][:n]
     try:
         import numpy as np
         from lttb import downsample as _lttb_ds
