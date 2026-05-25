@@ -7,7 +7,12 @@ Use this when Codex is operating in a repo or terminal.
 - For diagrams, use `glyph-arts chat mermaid`, `diagram`, or `graph` instead of
   hand-drawing.
 - For function/path drawing, use `textplot` or `turtle`.
-- Run the verifier before final response when output will be pasted to chat.
+- Render to stdout or capture stdout into a text file.
+- Run `scripts/verify_chat_art.py` before every final response that contains a
+  drawing.
+- If verification fails, rerender smaller or fallback; do not reply with broken
+  output.
+- Paste the verified stdout drawing into the final response.
 
 Codex command loop:
 

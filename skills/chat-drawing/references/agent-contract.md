@@ -10,9 +10,10 @@ render inside the conversation:
 
 1. Use `glyph-arts chat ...` first.
 2. Render to stdout.
-3. Verify stdout before replying.
-4. Reply with the drawing itself in a fenced `text` block.
-5. Mention files only as secondary artifacts.
+3. Verify stdout with `scripts/verify_chat_art.py` before replying.
+4. Rerender smaller or use a fallback route if verification fails.
+5. Reply with the verified stdout drawing itself in a fenced `text` block.
+6. Mention files only as secondary artifacts.
 
 ## Required Loop
 
@@ -23,6 +24,14 @@ python skills/chat-drawing/scripts/verify_chat_art.py output.txt --max-width 100
 
 If stdout is empty, too wide, contains ANSI when chat-safe text was expected, or
 loses the requested labels, rerender before replying.
+
+The agent adapter itself must also pass:
+
+```bash
+python skills/chat-drawing/scripts/verify_agent_contract.py
+```
+
+If this gate fails, the adapter is not allowed to claim chat-drawing support.
 
 ## Core Routing
 
@@ -45,6 +54,8 @@ loses the requested labels, rerender before replying.
 - Do not tell the user a file was created instead of showing the drawing.
 - Do not hand-write charts when a `glyph-arts chat ...` route exists.
 - Do not send ANSI escape codes into a markdown chat unless color was requested.
+- Do not reply before the verifier passes.
+- Do not claim success after a failed verification run.
 - Do not claim video/audio/YouTube streaming is chat-safe; use snapshots or text
   summaries instead.
 - Do not use `kitty`, `iterm`, or `sixels` output in a chat transcript; force

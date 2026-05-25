@@ -2,6 +2,23 @@
   "name": "chat-drawing",
   "entry": "glyph-arts chat",
   "loop": ["route", "render_stdout", "verify", "rerender_on_failure", "reply_with_stdout"],
+  "anti_lazy": {
+    "gate": "python skills/chat-drawing/scripts/verify_agent_contract.py",
+    "must": [
+      "route with a glyph-arts chat command before drawing by hand",
+      "render to stdout or capture stdout into a text file",
+      "run scripts/verify_chat_art.py before replying with the drawing",
+      "rerender or fallback when verification fails",
+      "paste the verified visible stdout drawing into the reply"
+    ],
+    "forbidden": [
+      "hand_draw_when_route_exists",
+      "reply_without_verified_stdout",
+      "artifact_only_response",
+      "ansi_in_chat_without_user_request",
+      "claim_success_after_failed_verification"
+    ]
+  },
   "routing_refs": [
     "references/routing.md",
     "references/decision-tree.md",

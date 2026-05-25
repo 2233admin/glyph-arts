@@ -75,7 +75,7 @@ def test_chat_drawing_capability_manifest_is_agent_readable():
     assert manifest['default_entry'] == 'glyph-arts chat'
     assert (ROOT / manifest['skill_package'] / 'SKILL.md').exists()
     assert (ROOT / manifest['verification_script']).exists()
-    assert manifest['closed_loop'] == ['route', 'render', 'verify', 'rerender_on_failure', 'reply_with_stdout']
+    assert manifest['closed_loop'] == ['route', 'render_stdout', 'verify', 'rerender_on_failure', 'reply_with_stdout']
     capabilities = manifest['capabilities']
     for name, capability in capabilities.items():
         protocol = capability.get('protocol')

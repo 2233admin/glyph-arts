@@ -5,7 +5,7 @@
   "verification_script": "skills/chat-drawing/scripts/verify_chat_art.py",
   "closed_loop": [
     "route",
-    "render",
+    "render_stdout",
     "verify",
     "rerender_on_failure",
     "reply_with_stdout"

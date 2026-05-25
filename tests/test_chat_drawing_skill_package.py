@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SKILL_ROOT = ROOT / "skills" / "chat-drawing"
 VERIFY = SKILL_ROOT / "scripts" / "verify_chat_art.py"
+VERIFY_AGENT_CONTRACT = SKILL_ROOT / "scripts" / "verify_agent_contract.py"
 
 
 def test_chat_drawing_skill_has_closed_loop_contract() -> None:
@@ -17,12 +18,14 @@ def test_chat_drawing_skill_has_closed_loop_contract() -> None:
     assert "glyph-arts chat" in skill
     assert "Render first, verify second" in skill
     assert "scripts/verify_chat_art.py" in skill
+    assert "scripts/verify_agent_contract.py" in skill
     assert "references/routing.md" in skill
     assert "references/quality.md" in skill
     assert "references/decision-tree.md" in skill
     assert "references/agent-contract.md" in skill
     assert "Chat Drawing" in metadata
     assert "verify" in metadata
+    assert "rerender" in metadata
 
 
 def test_chat_drawing_skill_references_cover_core_routes() -> None:
@@ -57,7 +60,21 @@ def test_chat_drawing_cross_agent_contract_is_portable() -> None:
     assert "glyph-arts chat turtle" in contract
     assert "Unknown raw data shape" in decision_tree
     assert payload["loop"] == ["route", "render_stdout", "verify", "rerender_on_failure", "reply_with_stdout"]
+    assert payload["anti_lazy"]["gate"] == "python skills/chat-drawing/scripts/verify_agent_contract.py"
+    assert "reply_without_verified_stdout" in payload["anti_lazy"]["forbidden"]
     assert payload["routes"]["unknown_data"] == "glyph-arts chat incplot"
+
+
+def test_chat_drawing_agent_contract_gate_passes() -> None:
+    result = subprocess.run(
+        [sys.executable, str(VERIFY_AGENT_CONTRACT), "--repo-root", str(ROOT)],
+        text=True,
+        capture_output=True,
+        check=True,
+    )
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is True
+    assert payload["errors"] == []
 
 
 def test_verify_chat_art_accepts_good_box() -> None:

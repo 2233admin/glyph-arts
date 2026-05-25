@@ -1,4 +1,4 @@
 interface:
   display_name: "Chat Drawing"
   short_description: "Render chat-visible ASCII, diagrams, SDR plots, and image art."
-  default_prompt: "Draw this visibly in the chat transcript with glyph-arts and verify it before replying."
+  default_prompt: "Route with glyph-arts chat, render to stdout, verify with scripts/verify_chat_art.py, rerender or fallback on failure, then paste the verified drawing into the reply."

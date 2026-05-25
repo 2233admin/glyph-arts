@@ -7,6 +7,7 @@ draw directly in a chat transcript. The installable skill package lives at
 Machine-readable companion: `docs/chat_drawing_capabilities.json`.
 Portable agent contract: `skills/chat-drawing/references/agent-contract.md`.
 Route decision tree: `skills/chat-drawing/references/decision-tree.md`.
+Anti-lazy gate: `skills/chat-drawing/scripts/verify_agent_contract.py`.
 
 ## Rule
 
@@ -103,7 +104,11 @@ For Codex, Claude, OpenCode, or similar agents:
 2. Give the agent `references/agent-contract.md`.
 3. Use `references/decision-tree.md` before choosing a renderer.
 4. Use `agents/contract.json` for machine-readable route names.
-5. Require the render -> verify -> reply loop.
+5. Require the route -> render_stdout -> verify -> rerender_on_failure ->
+   reply_with_stdout loop.
+6. Run `python skills/chat-drawing/scripts/verify_agent_contract.py` in CI or
+   before shipping the adapter. A failing gate means the adapter is too lazy to
+   advertise chat drawing support.
 
 ## Backends
 

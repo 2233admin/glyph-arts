@@ -218,6 +218,12 @@ For other agents, the installable skill package is
 packet is [`docs/agent_chat_drawing_skill.md`](docs/agent_chat_drawing_skill.md),
 with a machine-readable capability map at
 [`docs/chat_drawing_capabilities.json`](docs/chat_drawing_capabilities.json).
+The skill ships an anti-lazy gate so copied agent adapters cannot quietly skip
+rendering, verification, or reply-with-visible-output:
+
+```bash
+python skills/chat-drawing/scripts/verify_agent_contract.py
+```
 
 ## Chat Effects
 
@@ -577,12 +583,14 @@ See [SKILL.md](SKILL.md) for the full AI usage contract: decision tree, schema r
 For Codex/Claude/OpenCode-style agents that support local skills, copy or link
 [`skills/chat-drawing`](skills/chat-drawing) into that agent's skills directory.
 It contains the closed loop: choose a `glyph-arts chat ...` route, render to
-stdout, verify with `scripts/verify_chat_art.py`, then reply with the visible
-drawing. The portable cross-agent prompt is
+stdout, verify with `scripts/verify_chat_art.py`, rerender or fallback on
+failure, then reply with the verified visible drawing. The portable cross-agent prompt is
 [`references/agent-contract.md`](skills/chat-drawing/references/agent-contract.md);
 route selection is in
 [`references/decision-tree.md`](skills/chat-drawing/references/decision-tree.md),
 with adapters under [`skills/chat-drawing/agents`](skills/chat-drawing/agents).
+Run `python skills/chat-drawing/scripts/verify_agent_contract.py` after editing
+those adapters; CI uses the same gate.
 
 ```bash
 # Claude Code skill (no pip required — uses scripts/ shims):

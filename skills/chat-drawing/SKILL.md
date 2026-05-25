@@ -7,6 +7,11 @@ description: Use when a user asks Codex, Claude, OpenCode, or another agent to d
 
 Render first, verify second, reply with the visible artifact third. The point of this skill is not to create hidden files; it is to make the chat transcript itself carry the drawing.
 
+This is a hard contract, not a suggestion. Agent adapters must pass
+`scripts/verify_agent_contract.py`; if an adapter does not force routing,
+stdout rendering, verification, fallback, and reply-with-visible-output, it is
+not a valid chat-drawing adapter.
+
 ## Loop
 
 1. Classify the request: image, chart, diagram, graph, SDR, table, dashboard, or mixed.
@@ -64,6 +69,18 @@ glyph-arts chat graph --json "Agent -> Tool" | python skills/chat-drawing/script
 ```
 
 If the checker fails, rerender and rerun it. Treat this as the closed loop.
+
+## Agent Adapter Gate
+
+When copying this skill into another agent, run the adapter gate too:
+
+```bash
+python skills/chat-drawing/scripts/verify_agent_contract.py
+```
+
+This rejects lazy adapters that skip `glyph-arts chat`, skip verification,
+save only hidden artifacts, or fail to paste the verified stdout drawing back to
+the user.
 
 ## Fallbacks
 
