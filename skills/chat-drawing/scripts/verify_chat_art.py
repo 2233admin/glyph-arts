@@ -11,6 +11,13 @@ ANSI_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 BOX_CHARS = set("\u250c\u2510\u2514\u2518\u2502\u2500\u251c\u2524\u252c\u2534\u253c")
 
 
+def _configure_stdio() -> None:
+    for stream in (sys.stdin, sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
+
+
 def _char_width(char: str) -> int:
     if char == "\t":
         return 4
@@ -82,6 +89,7 @@ def verify(
 
 
 def main(argv: list[str] | None = None) -> int:
+    _configure_stdio()
     parser = argparse.ArgumentParser(description="Verify chat-visible ASCII/Unicode art before replying.")
     parser.add_argument("path", nargs="?", help="Text file to verify. Reads stdin when omitted.")
     parser.add_argument("--max-width", type=int, default=None)
