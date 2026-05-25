@@ -91,6 +91,8 @@ def test_animate_line_no_crash_eof():
         input=data,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=15,
         cwd=str(__file__).split("tests")[0],
     )
@@ -106,6 +108,8 @@ def test_animate_scatter_no_crash_eof():
         input=data,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=15,
         cwd=str(__file__).split("tests")[0],
     )
@@ -120,6 +124,8 @@ def test_animate_sparkline_no_crash():
         input=data,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=15,
         cwd=str(__file__).split("tests")[0],
     )
@@ -134,6 +140,8 @@ def test_animate_unsupported_type_exits_1():
         input="1\n2\n3\n",
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=10,
         cwd=str(__file__).split("tests")[0],
     )
@@ -153,6 +161,8 @@ def test_animate_duration_stops():
         input=data,
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=10,
         cwd=str(__file__).split("tests")[0],
     )

@@ -20,6 +20,8 @@ def _run(args):
         [sys.executable, "-m", "cli_charts.chart", *args],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         timeout=30,
         cwd=str(ROOT),
     )

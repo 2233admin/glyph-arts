@@ -22,6 +22,10 @@ jobs:
             python-version: "3.10"
           - os: windows-latest
             python-version: "3.11"
+          - os: windows-latest
+            python-version: "3.13"
+          - os: windows-latest
+            python-version: "3.14"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -88,3 +92,47 @@ jobs:
           files: ./coverage.xml
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
+  check-deps:
+    name: check-deps smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Sync Python environment
+        run: uv sync --frozen --extra all --extra test --extra dev
+      - name: glyph-arts --check-deps
+        run: uv run glyph-arts --check-deps
+      - name: glyph-arts --check-deps --all
+        run: uv run glyph-arts --check-deps --all
+      - name: dashboard --check-deps
+        run: uv run python -m cli_charts.dashboard --check-deps
+
+  deepsource:
+    name: DeepSource Analysis
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run DeepSource
+        env:
+          DEEPSOURCE_TOKEN: ${{ secrets.DEEPSOURCE_TOKEN }}
+        run: |
+          pip install deepsource
+          if ! command -v deepsource >/dev/null 2>&1; then
+            echo "::warning::DeepSource CLI unavailable after install; skipping optional analysis."
+            exit 0
+          fi
+          if [ -z "${DEEPSOURCE_TOKEN:-}" ]; then
+            echo "::warning::DEEPSOURCE_TOKEN is not set; skipping optional analysis."
+            exit 0
+          fi
+          deepsource init --token "$DEEPSOURCE_TOKEN"
+          deepsource test
+          deepsource analyze

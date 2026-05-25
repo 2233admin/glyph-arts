@@ -8,6 +8,8 @@ def test_demo_dispatch_wires():
         [sys.executable, "-m", "cli_charts.chart", "demo", "--help"],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
     assert result.returncode == 0
@@ -20,6 +22,8 @@ def test_gallery_dispatch_wires():
         [sys.executable, "-m", "cli_charts.chart", "gallery", "--help"],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         check=False,
     )
     assert result.returncode == 0

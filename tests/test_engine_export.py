@@ -2,6 +2,7 @@
 
 import importlib.util
 import inspect
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -19,6 +20,7 @@ def _run(args: list[str]) -> subprocess.CompletedProcess[str]:
         capture_output=True,
         text=True,
         encoding="utf-8",
+        errors="replace",
         timeout=10,
         cwd=ROOT,
     )
@@ -33,8 +35,8 @@ def _output(name: str) -> Path:
 
 
 @pytest.mark.skipif(
-    importlib.util.find_spec("matplotlib") is None,
-    reason="matplotlib not installed",
+    importlib.util.find_spec("matplotlib") is None or shutil.which("chafa") is None,
+    reason="matplotlib or chafa not installed",
 )
 def test_output_png_unchanged() -> None:
     output = _output("out.png")

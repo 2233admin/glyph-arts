@@ -722,6 +722,7 @@ all = [
     { name = "lttb" },
     { name = "matplotlib" },
     { name = "pygments" },
+    { name = "textcharts" },
     { name = "textual" },
 ]
 art = [
@@ -752,6 +753,10 @@ test = [
     { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
     { name = "numpy", version = "2.4.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
     { name = "pytest" },
+    { name = "textcharts" },
+]
+textcharts = [
+    { name = "textcharts" },
 ]
 tui = [
     { name = "textual" },
@@ -786,12 +791,15 @@ requires-dist = [
     { name = "rich", specifier = ">=13.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6" },
     { name = "sparklines", specifier = ">=0.4" },
+    { name = "textcharts", marker = "extra == 'all'", specifier = ">=0.1.2" },
+    { name = "textcharts", marker = "extra == 'test'", specifier = ">=0.1.2" },
+    { name = "textcharts", marker = "extra == 'textcharts'", specifier = ">=0.1.2" },
     { name = "textual", marker = "extra == 'all'", specifier = ">=0.50" },
     { name = "textual", marker = "extra == 'interactive'", specifier = ">=0.50" },
     { name = "textual", marker = "extra == 'tui'", specifier = ">=0.50" },
     { name = "uniplot", specifier = ">=0.5" },
 ]
-provides-extras = ["art", "braille", "code", "lttb", "pixel", "test", "tui", "interactive", "ai-motion", "dev", "all"]
+provides-extras = ["art", "braille", "code", "lttb", "pixel", "test", "tui", "interactive", "ai-motion", "dev", "textcharts", "all"]
 
 [[package]]
 name = "h11"
@@ -2360,6 +2368,15 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/46/79/cf31d7a93a8fdc6aa0fbb665be84426a8c5a557d9240b6239e9e11e35fc5/termcolor-3.3.0.tar.gz", hash = "sha256:348871ca648ec6a9a983a13ab626c0acce02f515b9e1983332b17af7979521c5", size = 14434, upload-time = "2025-12-29T12:55:21.882Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/33/d1/8bb87d21e9aeb323cc03034f5eaf2c8f69841e40e4853c2627edf8111ed3/termcolor-3.3.0-py3-none-any.whl", hash = "sha256:cf642efadaf0a8ebbbf4bc7a31cec2f9b5f21a9f726f4ccbb08192c9c26f43a5", size = 7734, upload-time = "2025-12-29T12:55:20.718Z" },
+]
+
+[[package]]
+name = "textcharts"
+version = "0.1.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b9/2b/96e889cb235eb5f639aa18245766b8f0743ae9809ce0722271cd1b88c05a/textcharts-0.1.2.tar.gz", hash = "sha256:e4a515f526cdad4040485df79c280a1142bf109d0e74b473dbc44ae6db74d2ee", size = 3213312, upload-time = "2026-03-10T18:55:34.558Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f7/0b/7323188e204926bfd9bbb975f0f33af26e02247e8251fb16e94ae5da33bf/textcharts-0.1.2-py3-none-any.whl", hash = "sha256:1734a038d7a86f005067966edb7c1688a368a8227bfa44a51a9efde99dbe7513", size = 84980, upload-time = "2026-03-10T18:55:32.472Z" },
 ]
 
 [[package]]

@@ -20,6 +20,7 @@ def _run(args: list[str], env: dict[str, str] | None = None) -> subprocess.Compl
         capture_output=True,
         text=True,
         encoding="utf-8",
+        errors="replace",
         timeout=10,
         cwd=ROOT,
         env=merged_env,
