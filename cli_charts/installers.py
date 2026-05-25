@@ -158,7 +158,7 @@ def build_install_plan(target: str = "all", manager: str = "") -> list[InstallSt
     if target not in VALID_TARGETS:
         raise ValueError(f"unknown install target: {target!r}")
     manager = manager or detect_package_manager()
-    key = platform_key()
+    key = _platform_key_for_manager(manager) or platform_key()
     steps: list[InstallStep] = []
     if target in {"all", "media"}:
         steps.extend(_media_steps(key, manager))
@@ -252,6 +252,12 @@ def _media_steps(key: str, manager: str) -> list[InstallStep]:
         if manager == "pacman":
             return [InstallStep("media", ["sudo", "pacman", "-S", "--needed", "chafa", "ffmpeg"])]
     return []
+
+
+def _platform_key_for_manager(manager: str) -> str:
+    if manager in {"scoop", "choco", "winget"}:
+        return "windows"
+    return ""
 
 
 def _chat_media_steps(key: str, manager: str) -> list[InstallStep]:

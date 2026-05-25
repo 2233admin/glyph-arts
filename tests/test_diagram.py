@@ -325,8 +325,13 @@ def test_diagram_graphdag_builtin_layers() -> None:
 
 
 def test_diagram_can_call_external_diagon(tmp_path):
-    fake = tmp_path / "diagon.cmd"
-    fake.write_text("@echo off\r\necho external-%1\r\n", encoding="utf-8")
+    if os.name == "nt":
+        fake = tmp_path / "diagon.cmd"
+        fake.write_text("@echo off\r\necho external-%1\r\n", encoding="utf-8")
+    else:
+        fake = tmp_path / "diagon"
+        fake.write_text("#!/bin/sh\necho external-$1\n", encoding="utf-8")
+        os.chmod(fake, 0o755)
 
     result = _run([
         "diagram",
