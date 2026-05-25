@@ -118,6 +118,22 @@ runtime with `GLYPH_ARTS_RUNTIME=wsl` or `GLYPH_ARTS_RUNTIME=windows`.
 
 All non-video chart types are pure-Python and work after `pip install glyph-arts` alone.
 
+## Developer Workflow
+
+The project uses `uv` for Python dependency locking and `Nx` as a thin CI task
+runner:
+
+```bash
+uv sync --extra all --extra test --extra dev
+npm ci
+npx nx run glyph-arts:test
+npx nx run glyph-arts:lint
+npx nx run glyph-arts:docs-check
+```
+
+Nx targets call `uv run ...`; Python dependencies still live in
+`pyproject.toml` and `uv.lock`.
+
 ## Diagrams / Diagon
 
 `diagram` brings Diagon-style structure drawings into the same chat drawing

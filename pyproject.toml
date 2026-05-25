@@ -46,6 +46,7 @@ test    = ["pytest>=7", "numpy>=1.24"]
 tui     = ["textual>=0.50"]
 interactive = ["textual>=0.50"]
 ai-motion = ["mcp>=1.0,<2"]
+dev     = ["build>=1.2", "mypy>=1.8", "pytest-cov>=4", "ruff>=0.6"]
 all     = ["art>=6.0", "drawille>=0.2", "Pygments>=2.16", "lttb>=0.3", "matplotlib>=3.7", "textual>=0.50"]
 
 [project.scripts]

@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import Any
 
 _WATERFALL_RAMP = " .:-=+*#%@"
 
 
-def _coerce_floats(values: Iterable[object], name: str) -> list[float]:
+def _coerce_floats(values: Iterable[Any], name: str) -> list[float]:
     out: list[float] = []
     for value in values:
         out.append(float(value))

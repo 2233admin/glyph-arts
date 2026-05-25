@@ -386,7 +386,7 @@ def _find_matching_paren(expr: str, start: int) -> int:
     return -1
 
 
-def _replace_script(expr: str, marker: str, table: dict[int, str]) -> str:
+def _replace_script(expr: str, marker: str, table: dict[int, int]) -> str:
     out = []
     idx = 0
     while idx < len(expr):
@@ -406,7 +406,7 @@ def _replace_script(expr: str, marker: str, table: dict[int, str]) -> str:
     return "".join(out)
 
 
-def _format_script_text(text: str, table: dict[int, str]) -> str:
+def _format_script_text(text: str, table: dict[int, int]) -> str:
     out = []
     idx = 0
     while idx < len(text):

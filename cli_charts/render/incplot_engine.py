@@ -5,7 +5,7 @@ import io
 import json
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
+from typing import Any, cast
 
 from cli_charts.auto_detect import detect_auto
 
@@ -105,12 +105,13 @@ def _detect_records(records: list[dict[str, Any]], prefer: str = "") -> IncplotD
     ohlc = [lower.get(name) for name in ("open", "high", "low", "close")]
     date_col = _first_column(columns, ("date", "time", "day"))
     if all(ohlc) and date_col:
+        open_col, high_col, low_col, close_col = cast(list[str], ohlc)
         return _coerce(IncplotDetection("kline", {
             "dates": _normalize_dates([row.get(date_col, "") for row in records]),
-            "open": [_num(row.get(ohlc[0])) for row in records],
-            "high": [_num(row.get(ohlc[1])) for row in records],
-            "low": [_num(row.get(ohlc[2])) for row in records],
-            "close": [_num(row.get(ohlc[3])) for row in records],
+            "open": [_num(row.get(open_col)) for row in records],
+            "high": [_num(row.get(high_col)) for row in records],
+            "low": [_num(row.get(low_col)) for row in records],
+            "close": [_num(row.get(close_col)) for row in records],
         }), prefer)
 
     numeric_cols = [col for col in columns if all(_is_number(row.get(col)) for row in records if row.get(col) not in ("", None))]
@@ -215,14 +216,16 @@ def _labels(data: Any) -> list[Any]:
 
 def _grouped_bars(data: Any) -> dict[str, Any] | None:
     if isinstance(data, dict) and isinstance(data.get("series"), list):
-        series = [
-            {
+        series = []
+        for idx, item in enumerate(data["series"]):
+            if not isinstance(item, dict):
+                continue
+            raw_values = item.get("values", item.get("y", []))
+            values = raw_values if isinstance(raw_values, list) else []
+            series.append({
                 "label": str(item.get("label", f"S{idx + 1}")),
-                "values": [_num(value) for value in item.get("values", item.get("y", [])) if _is_number(value)],
-            }
-            for idx, item in enumerate(data["series"])
-            if isinstance(item, dict)
-        ]
+                "values": [_num(value) for value in values if _is_number(value)],
+            })
         labels = _labels(data) or list(range(len(series[0]["values"]))) if series else []
         return {"labels": labels, "series": series} if series else None
     if isinstance(data, list) and data and all(isinstance(item, dict) for item in data):

@@ -108,11 +108,11 @@ def _build_renderer(
         graph.add_node(node["id"] if isinstance(node, dict) else node)
     edges = data.get("edges")
     if edges is None:
-        text = data.get("text") or data.get("source") or data.get("dot") or data.get("graphml")
-        if text:
+        text_value = data.get("text") or data.get("source") or data.get("dot") or data.get("graphml")
+        if text_value:
             return _build_renderer(
-                str(text),
-                graph_format=data.get("format", graph_format),
+                str(text_value),
+                graph_format=str(data.get("format", graph_format) or graph_format),
                 node_style=node_style,
                 node_spacing=node_spacing,
                 layer_spacing=layer_spacing,
@@ -136,8 +136,8 @@ def _looks_like_graphml(text: str) -> bool:
 
 
 def _parse_edge_text(text: str) -> dict[str, Any]:
-    edges = []
-    nodes = []
+    edges: list[tuple[str, str]] = []
+    nodes: list[str] = []
     directed = True
     for raw_line in text.splitlines():
         line = raw_line.strip().strip(";")

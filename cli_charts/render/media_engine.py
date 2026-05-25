@@ -11,6 +11,7 @@ import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 _TEXT_SYMBOL_SETS = {
     "ascii",
@@ -637,6 +638,7 @@ def _ascii_pil_image(art: AsciiImage, *, background: str, no_color: bool, font_s
     Image, _ = _load_pillow()
     from PIL import ImageDraw, ImageFont
 
+    font: Any
     try:
         font = ImageFont.truetype("CascadiaMono.ttf", font_size)
     except OSError:

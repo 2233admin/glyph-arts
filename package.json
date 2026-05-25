@@ -1,0 +1,19 @@
+{
+  "name": "glyph-arts-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "npm@11.12.1",
+  "devDependencies": {
+    "nx": "22.7.3"
+  },
+  "scripts": {
+    "nx": "nx",
+    "lint": "nx run glyph-arts:lint",
+    "typecheck": "nx run glyph-arts:typecheck",
+    "test": "nx run glyph-arts:test",
+    "docs-check": "nx run glyph-arts:docs-check",
+    "doctor": "nx run glyph-arts:doctor",
+    "build": "nx run glyph-arts:build",
+    "ci": "nx run-many -t lint typecheck docs-check test doctor --parallel=3"
+  }
+}

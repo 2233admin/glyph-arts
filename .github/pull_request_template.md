@@ -18,8 +18,9 @@ Closes XAR-
 
 <!-- Bulleted checklist a reviewer can run -->
 
-- [ ] `pytest tests/`
-- [ ] `glyph-arts --check-deps --all`
+- [ ] `npx nx run glyph-arts:test`
+- [ ] `npx nx run glyph-arts:lint`
+- [ ] `npx nx run glyph-arts:doctor`
 - [ ] Manually rendered one chart type touched by this PR
 
 ## Notes for reviewer
