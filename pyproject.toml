@@ -86,3 +86,7 @@ ignore = ["E501", "E402"]
 python_version = "3.10"
 ignore_missing_imports = true
 files = ["cli_charts", "tests"]
+
+[tool.coverage.run]
+source = ["cli_charts"]
+patch = ["subprocess"]
