@@ -69,6 +69,8 @@ def test_chat_drawing_agent_contract_gate_passes() -> None:
     result = subprocess.run(
         [sys.executable, str(VERIFY_AGENT_CONTRACT), "--repo-root", str(ROOT)],
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=True,
     )
@@ -83,6 +85,8 @@ def test_verify_chat_art_accepts_good_box() -> None:
         [sys.executable, str(VERIFY), "--max-width", "20", "--require-label", "OK", "--equal-box-width"],
         input=art,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=True,
     )
@@ -97,6 +101,8 @@ def test_verify_chat_art_rejects_bad_box_width() -> None:
         [sys.executable, str(VERIFY), "--equal-box-width"],
         input=art,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=False,
     )
@@ -111,6 +117,8 @@ def test_verify_chat_art_rejects_ansi_by_default() -> None:
         [sys.executable, str(VERIFY)],
         input="\x1b[31mred\x1b[0m\n",
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=False,
     )
@@ -125,6 +133,8 @@ def test_verify_chat_art_uses_display_width_for_chinese_box() -> None:
         [sys.executable, str(VERIFY), "--equal-box-width"],
         input=art,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=True,
     )

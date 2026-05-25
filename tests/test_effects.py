@@ -13,6 +13,8 @@ def _run(args: list[str]) -> subprocess.CompletedProcess[str]:
         [sys.executable, "-m", "cli_charts.chart", *args],
         cwd=ROOT,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         capture_output=True,
         check=False,
     )
