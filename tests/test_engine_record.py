@@ -1,6 +1,7 @@
 """Phase 5 tests for asciinema recording wrapper."""
 
 import inspect
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -10,6 +11,10 @@ OUT_DIR = ROOT / "export_test_outputs"
 
 
 def _run(args: list[str], env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    merged_env = None
+    if env is not None:
+        merged_env = os.environ.copy()
+        merged_env.update(env)
     return subprocess.run(
         [sys.executable, "-m", "cli_charts.chart", *args],
         capture_output=True,
@@ -17,7 +22,7 @@ def _run(args: list[str], env: dict[str, str] | None = None) -> subprocess.Compl
         encoding="utf-8",
         timeout=10,
         cwd=ROOT,
-        env=env,
+        env=merged_env,
     )
 
 

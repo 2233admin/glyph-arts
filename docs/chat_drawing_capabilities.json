@@ -1,0 +1,479 @@
+{
+  "version": 1,
+  "default_entry": "glyph-arts chat",
+  "skill_package": "skills/chat-drawing",
+  "verification_script": "skills/chat-drawing/scripts/verify_chat_art.py",
+  "closed_loop": [
+    "route",
+    "render",
+    "verify",
+    "rerender_on_failure",
+    "reply_with_stdout"
+  ],
+  "capabilities": {
+    "image_ascii": {
+      "chat": true,
+      "ansi": true,
+      "artifact": true,
+      "command": "glyph-arts chat image --file <path>",
+      "protocol": {
+        "targets": [
+          "chat",
+          "terminal",
+          "artifact"
+        ],
+        "chat_safe": true,
+        "uses_ansi": false,
+        "unicode_tier": "unicode",
+        "fallback": "ascii",
+        "requires_host": "none"
+      }
+    },
+    "sdr_spectrum": {
+      "chat": true,
+      "ansi": false,
+      "artifact": true,
+      "command": "glyph-arts chat sdr spectrum --json <json>",
+      "protocol": {
+        "targets": [
+          "chat",
+          "terminal",
+          "artifact"
+        ],
+        "chat_safe": true,
+        "uses_ansi": false,
+        "unicode_tier": "unicode",
+        "fallback": "ascii",
+        "requires_host": "none"
+      }
+    },
+    "sdr_waterfall": {
+      "chat": true,
+      "ansi": false,
+      "artifact": true,
+      "command": "glyph-arts chat waterfall --json <json>",
+      "protocol": {
+        "targets": [
+          "chat",
+          "terminal",
+          "artifact"
+        ],
+        "chat_safe": true,
+        "uses_ansi": false,
+        "unicode_tier": "unicode",
+        "fallback": "ascii",
+        "requires_host": "none"
+      }
+    },
+    "diagon_sequence": {
+      "chat": true,
+      "ansi": false,
+      "artifact": true,
+      "command": "glyph-arts chat sequence --json <text>",
+      "protocol": {
+        "targets": [
+          "chat",
+          "terminal",
+          "artifact"
+        ],
+        "chat_safe": true,
+        "uses_ansi": false,
+        "unicode_tier": "unicode",
+        "fallback": "ascii",
+        "requires_host": "none"
+      }
+    },
+    "diagon_flowchart": {
+      "chat": true,
+      "ansi": false,
+      "artifact": true,
+      "command": "glyph-arts chat diagram flowchart --json <text>",
+      "protocol": {
+        "targets": [
+          "chat",
+          "terminal",
+          "artifact"
+        ],
+        "chat_safe": true,
+        "uses_ansi": false,
+        "unicode_tier": "unicode",
+        "fallback": "ascii",
+        "requires_host": "none"
+      }
+    },
+    "diagon_builtin_generators": {
+      "chat": true,
+      "ansi": false,
+      "artifact": true,
+      "generators": [
+        "math",
+        "sequence",
+        "tree",
+        "frame",
+        "table",
+        "graphplanar",
+        "graphdag",
+        "flowchart"
+      ],
+      "external_diagon_optional": true,
+      "command": "glyph-arts chat diagram <kind> --json <text>",
+      "protocol": {
+        "targets": [
+          "chat",
+          "terminal",
+          "artifact"
+        ],
+        "chat_safe": true,
+        "uses_ansi": false,
+        "unicode_tier": "unicode",
+        "fallback": "ascii",
+        "requires_host": "none"
+      }
+    },
+    "note_box": {
+      "chat": true,
+      "ansi": false,
+      "artifact": true,
+      "command": "glyph-arts chat diagram note --json <text>",
+      "protocol": {
+        "targets": [
+          "chat",
+          "terminal",
+          "artifact"
+        ],
+        "chat_safe": true,
+        "uses_ansi": false,
+        "unicode_tier": "unicode",
+        "fallback": "ascii",
+        "requires_host": "none"
+      }
+    },
+    "math_notation": {
+      "chat": true,
+      "ansi": false,
+      "artifact": true,
+      "builtin_fallback": true,
+      "supports": [
+        "greek",
+        "superscript",
+        "subscript",
+        "sqrt",
+        "fractions",
+        "arrows",
+        "comparisons"
+      ],
+      "command": "glyph-arts chat diagram math --json <text>",
+      "protocol": {
+        "targets": [
+          "chat",
+          "terminal",
+          "artifact"
+        ],
+        "chat_safe": true,
+        "uses_ansi": false,
+        "unicode_tier": "unicode",
+        "fallback": "ascii",
+        "requires_host": "none"
+      }
+    },
+    "cjk_layout": {
+      "chat": true,
+      "ansi": false,
+      "artifact": true,
+      "supports": [
+        "wide characters",
+        "Chinese box alignment",
+        "Chinese table alignment"
+      ],
+      "command": "glyph-arts chat diagram note --json <text>",
+      "protocol": {
+        "targets": [
+          "chat",
+          "terminal",
+          "artifact"
+        ],
+        "chat_safe": true,
+        "uses_ansi": false,
+        "unicode_tier": "unicode",
+        "fallback": "ascii",
+        "requires_host": "none"
+      }
+    },
+    "incplot_auto": {
+      "chat": true,
+      "ansi": true,
+      "artifact": true,
+      "input_formats": [
+        "JSON",
+        "JSONL",
+        "CSV",
+        "TSV"
+      ],
+      "auto_detects": [
+        "sparkline",
+        "bar",
+        "multibar",
+        "line",
+        "scatter",
+        "histogram",
+        "table",
+        "candlestick"
+      ],
+      "command": "glyph-arts chat incplot --json <data> or pipe CSV/TSV/JSONL",
+      "protocol": {
+        "targets": [
+          "chat",
+          "terminal",
+          "artifact"
+        ],
+        "chat_safe": true,
+        "uses_ansi": false,
+        "unicode_tier": "unicode",
+        "fallback": "ascii",
+        "requires_host": "none"
+      }
+    },
+    "beautiful_mermaid": {
+      "chat": true,
+      "ansi": false,
+      "artifact": true,
+      "input_formats": [
+        "graph",
+        "flowchart",
+        "sequenceDiagram",
+        "stateDiagram-v2",
+        "classDiagram",
+        "erDiagram",
+        "xychart-beta"
+      ],
+      "xychart_styles": [
+        "rounded vertical bars",
+        "horizontal bars",
+        "line overlay",
+        "legend",
+        "series names",
+        "CJK labels"
+      ],
+      "themes": [
+        "zinc-light",
+        "zinc-dark",
+        "tokyo-night",
+        "catppuccin-mocha",
+        "nord",
+        "dracula",
+        "github-light",
+        "github-dark",
+        "solarized-light",
+        "solarized-dark",
+        "one-dark"
+      ],
+      "command": "glyph-arts chat mermaid --json <mermaid-source>",
+      "protocol": {
+        "targets": [
+          "chat",
+          "terminal",
+          "artifact"
+        ],
+        "chat_safe": true,
+        "uses_ansi": false,
+        "unicode_tier": "unicode",
+        "fallback": "ascii",
+        "requires_host": "none"
+      }
+    },
+    "plotext_overlay": {
+      "chat": true,
+      "ansi": true,
+      "artifact": true,
+      "supports": [
+        "line",
+        "scatter",
+        "bar",
+        "histogram",
+        "date-time",
+        "candlestick",
+        "error bars",
+        "confusion matrix via confusion",
+        "extra text",
+        "vertical lines",
+        "horizontal lines",
+        "rectangles",
+        "polygons",
+        "colorized strings"
+      ],
+      "excludes": [
+        "video",
+        "audio",
+        "YouTube streaming"
+      ],
+      "command": "glyph-arts chat plotext --json <plotext-overlay-json>",
+      "protocol": {
+        "targets": [
+          "chat",
+          "terminal",
+          "artifact"
+        ],
+        "chat_safe": true,
+        "uses_ansi": false,
+        "unicode_tier": "unicode",
+        "fallback": "ascii",
+        "requires_host": "none"
+      }
+    },
+    "textplots_braille": {
+      "chat": true,
+      "ansi": false,
+      "artifact": true,
+      "supports": [
+        "continuous function plots",
+        "math expressions",
+        "Braille canvas",
+        "axes"
+      ],
+      "command": "glyph-arts chat textplot --json <expression-or-spec>",
+      "protocol": {
+        "targets": [
+          "chat",
+          "terminal",
+          "artifact"
+        ],
+        "chat_safe": true,
+        "uses_ansi": false,
+        "unicode_tier": "unicode",
+        "fallback": "ascii",
+        "requires_host": "none"
+      }
+    },
+    "drawille_turtle": {
+      "chat": true,
+      "ansi": false,
+      "artifact": true,
+      "supports": [
+        "Braille canvas",
+        "set/unset/toggle dots",
+        "line segments",
+        "turtle forward/back/left/right/goto",
+        "pen up/down"
+      ],
+      "command": "glyph-arts chat turtle --json <commands>",
+      "protocol": {
+        "targets": [
+          "chat",
+          "terminal",
+          "artifact"
+        ],
+        "chat_safe": true,
+        "uses_ansi": false,
+        "unicode_tier": "unicode",
+        "fallback": "ascii",
+        "requires_host": "none"
+      }
+    },
+    "phart_graph": {
+      "chat": true,
+      "ansi": false,
+      "artifact": true,
+      "input_formats": [
+        "json_edges",
+        "edge_list",
+        "dot",
+        "graphml"
+      ],
+      "command": "glyph-arts chat graph --json <text-or-json>",
+      "protocol": {
+        "targets": [
+          "chat",
+          "terminal",
+          "artifact"
+        ],
+        "chat_safe": true,
+        "uses_ansi": false,
+        "unicode_tier": "unicode",
+        "fallback": "ascii",
+        "requires_host": "none"
+      }
+    },
+    "chat_effect_presets": {
+      "chat": true,
+      "ansi": false,
+      "artifact": true,
+      "presets": [
+        "gallery",
+        "pipeline",
+        "metrics",
+        "system-map",
+        "signal-panel",
+        "timeline",
+        "matrix",
+        "comparison",
+        "swimlane",
+        "kanban",
+        "quadrant",
+        "mindmap"
+      ],
+      "command": "glyph-arts chat effects",
+      "protocol": {
+        "targets": [
+          "chat",
+          "terminal",
+          "artifact"
+        ],
+        "chat_safe": true,
+        "uses_ansi": false,
+        "unicode_tier": "unicode",
+        "fallback": "ascii",
+        "requires_host": "none"
+      }
+    },
+    "waveterm_adapter": {
+      "chat": false,
+      "ansi": true,
+      "artifact": true,
+      "requires": [
+        "WaveTerm",
+        "wsh"
+      ],
+      "formats": [
+        "html",
+        "txt",
+        "ansi"
+      ],
+      "command": "glyph-arts wave render <chart-type> --json <data>",
+      "protocol": {
+        "targets": [
+          "terminal",
+          "artifact",
+          "host"
+        ],
+        "chat_safe": false,
+        "uses_ansi": false,
+        "unicode_tier": "unicode",
+        "fallback": "artifact",
+        "requires_host": "waveterm"
+      }
+    },
+    "terminal_host_profiles": {
+      "chat": false,
+      "ansi": true,
+      "artifact": false,
+      "profiles": [
+        "windows-terminal",
+        "windows-terminal-preview",
+        "windows-terminal-canary",
+        "warp",
+        "waveterm"
+      ],
+      "command": "glyph-arts doctor",
+      "protocol": {
+        "targets": [
+          "terminal"
+        ],
+        "chat_safe": false,
+        "uses_ansi": false,
+        "unicode_tier": "unicode",
+        "fallback": "unicode",
+        "requires_host": "none"
+      }
+    }
+  }
+}

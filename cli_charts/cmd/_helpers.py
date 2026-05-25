@@ -22,6 +22,8 @@ import subprocess
 import sys
 import tempfile
 
+from cli_charts.cmd.media_args import add_media_arguments
+from cli_charts.cmd.media_dispatch import dispatch_media
 from cli_charts.font_tier import detect_font_tier
 from cli_charts.osc8 import link as _osc8_link
 from cli_charts.symbols import BLOCK, BRAILLE_ALL, get_symbol
@@ -55,6 +57,10 @@ def _symbol_tier(kw):
 
 
 def _bar_symbols(name, tier):
+    if name == 'ascii':
+        return '#', ' '
+    if name == 'unicode':
+        return BLOCK['eighth_low_8'], ' '
     if name == 'progress':
         return BLOCK['progress_full'], BLOCK['progress_empty']
     if name == 'braille':
@@ -63,7 +69,34 @@ def _bar_symbols(name, tier):
         return get_symbol('arrow_up', tier=tier), get_symbol('arrow_down', tier=tier)
     if name == 'block':
         return BLOCK['eighth_low_8'], ' '
+    if name == 'shade':
+        return BLOCK['eighth_low_8'], BLOCK['shade_light']
     raise ValueError(f"unknown symbol set: {name!r}")
+
+
+def _style_to_bar_symbols(style):
+    return {
+        'auto': None,
+        'unicode': 'unicode',
+        'ascii': 'ascii',
+        'braille': 'braille',
+        'block': 'block',
+        'shade': 'shade',
+    }.get(style)
+
+
+def _style_to_gauge(style):
+    return {
+        'auto': 'bar',
+        'unicode': 'bar',
+        'ascii': 'ascii',
+        'braille': 'braille',
+        'block': 'block',
+        'shade': 'shade',
+        'bar': 'bar',
+        'half-circle': 'half-circle',
+        'full-circle': 'full-circle',
+    }.get(style, style)
 
 
 def _capture_stdout(func):
@@ -92,107 +125,77 @@ def _canvas_line(canvas, x0, y0, x1, y1):
             y0 += sy
 
 
-# -- media renderers (chafa + ffmpeg) ----------------------------------------
+# -- media renderer metadata --------------------------------------------------
 
 _MEDIA_TYPES = {'image', 'video'}
+_IMAGE_EXTENSIONS = {
+    '.avif', '.bmp', '.gif', '.jpeg', '.jpg', '.png', '.tif', '.tiff', '.webp',
+}
+_CHAT_GROUP_ALIASES = {'sdr'}
+_CHAT_EFFECT_ALIASES = {'effects'}
+_DIAGRAM_KIND_ALIASES = {
+    'math', 'sequence', 'tree', 'table', 'frame', 'box', 'note', 'flowchart',
+    'graphdag', 'dag', 'graphplanar', 'planar',
+}
 
 
-def _render_image(path, w, h, symbols='braille', no_color=False):
-    """Render an image file to the terminal by shelling out to chafa.
-
-    Why chafa instead of reinventing: chafa 1.18 ships 2x4 braille sub-pixels
-    with 24-bit truecolor, outperforming any pure-Python renderer. See HANDOFF
-    2026-04-14 for the architectural split (charts = native, media = chafa).
-    """
-    import subprocess
-    if not shutil.which('chafa'):
-        print('ERROR:dep: chafa not found -- install from https://hpjansson.org/chafa/',
-              file=sys.stderr)
-        sys.exit(2)
-    cmd = ['chafa', '--size', f'{w}x{h}', '--symbols', symbols]
-    if no_color:
-        cmd += ['--colors', 'none']
-    cmd.append(path)
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        lines = (result.stderr or '').strip().splitlines()
-        msg = lines[-1] if lines else 'chafa exited non-zero'
-        print(f'ERROR:render: {msg}', file=sys.stderr)
-        sys.exit(4)
-    sys.stdout.write(result.stdout)
+def _has_flag(argv, *flags):
+    return any(arg in flags for arg in argv)
 
 
-def _render_video(path, w, h, fps=12, symbols='braille', duration=0.0, no_color=False):
-    """Play a video in the terminal: ffmpeg extracts frames, chafa renders each.
+def _rewrite_chat_argv(argv):
+    """Translate `glyph-arts chat ...` into chat-safe concrete chart commands."""
+    if not argv or argv[0] != 'chat':
+        return argv
+    rest = list(argv[1:])
+    if not rest:
+        return ['auto', '--no-color']
+    if rest[0] in ('-h', '--help'):
+        return ['--help']
 
-    Frames are extracted to a tempdir upfront (bounded by --duration if set),
-    then streamed at the target fps. Cursor hidden during playback; restored
-    on exit or Ctrl-C. Not suitable for hours-long input -- prefer clipping
-    first with ffmpeg -ss/-t.
-    """
-    import glob
-    import subprocess
-    import tempfile
-    import time
+    target = None
+    if rest and rest[0].lower() in _DIAGRAM_KIND_ALIASES:
+        return ['diagram', '--no-color', '--diagram-kind', rest[0], *rest[1:]]
+    if rest[0] in _CHAT_GROUP_ALIASES and len(rest) > 1:
+        rest = rest[1:]
+    if rest and rest[0] in _CHAT_EFFECT_ALIASES:
+        target = 'effect'
+        rest.pop(0)
+    elif rest and rest[0] in (set(CMDS) | _MEDIA_TYPES):
+        target = rest.pop(0)
+    elif rest and not rest[0].startswith('-'):
+        suffix = os.path.splitext(rest[0])[1].lower()
+        if suffix in _IMAGE_EXTENSIONS:
+            target = 'image'
+            rest = ['--file', rest[0], *rest[1:]]
+    if target is None:
+        target = 'auto'
 
-    if not shutil.which('chafa'):
-        print('ERROR:dep: chafa not found', file=sys.stderr)
-        sys.exit(2)
-    if not shutil.which('ffmpeg'):
-        print('ERROR:dep: ffmpeg not found -- required for video input',
-              file=sys.stderr)
-        sys.exit(2)
+    rewritten = [target, *rest]
+    if target == 'image' and not _has_flag(rewritten, '--chat'):
+        rewritten.insert(1, '--chat')
+    elif target != 'video' and not _has_flag(rewritten, '--no-color'):
+        rewritten.insert(1, '--no-color')
+    return rewritten
 
-    with tempfile.TemporaryDirectory(prefix='clichart_frames_') as tmp:
-        ff = ['ffmpeg', '-loglevel', 'error', '-y', '-i', path,
-              '-vf', f'fps={fps}']
-        if duration and duration > 0:
-            ff += ['-t', str(duration)]
-        ff.append(os.path.join(tmp, 'f_%05d.png'))
-        result = subprocess.run(ff, capture_output=True, text=True)
-        if result.returncode != 0:
-            lines = (result.stderr or '').strip().splitlines()
-            msg = lines[-1] if lines else 'ffmpeg exited non-zero'
-            print(f'ERROR:render: {msg}', file=sys.stderr)
-            sys.exit(4)
 
-        frames = sorted(glob.glob(os.path.join(tmp, 'f_*.png')))
-        if not frames:
-            print('ERROR:render: ffmpeg produced no frames', file=sys.stderr)
-            sys.exit(4)
-
-        delay = 1.0 / fps if fps > 0 else 1.0 / 12
-        is_tty = sys.stdout.isatty()
-        chafa_cmd = ['chafa', '--size', f'{w}x{h}', '--symbols', symbols,
-                     '--format', 'symbols']
-        if no_color:
-            chafa_cmd += ['--colors', 'none']
-
-        if is_tty:
-            sys.stdout.write('\x1b[?25l')  # hide cursor
-            sys.stdout.flush()
-        try:
-            for frame in frames:
-                t0 = time.time()
-                if is_tty:
-                    sys.stdout.write('\x1b[H')  # cursor home (less flicker than \x1b[2J)
-                    sys.stdout.flush()
-                result = subprocess.run(chafa_cmd + [frame], capture_output=True, text=True)
-                if result.returncode != 0:
-                    lines = (result.stderr or '').strip().splitlines()
-                    msg = lines[-1] if lines else 'chafa exited non-zero'
-                    print(f'ERROR:render: {msg}', file=sys.stderr)
-                    sys.exit(4)
-                sys.stdout.write(result.stdout)
-                elapsed = time.time() - t0
-                if elapsed < delay:
-                    time.sleep(delay - elapsed)
-        except KeyboardInterrupt:
-            pass
-        finally:
-            if is_tty:
-                sys.stdout.write('\x1b[?25h')  # show cursor
-                sys.stdout.flush()
+def _rewrite_diagram_argv(argv):
+    """Allow `diagram sequence --json ...` despite argparse's nargs='*' edge."""
+    if not argv or argv[0] != 'diagram':
+        return argv
+    out = [argv[0]]
+    idx = 1
+    while idx < len(argv):
+        arg = argv[idx]
+        if arg == '--diagram-kind':
+            return argv
+        if arg.lower() in _DIAGRAM_KIND_ALIASES:
+            out.extend(['--diagram-kind', arg])
+            out.extend(argv[idx + 1:])
+            return out
+        out.append(arg)
+        idx += 1
+    return out
 
 
 def _plt_finalize(plt, title, w, h, theme, kw):
@@ -491,12 +494,12 @@ def bar(d, title, w, h, theme, **kw):
     plt.clear_figure()
     plt.bar(d['labels'], d['values'],
             orientation=kw.get('orientation', 'vertical'))
-    symbol_set = kw.get('symbol_set')
+    symbol_set = kw.get('symbol_set') or _style_to_bar_symbols(kw.get('visual_style'))
     if symbol_set:
         full, empty = _bar_symbols(symbol_set, _symbol_tier(kw))
         default_full = BLOCK['eighth_low_8']
         output = _capture_stdout(lambda: _plt_finalize(plt, title, w, h, theme, kw))
-        sys.stdout.write(output.replace(default_full, full).replace(' ', empty if symbol_set == 'braille' else ' '))
+        sys.stdout.write(output.replace(default_full, full).replace(' ', empty if symbol_set in {'braille', 'shade'} else ' '))
         return
     _plt_finalize(plt, title, w, h, theme, kw)
 
@@ -569,6 +572,26 @@ def heatmap(d, title, w, h, theme, **kw):
     )
     plt.heatmap(df)
     _plt_finalize(plt, title, w, h, theme, kw)
+
+
+def spectrum(d, title, w, h, theme, **kw):
+    """SDR-style RF spectrum with center/band/peak overlays."""
+    if kw.get('statusline'):
+        _render_statusline('spectrum', d, title)
+        return
+    from cli_charts.render.sdr_engine import render_spectrum
+
+    print(render_spectrum(d, title=title, width=w, height=h), end="")
+
+
+def waterfall(d, title, w, h, theme, **kw):
+    """SDR-style waterfall intensity map."""
+    if kw.get('statusline'):
+        _render_statusline('waterfall', d, title)
+        return
+    from cli_charts.render.sdr_engine import render_waterfall
+
+    print(render_waterfall(d, title=title, width=w, height=h), end="")
 
 
 def box(d, title, w, h, theme, **kw):
@@ -682,20 +705,23 @@ def panel(d, title, w, h, theme, **kw):
 
 def graph(d, title, w, h, theme, **kw):
     """PHART ASCII network graph."""
-    import networkx as nx
-    from phart import ASCIIRenderer, LayoutOptions, NodeStyle
-    G = nx.DiGraph() if d.get('directed', True) else nx.Graph()
-    for node in d.get('nodes', []):
-        G.add_node(node['id'] if isinstance(node, dict) else node)
-    G.add_edges_from(d['edges'])
-    style_name = d.get('node_style', 'ROUND').upper()
-    style = getattr(NodeStyle, style_name, NodeStyle.ROUND)
-    opts = LayoutOptions(
+    del title, w, h, theme
+    from cli_charts.render.graph_engine import render_graph
+
+    style = kw.get('graph_style') or (d.get('node_style') if isinstance(d, dict) else None) or 'round'
+    node_spacing = (d.get('node_spacing') if isinstance(d, dict) else None) or kw.get('graph_node_spacing') or 4
+    layer_spacing = (d.get('layer_spacing') if isinstance(d, dict) else None) or kw.get('graph_layer_spacing') or 2
+    rc = render_graph(
+        d,
+        output=kw.get('output') or None,
+        graph_format=kw.get('graph_format') or (d.get('format') if isinstance(d, dict) else 'auto'),
         node_style=style,
-        node_spacing=d.get('node_spacing', 4),
-        layer_spacing=d.get('layer_spacing', 2),
+        node_spacing=node_spacing,
+        layer_spacing=layer_spacing,
+        charset=kw.get('graph_charset') or 'unicode',
     )
-    print(ASCIIRenderer(G, options=opts).render())
+    if rc:
+        sys.exit(rc)
 
 
 def curve(d, title, w, h, theme, **kw):
@@ -779,8 +805,14 @@ def gauge(d, title, w, h, theme, **kw):
     t.add_column('Label', style='bold', min_width=12)
     t.add_column('Bar', min_width=32)
     t.add_column('Value', justify='right', min_width=10)
-    style = kw.get('gauge_style') or 'bar'
+    style = _style_to_gauge(kw.get('gauge_style') or kw.get('visual_style') or 'bar')
     if style == 'bar':
+        full, empty = BLOCK['eighth_low_8'], BLOCK['shade_light']
+    elif style == 'ascii':
+        full, empty = '#', '-'
+    elif style == 'block':
+        full, empty = BLOCK['eighth_low_8'], ' '
+    elif style == 'shade':
         full, empty = BLOCK['eighth_low_8'], BLOCK['shade_light']
     elif style == 'half-circle':
         tier = _symbol_tier(kw)
@@ -998,6 +1030,110 @@ def art_command(d, title, w, h, theme, **kw):
         kw.get('output', ''),
     )
     sys.exit(rc)
+
+
+def diagram(d, title, w, h, theme, **kw):
+    """Diagon-compatible structural diagram renderer."""
+    del theme
+    from cli_charts.render.diagram_engine import render_diagram
+
+    if isinstance(d, dict):
+        kind = kw.get('diagram_kind') or d.get('kind') or d.get('type')
+        text = d.get('text') or d.get('source') or d.get('data') or ''
+    else:
+        kind = kw.get('diagram_kind')
+        text = str(d)
+    if not kind:
+        raise ValueError('diagram needs a kind such as sequence/tree/table/flowchart/math')
+    rc = render_diagram(
+        kind,
+        text,
+        width=w,
+        output=kw.get('output') or None,
+        engine=kw.get('diagram_engine', 'auto'),
+    )
+    if rc:
+        sys.exit(rc)
+    if title and kw.get('statusline'):
+        _render_statusline('diagram', {'label': title, 'value': 1}, title)
+
+
+def mermaid(d, title, w, h, theme, **kw):
+    """beautiful-mermaid-inspired Mermaid renderer for chat-safe diagrams."""
+    del h, theme
+    from cli_charts.render.mermaid_engine import render_mermaid
+
+    source = d.get('source') or d.get('text') or d.get('data') if isinstance(d, dict) else str(d)
+    print(render_mermaid(
+        source,
+        width=w,
+        use_ascii=bool(kw.get('mermaid_ascii')),
+        padding_x=int(kw.get('mermaid_padding_x') or 5),
+        padding_y=int(kw.get('mermaid_padding_y') or 1),
+        box_padding=int(kw.get('mermaid_box_padding') or 1),
+        theme=kw.get('mermaid_theme') or 'zinc-dark',
+    ), end="")
+
+
+def plotext(d, title, w, h, theme, **kw):
+    """plotext overlay renderer: error bars, date plots, text, lines, shapes."""
+    from cli_charts.render.plotextx_engine import render_plotextx
+
+    return render_plotextx(
+        d,
+        title=title,
+        width=w,
+        height=h,
+        theme=theme,
+        xlabel=kw.get('xlabel', ''),
+        ylabel=kw.get('ylabel', ''),
+        xlim=kw.get('xlim'),
+        ylim=kw.get('ylim'),
+        xscale=kw.get('xscale', 'linear'),
+        yscale=kw.get('yscale', 'linear'),
+        orientation=kw.get('orientation', 'vertical'),
+        no_color=kw.get('no_color', False),
+    )
+
+
+def incplot(d, title, w, h, theme, **kw):
+    """incplot-style auto renderer for JSON, JSONL, CSV, and TSV."""
+    from cli_charts.render.incplot_engine import detect_incplot
+
+    detected = detect_incplot(d, kw.get('prefer', ''))
+    nested_kw = dict(kw)
+    nested_kw.pop('prefer', None)
+    return CMDS[detected.chart_type](detected.data, title, w, h, theme, **nested_kw)
+
+
+def textplot(d, title, w, h, theme, **kw):
+    """textplots-rs-style continuous function plot on a Braille canvas."""
+    del theme, kw
+    from cli_charts.render.braille_engine import render_textplot
+
+    print(render_textplot(d, title=title, width=w, height=h), end="")
+
+
+def turtle(d, title, w, h, theme, **kw):
+    """drawille-style Turtle/Canvas renderer backed by Braille cells."""
+    del theme, kw
+    from cli_charts.render.braille_engine import render_turtle
+
+    print(render_turtle(d, title=title, width=w, height=h), end="")
+
+
+def effect(d, title, w, h, theme, **kw):
+    """Chat-first visual effect presets composed from the renderer toolbox."""
+    del h, theme
+    from cli_charts.render.effect_engine import render_effect
+
+    if isinstance(d, dict):
+        data = d
+        kind = kw.get('effect_kind') or d.get('kind') or d.get('effect') or ''
+    else:
+        data = {'text': str(d)}
+        kind = kw.get('effect_kind') or ''
+    print(render_effect(str(kind), data, title=title, width=w), end="")
 
 
 def uniplot(d, title, w, h, theme, **kw):
@@ -1401,6 +1537,31 @@ def gallery_command(d, title, w, h, theme, **kw):
     raise RuntimeError("gallery is dispatched by main()")
 
 
+def auto_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("auto is dispatched by main()")
+
+
+def live_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("live is dispatched by main()")
+
+
+def doctor_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("doctor is dispatched by main()")
+
+
+def install_backends_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("install-backends is dispatched by main()")
+
+
+def wave_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("wave is dispatched by main()")
+
+
 CMDS = {
     'kline':      kline,
     'line':       line,
@@ -1412,6 +1573,8 @@ CMDS = {
     'stackedbar': stackedbar,
     'hist':       hist,
     'heatmap':    heatmap,
+    'spectrum':   spectrum,
+    'waterfall':  waterfall,
     'box':        box,
     'indicator':  indicator,
     'event':      event,
@@ -1422,7 +1585,14 @@ CMDS = {
     'panel':      panel,
     'gauge':      gauge,
     'dashboard':  dashboard,
+    'incplot':    incplot,
     'graph':      graph,
+    'diagram':    diagram,
+    'mermaid':    mermaid,
+    'plotext':    plotext,
+    'textplot':   textplot,
+    'turtle':     turtle,
+    'effect':     effect,
     'curve':      curve,
     'uniplot':    uniplot,
     'banner':      banner,
@@ -1442,20 +1612,28 @@ CMDS = {
     'splash':      splash_command,
     'demo':        demo_command,
     'gallery':     gallery_command,
+    'auto':        auto_command,
+    'live':        live_command,
+    'doctor':      doctor_command,
+    'install-backends': install_backends_command,
+    'wave':        wave_command,
 }
 
 # Single source of truth for chart-type docs. Order is intentional.
 CHART_TYPES_BY_ENGINE: dict[str, list[str]] = {
+    'incplot': ['incplot'],
     'plotext': [
         'kline', 'candlestick', 'line', 'scatter', 'step', 'bar', 'multibar',
         'stackedbar', 'hist', 'heatmap', 'box', 'indicator', 'event',
-        'confusion',
+        'confusion', 'plotext',
     ],
+    'sdr': ['spectrum', 'waterfall'],
     'rich': ['table', 'tree', 'panel', 'gauge', 'pie', 'dashboard', 'rich_live'],
-    'drawille': ['curve', 'hires', 'radar'],
+    'diagram': ['diagram', 'mermaid'],
+    'drawille': ['curve', 'hires', 'radar', 'textplot', 'turtle'],
     'plotille': ['plotille'],
     'uniplot': ['uniplot'],
-    'misc': ['graph', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery'],
+    'misc': ['graph', 'effect', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'wave'],
     'media': ['image', 'video'],
 }
 
@@ -1476,6 +1654,8 @@ EXPECTED_SCHEMAS = {
     'stackedbar': '{"labels":[...], "series":[{"label":"A","values":[...]}, ...]}',
     'hist':       '{"values":[...], "bins":20} or [{"label":"A","values":[...]}, ...]',
     'heatmap':    '{"matrix":[[...]], "xlabels":[...], "ylabels":[...]}',
+    'spectrum':   '{"freq":[99.0,...], "power":[-93,...], "center":99.3, "bandwidth":0.2}',
+    'waterfall':  '{"matrix":[[...]], "xlabels":["99.0","99.6"], "ylabels":["t-1","now"], "min":-94, "max":-42}',
     'box':        '{"data":[[s1_vals],[s2_vals],...], "labels":["A","B",...]}',
     'indicator':  '{"value":23.4, "label":"Total Return %"}',
     'event':      '{"data":[x1,x2,...]}',
@@ -1486,7 +1666,12 @@ EXPECTED_SCHEMAS = {
     'panel':      '{"content":"text here", "title":"optional", "box":"ROUNDED"}',
     'gauge':      '[{"label":"CPU","value":75,"max":100,"color":"red"}, ...] or {"metrics":[...]}',
     'dashboard':  '{"panels":[{"type":"gauge","data":{"label":"CPU","value":72,"max":100},"title":"CPU"},{"type":"sparkline","data":{"values":[1,3,5,2,8]},"title":"Load"}]}',
+    'incplot':    'Raw JSON/JSONL/CSV/TSV auto plot. Supports prefer=bar|multibar|stackedbar|line|scatter|hist|table|kline via --prefer.',
     'graph':      '{"edges":[["A","B"],...], "directed":true, "node_style":"ROUND"}',
+    'diagram':    'glyph-arts diagram sequence --json "Alice->Bob: Hello" or {"kind":"flowchart","text":"A -> B"}',
+    'mermaid':    'Mermaid source text: graph/flowchart, sequenceDiagram, stateDiagram-v2, classDiagram, erDiagram, xychart-beta',
+    'plotext':    '{"series":[{"type":"line|scatter|error|bar|hist|candlestick","x":[...],"y":[...]}],"texts":[...],"vlines":[...],"hlines":[...],"shapes":[...]}',
+    'effect':     'glyph-arts effect gallery|pipeline|metrics|system-map|signal-panel|timeline|matrix|comparison|swimlane|kanban|quadrant|mindmap',
     'curve':      '{"points":[[x,y],...]}',
     'uniplot':    '[{"label":"A","x":[...],"y":[...]}] or {"label":"A","y":[...]}',
     'banner':      '{"text":"PROFIT","font":"big","color":"green"}',
@@ -1494,6 +1679,8 @@ EXPECTED_SCHEMAS = {
     'candlestick': '{"dates":["DD/MM/YYYY",...], "open":[...], "high":[...], "low":[...], "close":[...]}',
     'hires':       '[{"label":"Q5","y":[3.5,9.2,9.4],"color":[0,245,212]},{"label":"Q1","y":[3.1,5.1,4.5],"color":[255,107,107]}]',
     'radar':       '{"labels":["ATK","DEF","SPD","MGC","LCK"],"series":[{"label":"Hero","values":[80,60,90,70,50],"color":[0,245,212]}],"max":100}',
+    'textplot':    '{"expr":"sin(x) / x","xmin":-20,"xmax":20} or trailing expression text',
+    'turtle':      '{"commands":[["forward",30],["right",90],["forward",30]]}',
     'plotille':    '[{"label":"A","x":[1,2,3,4],"y":[2,4,3,6],"color":"bright_cyan"}]',
     'rich_live':   '{"panels":[{"type":"bar","title":"Left","data":{"labels":["A","B"],"values":[1,2]}},{"type":"sparkline","title":"Right","data":{"values":[1,3,5,2,8]}}],"layout":"row","frames":1}',
     'animate':     'glyph-arts animate line --duration 5 --frames 30 --json \'[{"label":"DAU","x":[...],"y":[...]}]\'',
@@ -1506,6 +1693,11 @@ EXPECTED_SCHEMAS = {
     'splash':      'glyph-arts splash',
     'demo':        'glyph-arts demo --speed fast',
     'gallery':     'glyph-arts gallery --output gallery.html',
+    'auto':        "glyph-arts auto --json '[1,2,3]'",
+    'live':        'glyph-arts live random --duration 10 --interval 0.2',
+    'doctor':      'glyph-arts doctor',
+    'install-backends': 'glyph-arts install-backends --target all [--run --yes]',
+    'wave':        'glyph-arts wave render bar --json \'{"labels":["A"],"values":[3]}\'',
 }
 
 # Types where --width/--height/--theme have no effect
@@ -1543,7 +1735,7 @@ def _require_ascii_motion_npx():
 def _render_ascii_motion_frames(chart_type, data, args, adapter, no_color=False):
     if chart_type not in CMDS or chart_type in {
         'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion',
-        'code', 'status', 'splash', 'demo', 'gallery',
+    'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'wave',
     }:
         print('ERROR:schema: to-ascii-motion needs a renderable chart type argument', file=sys.stderr)
         sys.exit(1)
@@ -1571,6 +1763,8 @@ def _render_ascii_motion_frames(chart_type, data, args, adapter, no_color=False)
 
 def main(argv=None):
     raw_argv = list(sys.argv[1:] if argv is None else argv)
+    raw_argv = _rewrite_chat_argv(raw_argv)
+    raw_argv = _rewrite_diagram_argv(raw_argv)
     epilog_lines = [f'Chart types ({CHART_TYPE_COUNT}):']
     for engine, types in CHART_TYPES_BY_ENGINE.items():
         epilog_lines.append(f'  {engine:9}: {" ".join(types)}')
@@ -1580,6 +1774,15 @@ Examples:
   python chart.py scatter --json '[{"label":"A","x":[1,2,3],"y":[4,2,5]}]'
   python chart.py hist --json '{"values":[1,2,2,3,3,3,4,4,5],"bins":5}'
   python chart.py heatmap --json '{"matrix":[[1,2],[3,4]],"xlabels":["A","B"],"ylabels":["X","Y"]}'
+  python chart.py spectrum --json '{"freq":[99.0,99.3,99.6],"power":[-93,-42,-93],"center":99.3,"bandwidth":0.2}'
+  python chart.py waterfall --json '{"matrix":[[0,3,8,3,0],[0,2,9,4,0]],"xlabels":["99.0","99.6"],"ylabels":["t-1","now"]}'
+  python chart.py diagram sequence --json 'Alice->Bob: Hello'
+  python chart.py chat mermaid --json 'graph LR\nA[Start] --> B[Done]'
+  python chart.py chat effects
+  python chart.py effect signal-panel
+  python chart.py chat image --file photo.jpg --width 80 --height 30
+  python chart.py chat sequence --json 'Alice->Bob: Hello'
+  python chart.py chat sdr spectrum --json '{"freq":[99.0,99.3,99.6],"power":[-93,-42,-93]}'
   python chart.py box --json '{"data":[[1,2,3,4,5],[2,3,4,5,6]],"labels":["A","B"]}'
   python chart.py sparkline --json '{"values":[1,3,5,2,8,4,6]}'
   python chart.py indicator --json '{"value":23.4,"label":"Total Return %"}'
@@ -1596,12 +1799,12 @@ Examples:
 """)
     epilog = '\n'.join(epilog_lines)
     p = argparse.ArgumentParser(
-        description='glyph-arts -- terminal-visible charts for Claude Code',
+        description='glyph-arts -- terminal-visible charts and chat drawing',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=epilog)
     p.add_argument('type', choices=list(CMDS) + sorted(_MEDIA_TYPES), metavar='TYPE',
-                   help='Chart type: ' + ' | '.join(CMDS) +
-                        ' | image | video (media via chafa/ffmpeg)')
+                   help='Chart type, or use `chat TYPE ...` for chat-safe drawing: ' + ' | '.join(CMDS) +
+                        ' | image | video (media via Pillow/chafa/ffmpeg)')
     p.add_argument('art_text', nargs='*',
                    help='Text for TYPE=art (example: glyph-arts art SHIP IT)')
     p.add_argument('--json',        dest='data', help='JSON data string')
@@ -1636,6 +1839,7 @@ Examples:
                         'Phase A pixel support: bar/line/scatter only. '
                         'interactive = Textual keyboard-first TUI for line charts '
                         '(requires `pip install glyph-arts[interactive]`).')
+    add_media_arguments(p)
     p.add_argument('--art', choices=['low', 'default', 'high'], default='default',
                    help='Visual fidelity tier (only with --engine pixel). low=block(compat). default=vhalf(btop-style). high=sextant(max resolution).')
     p.add_argument('--xlabel',      default='', help='X-axis label (plotext charts)')
@@ -1668,11 +1872,44 @@ Examples:
                    help='TYPE=scatter marker symbol set')
     p.add_argument('--symbols',     default=None, metavar='SET',
                    help='TYPE=bar symbol set (block, progress, braille, arrows); '
-                        'image/video chafa --symbols value (default: braille)')
+                        'image symbols (ascii, shade, block, half) or chafa --symbols value; '
+                        'video chafa --symbols value')
     p.add_argument('--candle-style', choices=['default', 'geom'], default='default',
                    help='TYPE=kline candle glyph style')
-    p.add_argument('--style',       choices=['bar', 'half-circle', 'full-circle', 'braille'],
-                   default='bar', help='TYPE=gauge glyph style')
+    p.add_argument('--style',       choices=['auto', 'ascii', 'unicode', 'braille', 'block', 'shade', 'bar', 'half-circle', 'full-circle'],
+                   default='auto', help='Visual style. Gauge aliases bar/half-circle/full-circle remain supported')
+    p.add_argument('--prefer',      choices=['sparkline', 'bar', 'multibar', 'stackedbar', 'line', 'scatter', 'hist', 'table', 'kline', 'candlestick'], default='',
+                   help='TYPE=auto/incplot chart preference override')
+    p.add_argument('--diagram-kind', choices=['math', 'sequence', 'tree', 'table', 'frame', 'box', 'note', 'flowchart', 'graphdag', 'dag', 'graphplanar', 'planar'],
+                   default='', help='TYPE=diagram generator override')
+    p.add_argument('--diagram-engine', choices=['auto', 'diagon', 'builtin'], default='auto',
+                   help='TYPE=diagram backend. auto uses Diagon when installed, else builtin fallback.')
+    p.add_argument('--mermaid-theme', choices=[
+        'zinc-light', 'zinc-dark', 'tokyo-night', 'tokyo-night-storm',
+        'tokyo-night-light', 'catppuccin-mocha', 'catppuccin-latte', 'nord',
+        'nord-light', 'dracula', 'github-light', 'github-dark',
+        'solarized-light', 'solarized-dark', 'one-dark',
+    ], default='zinc-dark', help='TYPE=mermaid beautiful-mermaid-compatible theme name')
+    p.add_argument('--mermaid-ascii', action='store_true',
+                   help='TYPE=mermaid use ASCII connectors instead of Unicode')
+    p.add_argument('--mermaid-padding-x', type=int, default=5,
+                   help='TYPE=mermaid horizontal spacing between nodes')
+    p.add_argument('--mermaid-padding-y', type=int, default=1,
+                   help='TYPE=mermaid vertical spacing between nodes')
+    p.add_argument('--mermaid-box-padding', type=int, default=1,
+                   help='TYPE=mermaid node inner padding')
+    p.add_argument('--graph-format', choices=['auto', 'json', 'edges', 'dot', 'graphml'], default='auto',
+                   help='TYPE=graph input format override')
+    p.add_argument('--graph-style', choices=['minimal', 'square', 'round', 'diamond'], default='round',
+                   help='TYPE=graph PHART node style')
+    p.add_argument('--graph-charset', choices=['unicode', 'ascii'], default='unicode',
+                   help='TYPE=graph PHART character set')
+    p.add_argument('--graph-node-spacing', type=int, default=4,
+                   help='TYPE=graph horizontal node spacing')
+    p.add_argument('--graph-layer-spacing', type=int, default=2,
+                   help='TYPE=graph vertical layer spacing')
+    p.add_argument('--effect-kind', choices=['gallery', 'pipeline', 'metrics', 'system-map', 'signal-panel', 'timeline', 'matrix', 'comparison', 'swimlane', 'kanban', 'quadrant', 'mindmap'],
+                   default='', help='TYPE=effect preset override')
     p.add_argument('--fps',         type=int, default=12, metavar='N',
                    help='Video playback frames/sec for type=video (default: 12)')
     p.add_argument('--version',     action='version', version=f'glyph-arts {_VERSION}')
@@ -1690,6 +1927,8 @@ Examples:
                    help='Keep last N data points in view (0=unlimited, default: 50)')
     p.add_argument('--duration',   type=float, default=0, metavar='SEC',
                    help='Auto-stop after SEC seconds (0=until EOF/Ctrl-C)')
+    p.add_argument('--interval',   type=float, default=0.2, metavar='SEC',
+                   help='TYPE=live update interval in seconds (default: 0.2)')
     p.add_argument('--frames',     type=int, default=30, metavar='N',
                    help='TYPE=animate frame count (default: 30)')
     p.add_argument('--spinner',    default='',
@@ -1714,12 +1953,42 @@ Examples:
                    help='TYPE=demo speed: fast=10s, normal=30s, slow=60s')
     p.add_argument('--no-clear', action='store_true',
                    help='TYPE=demo do not clear the terminal between sections')
+    p.add_argument('--demo', action='store_true',
+                   help='TYPE=dashboard use built-in dashboard demo')
+    p.add_argument('--no-interactive', action='store_true',
+                   help='TYPE=dashboard render static Rich dashboard instead of Textual TUI')
     p.add_argument('--chart', default='',
                    help='TYPE=gallery pre-select chart type')
+    p.add_argument(
+        '--target',
+        choices=['all', 'chat', 'media', 'fonts', 'diagrams'],
+        default='all',
+        help='TYPE=install-backends install target',
+    )
+    p.add_argument(
+        '--manager',
+        choices=[
+            'auto', 'scoop', 'choco', 'winget', 'brew', 'apt-get',
+            'dnf', 'pacman', 'snap', 'x-cmd',
+        ],
+        default='auto',
+        help='TYPE=install-backends package manager override',
+    )
+    p.add_argument('--run', action='store_true',
+                   help='TYPE=install-backends execute the generated install commands')
+    p.add_argument('--yes', action='store_true',
+                   help='TYPE=install-backends confirm execution when used with --run')
+    p.add_argument('--dry-run', action='store_true',
+                   help='TYPE=wave print planned chart/wsh commands without running them')
+    p.add_argument('--wave-format', choices=['html', 'txt', 'ansi'], default='html',
+                   help='TYPE=wave render export format for wave render')
+    p.add_argument('--wave-stdout', action='store_true',
+                   help='TYPE=wave render also print the generated preview file')
     if '--check-deps' in sys.argv:
         _CORE = ['plotext', 'rich', 'uniplot', 'pyfiglet',
                  'sparklines', 'duckdb', 'pandas', 'networkx', 'phart']
         _OPT = [
+            ('PIL',      'image text fallback', 'Pillow'),
             ('drawille', 'curve chart',   'glyph-arts[braille]'),
             ('lttb',     'LTTB sampling', 'glyph-arts[lttb]'),
             ('textual',  'dashboard TUI', 'glyph-arts[tui]'),
@@ -1733,8 +2002,9 @@ Examples:
                 status = 'MISSING'
             print(f'  {pkg:<13} {status}')
         print('[media]')
-        for tool, purpose in (('chafa', 'image/video render'),
-                              ('ffmpeg', 'video frame extract')):
+        for tool, purpose in (('chafa', 'image/video high-fidelity render'),
+                              ('ffmpeg', 'video frame extract'),
+                              ('diagon', 'math/sequence/tree/flowchart diagrams')):
             status = 'OK' if shutil.which(tool) else 'MISSING'
             print(f'  {tool:<13} {status}  ({purpose})')
         if '--all' in sys.argv:
@@ -1750,9 +2020,26 @@ Examples:
                 print(f'  {pkg:<13} {status}  ({purpose}){hint}')
         sys.exit(0)
 
-    args = p.parse_args(argv)
+    args = p.parse_args(raw_argv)
     if args.font_tier is None:
         args.font_tier = detect_font_tier()
+
+    if args.type == 'doctor':
+        from cli_charts.installers import render_doctor
+        print(render_doctor(), end='')
+        sys.exit(0)
+
+    if args.type == 'install-backends':
+        from cli_charts.installers import render_install_plan, run_install_plan
+        manager = '' if args.manager == 'auto' else args.manager
+        if args.run:
+            sys.exit(run_install_plan(args.target, manager, yes=args.yes))
+        print(render_install_plan(args.target, manager), end='')
+        sys.exit(0)
+
+    if args.type == 'wave':
+        from cli_charts.adapters.waveterm import run_wave_command
+        sys.exit(run_wave_command(args))
 
     if args.type == 'demo':
         from cli_charts.demo_engine import run_demo
@@ -1770,6 +2057,22 @@ Examples:
 
     from cli_charts.splash import maybe_play_first_run
     maybe_play_first_run(no_splash=args.no_splash)
+
+    if args.type == 'live':
+        from cli_charts.live_engine import run_live
+        source = args.art_text[0] if args.art_text else 'random'
+        no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
+        sys.exit(run_live(
+            source,
+            window=args.window,
+            interval=args.interval,
+            duration=args.duration,
+            title=args.title,
+            width=args.width,
+            height=args.height,
+            theme=args.theme,
+            no_color=no_color,
+        ))
 
     if args.type == 'code':
         if not args.file:
@@ -1795,26 +2098,17 @@ Examples:
         )
         sys.exit(rc)
 
+    if args.type == 'dashboard' and args.demo:
+        dash_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'dashboard.py')
+        cmd = [sys.executable, dash_script, '--demo']
+        if args.no_interactive:
+            cmd.append('--no-interactive')
+        result = subprocess.run(cmd)
+        sys.exit(result.returncode)
+
     # Media types (image/video) bypass JSON loading -- they take a filesystem path.
     if args.type in _MEDIA_TYPES:
-        path = args.file or args.data
-        if not path:
-            print(f'ERROR:schema: {args.type} needs a path via --file PATH or --json PATH',
-                  file=sys.stderr)
-            sys.exit(1)
-        if not os.path.exists(path):
-            print(f'ERROR:schema: file not found: {path}', file=sys.stderr)
-            sys.exit(1)
-        no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
-        try:
-            if args.type == 'image':
-                _render_image(path, args.width, args.height, args.symbols or 'braille', no_color)
-            else:
-                _render_video(path, args.width, args.height, args.fps,
-                              args.symbols or 'braille', args.duration, no_color)
-        except subprocess.CalledProcessError as exc:
-            print(f'ERROR:render: chafa/ffmpeg exit {exc.returncode}', file=sys.stderr)
-            sys.exit(4)
+        sys.exit(dispatch_media(args))
         return
 
     if args.type == 'art':
@@ -1833,6 +2127,152 @@ Examples:
             args.output,
         )
         sys.exit(rc)
+
+    if args.type in {'incplot', 'textplot', 'turtle'}:
+        if args.file:
+            with open(args.file, encoding='utf-8') as _f:
+                raw = _f.read().strip()
+        elif args.data is not None:
+            raw = args.data
+        elif args.art_text:
+            raw = ' '.join(args.art_text)
+        else:
+            raw = sys.stdin.read().strip()
+        if not raw:
+            print(f'ERROR:schema: {args.type} needs --json TEXT, --file PATH, stdin, or trailing text',
+                  file=sys.stderr)
+            sys.exit(1)
+        data = raw
+        if args.type != 'incplot':
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError:
+                data = raw
+        no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
+        render_kw = dict(
+            xlabel=args.xlabel,
+            ylabel=args.ylabel,
+            xlim=args.xlim,
+            ylim=args.ylim,
+            xscale=args.xscale,
+            yscale=args.yscale,
+            orientation=args.orientation,
+            output='',
+            no_color=no_color,
+            prefer=args.prefer,
+        )
+        if args.output:
+            from cli_charts.render.export_engine import export_to_path
+
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                CMDS[args.type](data, args.title, args.width, args.height, args.theme, **render_kw)
+            export_to_path(buf.getvalue(), args.output, no_color)
+        else:
+            CMDS[args.type](data, args.title, args.width, args.height, args.theme, **render_kw)
+        sys.exit(0)
+
+    if args.type == 'diagram':
+        kind = args.diagram_kind or (args.art_text[0] if args.art_text else '')
+        inline_text = ' '.join(args.art_text[1:]) if args.art_text and kind == args.art_text[0] else ''
+        if args.file:
+            with open(args.file, encoding='utf-8') as _f:
+                raw = _f.read().strip()
+        elif args.data is not None:
+            raw = args.data
+        elif inline_text:
+            raw = inline_text
+        else:
+            raw = sys.stdin.read().strip()
+        if not raw:
+            print('ERROR:schema: diagram needs --json TEXT, --file PATH, stdin, or trailing text',
+                  file=sys.stderr)
+            sys.exit(1)
+        data = raw
+        try:
+            parsed = json.loads(raw)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, dict):
+            data = parsed
+            kind = kind or parsed.get('kind') or parsed.get('type') or ''
+        if not kind:
+            print('ERROR:schema: diagram needs a kind: math, sequence, tree, table, frame, note, flowchart, graphdag, graphplanar',
+                  file=sys.stderr)
+            sys.exit(1)
+        rc = diagram(
+            data,
+            args.title,
+            args.width,
+            args.height,
+            args.theme,
+            output=args.output,
+            diagram_kind=kind,
+            diagram_engine=args.diagram_engine,
+            statusline=args.statusline,
+        )
+        sys.exit(rc or 0)
+
+    if args.type == 'mermaid':
+        if args.file:
+            with open(args.file, encoding='utf-8') as _f:
+                raw = _f.read().strip()
+        elif args.data is not None:
+            raw = args.data
+        elif args.art_text:
+            raw = ' '.join(args.art_text)
+        else:
+            raw = sys.stdin.read().strip()
+        if not raw:
+            print('ERROR:schema: mermaid needs --json TEXT, --file PATH, stdin, or trailing text',
+                  file=sys.stderr)
+            sys.exit(1)
+        rc = mermaid(
+            raw,
+            args.title,
+            args.width,
+            args.height,
+            args.theme,
+            mermaid_theme=args.mermaid_theme,
+            mermaid_ascii=args.mermaid_ascii,
+            mermaid_padding_x=args.mermaid_padding_x,
+            mermaid_padding_y=args.mermaid_padding_y,
+            mermaid_box_padding=args.mermaid_box_padding,
+        )
+        sys.exit(rc or 0)
+
+    if args.type == 'effect':
+        kind = args.effect_kind or (args.art_text[0] if args.art_text else '')
+        inline_text = ' '.join(args.art_text[1:]) if args.art_text and kind == args.art_text[0] else ''
+        raw = ''
+        if args.file:
+            with open(args.file, encoding='utf-8') as _f:
+                raw = _f.read().strip()
+        elif args.data is not None:
+            raw = args.data
+        elif inline_text:
+            raw = inline_text
+        data = {}
+        if raw:
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError:
+                parsed = {'text': raw}
+            if isinstance(parsed, dict):
+                data = parsed
+            else:
+                data = {'values': parsed}
+        rc = effect(
+            data,
+            args.title,
+            args.width,
+            args.height,
+            args.theme,
+            output=args.output,
+            effect_kind=kind or data.get('kind') or data.get('effect') or 'gallery',
+            statusline=args.statusline,
+        )
+        sys.exit(rc or 0)
 
     if args.type == 'animate':
         if not args.art_text:
@@ -1955,7 +2395,7 @@ Examples:
         kw = dict(xlabel=args.xlabel, ylabel=args.ylabel, xlim=args.xlim,
                   ylim=args.ylim, xscale=args.xscale, yscale=args.yscale,
                   orientation=args.orientation, output=args.output,
-                  no_color=no_color)
+                  no_color=no_color, visual_style=args.style)
         _animate_stdin(args.type, args.title, args.width, args.height,
                        args.theme, args.refresh, args.window, args.duration, kw)
         return
@@ -1978,7 +2418,23 @@ Examples:
     no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
 
     try:
-        if args.duckdb:
+        if args.type == 'auto':
+            if args.file:
+                with open(args.file) as _f:
+                    raw = _f.read().strip()
+            elif args.data:
+                raw = args.data
+            else:
+                raw = sys.stdin.read().strip()
+            if not raw:
+                print('ERROR:schema: Provide --json, --file, or pipe JSON/CSV/TSV to stdin',
+                      file=sys.stderr)
+                sys.exit(1)
+            from cli_charts.auto_detect import detect_auto
+            detected = detect_auto(raw, args.prefer)
+            args.type = detected.chart_type
+            data = detected.data
+        elif args.duckdb:
             if not args.db:
                 print('ERROR:schema: --db is required when using --duckdb '
                       '(e.g. --db /path/to/data.duckdb)', file=sys.stderr)
@@ -2000,8 +2456,11 @@ Examples:
             try:
                 data = json.loads(raw)
             except json.JSONDecodeError as exc:
-                print(f'ERROR:json: {exc}', file=sys.stderr)
-                sys.exit(1)
+                if args.type == 'graph':
+                    data = raw
+                else:
+                    print(f'ERROR:json: {exc}', file=sys.stderr)
+                    sys.exit(1)
 
         if args.sample > 0:
             data = _sample_data(data, args.sample, chart_type=args.type)
@@ -2020,11 +2479,24 @@ Examples:
             link_title=args.link_title,
             statusline=args.statusline,
             rich_progress=args.rich_progress,
+            prefer=args.prefer,
             font_tier=args.font_tier,
             marker=args.marker if args.type == 'scatter' else None,
             symbol_set=args.symbols if args.type == 'bar' else None,
+            visual_style=args.style,
             candle_style=args.candle_style if args.type == 'kline' else 'default',
             gauge_style=args.style if args.type == 'gauge' else 'bar',
+            graph_format=args.graph_format,
+            graph_style=args.graph_style,
+            graph_charset=args.graph_charset,
+            graph_node_spacing=args.graph_node_spacing,
+            graph_layer_spacing=args.graph_layer_spacing,
+            mermaid_theme=args.mermaid_theme,
+            mermaid_ascii=args.mermaid_ascii,
+            mermaid_padding_x=args.mermaid_padding_x,
+            mermaid_padding_y=args.mermaid_padding_y,
+            mermaid_box_padding=args.mermaid_box_padding,
+            effect_kind=args.effect_kind,
         )
 
         try:

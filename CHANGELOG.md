@@ -4,6 +4,45 @@ All notable changes to glyph-arts are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 
+## [Unreleased] - 2026-05-24
+
+### Added
+- `image --chat`: plain text Pillow renderer for AI chat panes and Markdown
+  code blocks. The default chat path now auto-crops foreground subjects,
+  suppresses flat backgrounds, and boosts contrast/edges.
+- `image --media-engine {auto,chafa,pillow}` with Pillow fallback when `chafa`
+  is unavailable.
+- `image --image-mode {auto,raw,detail,edge,silhouette}` and `--no-trim` for
+  controllable chat/image rendering.
+- `image --image-style {classic,braille,block,edge,dot-cross,halftone,particles,retro-art,terminal}`,
+  `--color-mode`, `--custom-color`, `--background`, `--ratio`, `--dither`,
+  `--font-size`, `--image-random`, and static `.txt/.md/.html/.svg/.png/.gif/.tsx`
+  exports to cover the core neethanwu/ascii-art skill feature set.
+- `spectrum` and `waterfall` SDR-style renderers for chat-safe RF spectrum and
+  waterfall snapshots.
+- `docs/capability_matrix.md` to mark which features are chat text, ANSI,
+  exported artifacts, or interactive terminal flows.
+- Golden visual snapshot tests for a portrait ASCII render plus SDR spectrum
+  and waterfall output.
+- `chat` front-door mode for chat drawing: `chat image --file photo.jpg`,
+  `chat photo.jpg`, and `chat sdr spectrum --json ...`.
+- `diagram` command for Diagon-style math/sequence/tree/table/frame/flowchart/
+  GraphDAG/GraphPlanar rendering. Auto mode delegates to the external `diagon`
+  binary when available and falls back to builtin chat-safe renderers for
+  sequence/tree/table/frame/flowchart/graphdag.
+- PHART graph ingestion now accepts edge-list text, simple DOT, GraphML content,
+  and JSON edges through `chat graph ...`.
+- `docs/agent_chat_drawing_skill.md` with compact routing rules so other
+  agents can use the chat drawing surface without reverse-engineering flags.
+- Added `diagram note` and explicit ASCII diagram formatting/verification rules
+  inspired by the microbians ASCII Art Diagrams skill.
+
+### Changed
+- Moved image/video rendering out of `cmd/_helpers.py` into
+  `render/media_engine.py`.
+- Moved image/video argparse flags and media dispatch into focused
+  `cmd/media_args.py` and `cmd/media_dispatch.py` modules.
+
 ## [3.0.1] - 2026-04-15
 
 ### Fixed

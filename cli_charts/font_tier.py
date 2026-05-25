@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 
+from cli_charts.terminal_profiles import detect_terminal_profile
+
 FontTier = str
 
 _TIERS = {"ascii", "unicode", "unicode-extended", "nerd"}
@@ -22,13 +24,4 @@ def detect_font_tier() -> FontTier:
     if _truthy(os.environ.get("NERD_FONT")):
         return "nerd"
 
-    term_program = os.environ.get("TERM_PROGRAM", "")
-    if term_program == "WarpTerminal":
-        return "unicode-extended"
-    if term_program == "vscode":
-        return "unicode"
-
-    if os.environ.get("WT_SESSION"):
-        return "unicode"
-
-    return "unicode"
+    return detect_terminal_profile().font_tier

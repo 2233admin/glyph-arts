@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "glyph-arts"
 dynamic = ["version"]
-description = "Terminal-visible chart toolkit -- 29 chart types (incl. image/video via chafa+ffmpeg) + live animation rendered directly in the CLI, no browser, no files."
+description = "Chat drawing and terminal-visible chart toolkit -- 56 chart types (incl. incplot-style auto plots, Mermaid/beautiful-mermaid-style diagrams, chat effect presets, Diagon-style diagrams, SDR spectrum/waterfall, chat-safe image rendering, WaveTerm adapter, Graphviz/Diagon/chafa/font backend doctor/install helpers, and video via chafa+ffmpeg) + live animation rendered directly in the CLI, no browser, no files."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
@@ -27,6 +27,7 @@ dependencies = [
     "networkx>=3.0",
     "pandas>=2.0",
     "phart>=0.4",
+    "Pillow>=10",
     "plotext>=5.2",
     "plotille>=0.5",
     "pyfiglet>=0.8",

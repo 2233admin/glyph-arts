@@ -1,0 +1,24 @@
+{
+  "name": "chat-drawing",
+  "entry": "glyph-arts chat",
+  "loop": ["route", "render_stdout", "verify", "rerender_on_failure", "reply_with_stdout"],
+  "routing_refs": [
+    "references/routing.md",
+    "references/decision-tree.md",
+    "references/agent-contract.md"
+  ],
+  "agent_adapters": ["claude.md", "codex.md", "opencode.md"],
+  "routes": {
+    "unknown_data": "glyph-arts chat incplot",
+    "plot_overlays": "glyph-arts chat plotext",
+    "function_curve": "glyph-arts chat textplot",
+    "drawille_path": "glyph-arts chat turtle",
+    "mermaid": "glyph-arts chat mermaid",
+    "diagram": "glyph-arts chat diagram",
+    "graph": "glyph-arts chat graph",
+    "image": "glyph-arts chat image",
+    "sdr_spectrum": "glyph-arts chat sdr spectrum",
+    "sdr_waterfall": "glyph-arts chat waterfall"
+  },
+  "verify": "python skills/chat-drawing/scripts/verify_chat_art.py output.txt --max-width 100"
+}
