@@ -1,4 +1,5 @@
 """Doc-drift regression tests for chart docs and canonical type metadata."""
+import json
 import re
 from pathlib import Path
 
@@ -50,7 +51,7 @@ def test_readme_no_demo_placeholder():
 
 def test_readme_lists_system_deps_for_media():
     readme = (ROOT / 'README.md').read_text(encoding='utf-8').lower()
-    for tool in ('chafa', 'ffmpeg'):
+    for tool in ('chafa', 'ffmpeg', 'graphviz', 'diagon', 'symbols nerd font'):
         assert tool in readme, f'README does not mention {tool}'
 
 
@@ -65,3 +66,40 @@ def test_skill_md_engines_match_code():
         if engine == 'misc':
             continue
         assert engine.lower() in skill, f"SKILL.md doesn't mention engine '{engine}'"
+
+
+def test_chat_drawing_capability_manifest_is_agent_readable():
+    from cli_charts.render_target import validate_protocol
+
+    manifest = json.loads((ROOT / 'docs' / 'chat_drawing_capabilities.json').read_text(encoding='utf-8'))
+    assert manifest['default_entry'] == 'glyph-arts chat'
+    assert (ROOT / manifest['skill_package'] / 'SKILL.md').exists()
+    assert (ROOT / manifest['verification_script']).exists()
+    assert manifest['closed_loop'] == ['route', 'render_stdout', 'verify', 'rerender_on_failure', 'reply_with_stdout']
+    capabilities = manifest['capabilities']
+    for name, capability in capabilities.items():
+        protocol = capability.get('protocol')
+        assert isinstance(protocol, dict), f"{name} missing protocol block"
+        validate_protocol(protocol, name=name)
+        if capability.get('chat') is True:
+            assert protocol['targets'][0] == 'chat'
+            assert protocol['chat_safe'] is True
+            assert protocol['uses_ansi'] is False
+
+    for name in (
+        'image_ascii',
+        'diagon_sequence',
+        'diagon_flowchart',
+        'math_notation',
+        'cjk_layout',
+        'incplot_auto',
+        'beautiful_mermaid',
+        'plotext_overlay',
+        'textplots_braille',
+        'drawille_turtle',
+        'phart_graph',
+        'sdr_spectrum',
+        'chat_effect_presets',
+    ):
+        assert capabilities[name]['chat'] is True
+        assert capabilities[name]['command'].startswith('glyph-arts chat')

@@ -214,7 +214,7 @@ glyph-arts uniplot --json '...'   # 等价于 glyph-arts line --style science
 
 ### 6.2 渐进迁移
 
-旧用户：不需要任何修改  
+旧用户：不需要任何修改
 新用户：可选用 `--style` 探索更多风格
 
 ## 7. 风险与权衡
@@ -298,4 +298,3 @@ retro   → textgraph (复古 Unicode)
 rich    → Rich (表格/面板/进度)
 art     → figlet + art (艺术字)
 ```
-

@@ -45,6 +45,17 @@ def test_font_tier_auto_detect_warp_returns_unicode_extended(monkeypatch) -> Non
 
     monkeypatch.delenv("GLYPH_ARTS_FONT_TIER", raising=False)
     monkeypatch.delenv("NERD_FONT", raising=False)
+    monkeypatch.delenv("GLYPH_ARTS_TERMINAL_PROFILE", raising=False)
     monkeypatch.setenv("TERM_PROGRAM", "WarpTerminal")
+
+    assert detect_font_tier() == "unicode-extended"
+
+
+def test_font_tier_uses_terminal_profile_override(monkeypatch) -> None:
+    from cli_charts.font_tier import detect_font_tier
+
+    monkeypatch.delenv("GLYPH_ARTS_FONT_TIER", raising=False)
+    monkeypatch.delenv("NERD_FONT", raising=False)
+    monkeypatch.setenv("GLYPH_ARTS_TERMINAL_PROFILE", "warp")
 
     assert detect_font_tier() == "unicode-extended"

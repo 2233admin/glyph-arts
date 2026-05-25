@@ -164,14 +164,19 @@ def to_hyperframes(
         print(f"ERROR:schema: {exc}", file=sys.stderr)
         return 1
 
+    mpl: Any | None
+    pyplot: Any | None
     try:
-        import matplotlib as mpl
+        import matplotlib as _mpl
 
-        mpl.use("Agg")
-        import matplotlib.pyplot as pyplot
+        _mpl.use("Agg")
+        import matplotlib.pyplot as _pyplot
     except ImportError:
         mpl = None
         pyplot = None
+    else:
+        mpl = _mpl
+        pyplot = _pyplot
 
     out_dir = Path(output_dir)
     duration_ms = round(duration_s * 1000)

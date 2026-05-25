@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [master, main]
 
+env:
+  NX_DAEMON: "false"
+
 jobs:
   test:
     name: pytest (${{ matrix.os }}, ${{ matrix.python-version }})
@@ -28,24 +31,41 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - name: Install package + test deps
-        run: pip install -e ".[all,test]"
-      - name: Run tests
-        run: pytest tests/ -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install Nx
+        run: npm ci
+      - name: Sync Python environment
+        run: uv sync --frozen --extra all --extra test --extra dev
+      - name: Run tests via Nx
+        run: npx nx run glyph-arts:test
 
-  lint:
+  quality:
+    name: lint / typecheck / docs / doctor
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install
-        run: pip install ruff mypy
-      - name: Ruff
-        run: ruff check cli_charts tests
-      - name: Mypy
-        run: mypy cli_charts --ignore-missing-imports
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install Nx
+        run: npm ci
+      - name: Sync Python environment
+        run: uv sync --frozen --extra all --extra test --extra dev
+      - name: Run quality targets via Nx
+        run: npx nx run-many -t lint typecheck docs-check doctor --parallel=3
 
   coverage:
     runs-on: ubuntu-latest
@@ -54,18 +74,24 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install coverage deps
-        run: pip install pytest pytest-cov
-      - name: Install package
-        run: pip install -e ".[all,test]"
-      - name: Test with coverage
-        run: pytest --cov=cli_charts --cov-report=xml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Install Nx
+        run: npm ci
+      - name: Sync Python environment
+        run: uv sync --frozen --extra all --extra test --extra dev
+      - name: Test with coverage via Nx
+        run: npx nx run glyph-arts:coverage
       - uses: codecov/codecov-action@v5
         with:
           files: ./coverage.xml
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
-
   check-deps:
     name: check-deps smoke test
     runs-on: ubuntu-latest
@@ -74,14 +100,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install package (all extras)
-        run: pip install -e ".[all]"
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Sync Python environment
+        run: uv sync --frozen --extra all --extra test --extra dev
       - name: glyph-arts --check-deps
-        run: glyph-arts --check-deps
+        run: uv run glyph-arts --check-deps
       - name: glyph-arts --check-deps --all
-        run: glyph-arts --check-deps --all
+        run: uv run glyph-arts --check-deps --all
       - name: dashboard --check-deps
-        run: python -m cli_charts.dashboard --check-deps
+        run: uv run python -m cli_charts.dashboard --check-deps
 
   deepsource:
     name: DeepSource Analysis

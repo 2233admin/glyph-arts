@@ -19,7 +19,7 @@ ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 
 GALLERY_CHARTS = [
     "kline", "line", "scatter", "step", "bar", "pie", "multibar", "stackedbar",
-    "hist", "heatmap", "box", "indicator", "event", "confusion", "sparkline",
+    "hist", "heatmap", "spectrum", "waterfall", "box", "indicator", "event", "confusion", "sparkline",
     "table", "tree", "panel", "gauge", "dashboard", "graph", "curve", "uniplot",
     "banner", "radar",
 ]
@@ -35,6 +35,8 @@ SAMPLES = {
     "stackedbar": {"labels": ["Q1", "Q2"], "series": [{"label": "Core", "values": [6, 9]}, {"label": "Plus", "values": [3, 4]}]},
     "hist": {"values": [1, 2, 2, 3, 3, 3, 4, 5], "bins": 5},
     "heatmap": {"matrix": [[1, 2], [3, 4]], "xlabels": ["A", "B"], "ylabels": ["X", "Y"]},
+    "spectrum": {"freq": [99.0, 99.15, 99.3, 99.45, 99.6], "power": [-93, -80, -42, -82, -93], "center": 99.3, "bandwidth": 0.2},
+    "waterfall": {"matrix": [[-94, -80, -52, -45, -60, -90], [-94, -72, -45, -42, -55, -88], [-94, -82, -58, -44, -50, -86]], "xlabels": ["99.0", "99.6"], "ylabels": ["t-2", "t-1", "now"], "min": -94, "max": -42},
     "box": {"data": [[1, 2, 3, 4], [2, 3, 5, 6]], "labels": ["A", "B"]},
     "indicator": {"value": 72, "label": "Health"},
     "event": {"data": [1, 3, 5, 8, 13]},

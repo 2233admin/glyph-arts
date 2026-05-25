@@ -174,13 +174,18 @@ def _detect_chafa_format() -> str:
     Always returns 'symbols' when stdout is not a TTY (piping, Claude
     Code UI text panel, redirect to file) so output is greppable text.
 
-    Override via GLYPH_ARTS_FORMAT env var (kitty|iterm|sixel|symbols).
+    Override via GLYPH_ARTS_FORMAT env var (kitty|iterm|sixel|sixels|symbols).
     """
     override = os.environ.get('GLYPH_ARTS_FORMAT', '').strip().lower()
-    if override in {'kitty', 'iterm', 'sixel', 'symbols'}:
-        return override
+    if override in {'kitty', 'iterm', 'sixel', 'sixels', 'symbols'}:
+        return 'sixels' if override == 'sixel' else override
     if not os.isatty(1):
         return 'symbols'
+    from cli_charts.terminal_profiles import detect_terminal_profile
+
+    profile = detect_terminal_profile()
+    if profile.chafa_format in {'kitty', 'iterm', 'sixel', 'sixels', 'symbols'}:
+        return 'sixels' if profile.chafa_format == 'sixel' else profile.chafa_format
     term = os.environ.get('TERM', '').lower()
     term_program = os.environ.get('TERM_PROGRAM', '').lower()
     if 'kitty' in term or os.environ.get('KITTY_WINDOW_ID'):
@@ -189,9 +194,6 @@ def _detect_chafa_format() -> str:
         return 'iterm'
     if term_program == 'wezterm' or os.environ.get('WEZTERM_EXECUTABLE'):
         return 'sixel'
-    # Warp graphics support is flag-gated and version-specific; symbols
-    # is the safe default (still uses truecolor + Unicode block chars).
-    # Windows Terminal also lacks native kitty/sixel — same default.
     return 'symbols'
 
 

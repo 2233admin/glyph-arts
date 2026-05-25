@@ -1,0 +1,53 @@
+{
+  "$schema": "./node_modules/nx/schemas/project-schema.json",
+  "name": "glyph-arts",
+  "projectType": "application",
+  "root": ".",
+  "sourceRoot": "cli_charts",
+  "targets": {
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "uv run --extra dev ruff check ."
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "uv run --extra dev mypy cli_charts --ignore-missing-imports"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "uv run --extra all --extra test pytest tests/ -v"
+      }
+    },
+    "coverage": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/coverage.xml"],
+      "options": {
+        "command": "uv run --extra all --extra test --extra dev pytest --cov=cli_charts --cov-report=xml"
+      }
+    },
+    "docs-check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "uv run --extra test pytest tests/test_doc_consistency.py tests/test_chat_drawing_skill_package.py -q"
+      }
+    },
+    "doctor": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "uv run glyph-arts doctor --no-splash"
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "command": "uv run --extra dev python -m build"
+      }
+    }
+  }
+}
