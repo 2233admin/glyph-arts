@@ -65,7 +65,8 @@ def test_font_download_install_plan(monkeypatch) -> None:
     plan = installers.render_install_plan("fonts", "download")
 
     assert "cli_charts.font_downloads install max" in plan
-    assert "max OFL font pack" in plan
+    assert "max open font pack" in plan
+    assert "Google Noto fallbacks" in plan
     assert "LICENSE and NOTICE" in plan
 
 
@@ -209,12 +210,28 @@ def test_font_groups_status_and_remove(tmp_path) -> None:
     ]
 
     assert [spec.key for spec in font_downloads._selected_specs(["visual"])] == [
+        "noto-sans",
+        "noto-sans-mono",
+        "noto-math",
+        "noto-symbols-legacy",
         "noto-symbols",
+        "noto-cjk-sc",
         "noto-emoji",
         "unifont",
     ]
 
+    assert [spec.key for spec in font_downloads._selected_specs(["google"])] == [
+        "noto-sans",
+        "noto-sans-mono",
+        "noto-math",
+        "noto-symbols-legacy",
+        "noto-symbols",
+        "noto-cjk-sc",
+        "noto-emoji",
+    ]
+
     assert "noto-symbols" in [spec.key for spec in font_downloads._selected_specs(["max"])]
+    assert "noto-cjk-sc" in [spec.key for spec in font_downloads._selected_specs(["max"])]
     assert "unifont" in [spec.key for spec in font_downloads._selected_specs(["max"])]
 
     font_root = tmp_path / "fonts"
@@ -241,7 +258,11 @@ def test_fonts_cli_lists_downloadable_fonts() -> None:
     assert "glyph-arts downloadable fonts" in result.stdout
     assert "jetbrainsmono-nerd" in result.stdout
     assert "symbols-nerd-font" in result.stdout
+    assert "google" in result.stdout
+    assert "noto-sans" in result.stdout
+    assert "noto-math" in result.stdout
     assert "noto-symbols" in result.stdout
+    assert "noto-cjk-sc" in result.stdout
     assert "unifont" in result.stdout
 
 

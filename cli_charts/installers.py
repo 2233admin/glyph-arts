@@ -405,7 +405,7 @@ def _font_download_step() -> InstallStep:
             "install",
             "max",
         ],
-        "Downloads the max OFL font pack to "
+        "Downloads the max open font pack, including Google Noto fallbacks, to "
         f"{default_font_dir()} with LICENSE and NOTICE files; select the font in your terminal.",
     )
 

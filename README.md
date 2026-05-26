@@ -121,13 +121,14 @@ block elements, and dense terminal glyphs. Also install Symbols Nerd Font as a
 fallback for private-use icons. `install-backends --target fonts` uses Scoop on
 Windows or Homebrew on macOS when available.
 
-You can also keep fonts out of the package and download open OFL programming
-fonts on demand:
+You can also keep fonts out of the package and download open fonts on demand:
 
 ```bash
 glyph-arts fonts list
 glyph-arts fonts status
 glyph-arts fonts install core
+glyph-arts fonts install google
+glyph-arts fonts install noto
 glyph-arts fonts install visual
 glyph-arts fonts install max
 glyph-arts fonts install iosevka juliamono
@@ -139,11 +140,13 @@ glyph-arts install-backends --target fonts --manager download --run --yes
 
 The default `core` pack downloads Iosevka, JuliaMono, JetBrainsMono Nerd Font,
 and Symbols Nerd Font under `~/.glyph-arts/fonts`, including `LICENSE` and
-`NOTICE.txt` files. The `visual` pack adds Noto Sans Symbols 2, Noto Color
-Emoji, and GNU Unifont for broad chat glyph fallback. The `max` pack combines
-core, visual, FiraCode Nerd Font, Hack Nerd Font, Cascadia Code, and Monaspace.
-Select the downloaded font or fallback chain in your terminal profile after the
-download finishes; `glyph-arts doctor` reports the downloaded-font status.
+`NOTICE.txt` files. The `google`/`noto` pack adds Noto Sans, Noto Sans Mono,
+Noto Sans Math, Noto Sans Symbols, Noto Sans Symbols 2, Noto Sans Mono CJK SC,
+and Noto Color Emoji. The `visual` pack adds those Noto fonts plus GNU Unifont
+for broad chat glyph fallback. The `max` pack combines core, visual, FiraCode
+Nerd Font, Hack Nerd Font, Cascadia Code, and Monaspace. Select the downloaded
+font or fallback chain in your terminal profile after the download finishes;
+`glyph-arts doctor` reports the downloaded-font status.
 
 `glyph-arts doctor` also reports a first-class terminal profile. The profile
 decides how `chafa` is invoked and what symbol tier is safe:
