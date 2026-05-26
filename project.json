@@ -20,20 +20,20 @@
     "test": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "uv run --extra all --extra test pytest tests/ -v"
+        "command": "uv run --extra all --extra test python -m pytest tests/ -v"
       }
     },
     "coverage": {
       "executor": "nx:run-commands",
       "outputs": ["{projectRoot}/coverage.xml"],
       "options": {
-        "command": "uv run --extra all --extra test --extra dev pytest --cov=cli_charts --cov-report=xml"
+        "command": "uv run --extra all --extra test --extra dev python -m pytest --cov=cli_charts --cov-report=xml"
       }
     },
     "docs-check": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "uv run --extra test pytest tests/test_doc_consistency.py tests/test_chat_drawing_skill_package.py -q"
+        "command": "uv run --extra test python -m pytest tests/test_doc_consistency.py tests/test_chat_drawing_skill_package.py -q"
       }
     },
     "doctor": {

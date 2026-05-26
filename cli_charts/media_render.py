@@ -13,7 +13,7 @@ import subprocess
 import sys
 import tempfile
 from collections.abc import Iterator
-
+from typing import cast
 
 IMAGE_CHAT_PRESETS: dict[str, dict[str, object]] = {
     'chat': {
@@ -83,8 +83,8 @@ def resolve_image_options(
         print(f'ERROR:render: unknown image preset: {preset}', file=sys.stderr)
         sys.exit(2)
     return (
-        int(spec['width']),
-        int(spec['height']),
+        int(cast(int, spec['width'])),
+        int(cast(int, spec['height'])),
         str(spec['symbols']),
         bool(spec['no_color']),
         str(spec['fit']),

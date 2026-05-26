@@ -1,8 +1,9 @@
 import contextlib
 import subprocess
 
-from cli_charts import media_render
 from PIL import Image
+
+from cli_charts import media_render
 
 
 def test_chafa_image_cmd_forces_symbol_output():

@@ -10,6 +10,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -289,7 +290,7 @@ def _sympy_source(expr: str) -> str:
     return text
 
 
-def _translate_if_possible(value: str, table: dict[int, str], fallback: str) -> str:
+def _translate_if_possible(value: str, table: Mapping[int, int | str | None], fallback: str) -> str:
     translated = value.translate(table)
     return translated if translated != value or all(ord(ch) in table for ch in value) else fallback
 
@@ -341,8 +342,8 @@ def _headers_and_rows(data: Any) -> tuple[list[str], list[list[str]]]:
             return [], []
         if all(isinstance(row, dict) for row in data):
             headers = list(dict.fromkeys(key for row in data for key in row))
-            rows = [[str(row.get(header, "")) for header in headers] for row in data]
-            return [str(header) for header in headers], rows
+            dict_rows = [[str(row.get(header, "")) for header in headers] for row in data]
+            return [str(header) for header in headers], dict_rows
         return [], [[str(cell) for cell in row] if isinstance(row, (list, tuple)) else [str(row)] for row in data]
 
     columns = data.get("columns") or data.get("headers") or []
@@ -365,12 +366,11 @@ def _wrap_table_cells(rows: list[list[str]], maxcolwidths: list[int | None] | No
         return rows
     wrapped: list[list[str]] = []
     for row in rows:
-        wrapped.append([
-            wrap_visible(cell, maxcolwidths[index])
-            if index < len(maxcolwidths) and maxcolwidths[index]
-            else cell
-            for index, cell in enumerate(row)
-        ])
+        wrapped_row: list[str] = []
+        for index, cell in enumerate(row):
+            col_width = maxcolwidths[index] if index < len(maxcolwidths) else None
+            wrapped_row.append(wrap_visible(cell, col_width) if col_width else cell)
+        wrapped.append(wrapped_row)
     return wrapped
 
 
