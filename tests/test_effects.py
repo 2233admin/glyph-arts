@@ -52,7 +52,24 @@ def test_effect_signal_panel_has_spectrum_and_waterfall() -> None:
     assert result.returncode == 0, result.stderr
     assert "spectrum" in result.stdout
     assert "waterfall" in result.stdout
+    assert any(ch in result.stdout for ch in "░▒▓█")
     assert "range" in result.stdout
+
+
+def test_effect_system_status_uses_halftone_status_bars() -> None:
+    result = _run(["effect", "system-status", "--width", "80"])
+    assert result.returncode == 0, result.stderr
+    assert "System Status" in result.stdout
+    assert "⠶⠶⠶⠶⣤⣤⣤⣶⣶⣿⣿⣿⣿⣿⣿" in result.stdout
+    assert "╔" in result.stdout
+    assert "║" in result.stdout
+
+
+def test_effect_matrix_uses_unicode_shade_ramp() -> None:
+    result = _run(["effect", "matrix", "--width", "80"])
+    assert result.returncode == 0, result.stderr
+    assert "legend" in result.stdout
+    assert "░▒▓█" in result.stdout
 
 
 def test_effect_additional_presets_render() -> None:

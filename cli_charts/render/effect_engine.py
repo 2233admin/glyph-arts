@@ -9,6 +9,7 @@ EFFECT_KINDS = [
     "gallery",
     "pipeline",
     "metrics",
+    "system-status",
     "system-map",
     "signal-panel",
     "timeline",
@@ -20,7 +21,7 @@ EFFECT_KINDS = [
     "mindmap",
 ]
 
-_RAMP = " .:-=+*#%@"
+_RAMP = " ░▒▓█"
 _SPARK = "▁▂▃▄▅▆▇█"
 
 
@@ -128,6 +129,27 @@ def _render_metrics(data: dict, width: int) -> str:
     lines.append("")
     lines.append("trend     " + _sparkline(values, width=28))
     return _box(_string(data.get("title") or "Metrics Card"), lines, width)
+
+
+def _render_system_status(data: dict, width: int) -> str:
+    title = _string(data.get("title") or "System Status")
+    left = data.get("left") or [
+        "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿",
+        "⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣶⣶⣶⣶⣶⣶",
+        "⣿⣿⣿⣿⣿⣿⣿⣶⣶⣶⣶⣶⣶⣶⣤⣤⣤⣤⣤",
+        "⣿⣿⣿⣿⣶⣶⣶⣶⣶⣤⣤⣤⣤⣤⣤⠶⠶⠶",
+    ]
+    right = data.get("right") or ["⠶⠶⠶⠶⣤⣤⣤⣶⣶⣿⣿⣿⣿⣿⣿"] * len(left)
+    rows = [
+        f"{_string(a):<19}        {_string(b):<16}"
+        for a, b in zip(left, right, strict=False)
+    ]
+    inner = max(44, min(_width(width, minimum=48), max(display_width(row) for row in rows) + 2))
+    title_text = f" {title} "
+    side = max(0, (inner - display_width(title_text)) // 2)
+    top = "╔" + "═" * side + title_text + "═" * (inner - side - display_width(title_text)) + "╗"
+    body = ["║" + pad_right(row, inner) + "║" for row in rows]
+    return "\n".join([top, *body, "╚" + "═" * inner + "╝"]) + "\n"
 
 
 def _render_system_map(data: dict, width: int) -> str:
@@ -313,7 +335,7 @@ def _render_gallery(width: int) -> str:
     ]
     header = _box("Effect Gallery", [
         "glyph-arts chat effects",
-        "Presets: pipeline, metrics, system-map, signal-panel, timeline, matrix, comparison, swimlane, kanban, quadrant, mindmap",
+        "Presets: pipeline, metrics, system-status, system-map, signal-panel, timeline, matrix, comparison, swimlane, kanban, quadrant, mindmap",
     ], width)
     return "\n\n".join([header, *panels])
 
@@ -330,6 +352,8 @@ def render_effect(kind: str, data: dict | None = None, *, title: str = "", width
         return _render_pipeline(data, width)
     if kind == "metrics":
         return _render_metrics(data, width)
+    if kind == "system-status":
+        return _render_system_status(data, width)
     if kind == "system-map":
         return _render_system_map(data, width)
     if kind == "signal-panel":

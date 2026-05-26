@@ -291,6 +291,7 @@ recipes:
 glyph-arts chat effects
 glyph-arts effect pipeline --json '{"steps":["Input","Route","Render","Verify","Reply"]}'
 glyph-arts effect metrics
+glyph-arts effect system-status
 glyph-arts effect system-map
 glyph-arts effect signal-panel
 glyph-arts effect timeline
@@ -564,6 +565,7 @@ glyph-arts chat turtle --json '{"commands":[["forward",30],["right",90],["forwar
 glyph-arts chat probe
 glyph-arts chat profile
 glyph-arts chat effects
+glyph-arts chat effect system-status
 glyph-arts chat sdr spectrum --json '{"freq":[99.0,99.3],"power":[-93,-42]}'
 glyph-arts chat waterfall --json '{"matrix":[[-94,-42],[-90,-50]]}'
 ```

@@ -2341,7 +2341,7 @@ Examples:
                    help='TYPE=graph horizontal node spacing')
     p.add_argument('--graph-layer-spacing', type=int, default=2,
                    help='TYPE=graph vertical layer spacing')
-    p.add_argument('--effect-kind', choices=['gallery', 'pipeline', 'metrics', 'system-map', 'signal-panel', 'timeline', 'matrix', 'comparison', 'swimlane', 'kanban', 'quadrant', 'mindmap'],
+    p.add_argument('--effect-kind', choices=['gallery', 'pipeline', 'metrics', 'system-status', 'system-map', 'signal-panel', 'timeline', 'matrix', 'comparison', 'swimlane', 'kanban', 'quadrant', 'mindmap'],
                    default='', help='TYPE=effect preset override')
     p.add_argument('--fps',         type=int, default=12, metavar='N',
                    help='Video playback frames/sec for type=video (default: 12)')
