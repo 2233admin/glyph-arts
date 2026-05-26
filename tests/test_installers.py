@@ -64,8 +64,8 @@ def test_font_download_install_plan(monkeypatch) -> None:
 
     plan = installers.render_install_plan("fonts", "download")
 
-    assert "cli_charts.font_downloads install core" in plan
-    assert "core OFL font pack" in plan
+    assert "cli_charts.font_downloads install max" in plan
+    assert "max OFL font pack" in plan
     assert "LICENSE and NOTICE" in plan
 
 
@@ -159,6 +159,28 @@ def test_font_downloader_extracts_fonts_and_writes_license(monkeypatch, tmp_path
     ).read_text(encoding="utf-8")
 
 
+def test_font_downloader_installs_direct_font_urls(monkeypatch, tmp_path) -> None:
+    from cli_charts import font_downloads
+
+    def fake_download(url, dest):
+        if url.endswith(".ttf"):
+            dest.write_bytes(b"font")
+        else:
+            raise OSError("license mirror unavailable")
+
+    monkeypatch.setattr(font_downloads, "_download", fake_download)
+
+    rc = font_downloads.install_fonts(["noto-emoji"], tmp_path / "fonts")
+
+    assert rc == 0
+    target = tmp_path / "fonts" / "noto-emoji"
+    assert (target / "NotoColorEmoji.ttf").read_bytes() == b"font"
+    assert (target / "LICENSE.url").exists()
+    notice = (target / "NOTICE.txt").read_text(encoding="utf-8")
+    assert "Noto Color Emoji" in notice
+    assert "Downloaded assets:" in notice
+
+
 def test_font_downloader_extracts_tar_xz(tmp_path) -> None:
     from cli_charts import font_downloads
 
@@ -186,6 +208,15 @@ def test_font_groups_status_and_remove(tmp_path) -> None:
         "symbols-nerd-font",
     ]
 
+    assert [spec.key for spec in font_downloads._selected_specs(["visual"])] == [
+        "noto-symbols",
+        "noto-emoji",
+        "unifont",
+    ]
+
+    assert "noto-symbols" in [spec.key for spec in font_downloads._selected_specs(["max"])]
+    assert "unifont" in [spec.key for spec in font_downloads._selected_specs(["max"])]
+
     font_root = tmp_path / "fonts"
     (font_root / "iosevka").mkdir(parents=True)
     (font_root / "iosevka" / "Iosevka-Regular.ttf").write_bytes(b"font")
@@ -210,6 +241,8 @@ def test_fonts_cli_lists_downloadable_fonts() -> None:
     assert "glyph-arts downloadable fonts" in result.stdout
     assert "jetbrainsmono-nerd" in result.stdout
     assert "symbols-nerd-font" in result.stdout
+    assert "noto-symbols" in result.stdout
+    assert "unifont" in result.stdout
 
 
 def test_doctor_cli_prints_backend_status() -> None:

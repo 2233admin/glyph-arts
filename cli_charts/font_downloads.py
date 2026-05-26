@@ -10,6 +10,7 @@ import urllib.request
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 FONT_SUFFIXES = {".ttf", ".otf", ".ttc", ".woff", ".woff2"}
 
@@ -23,6 +24,8 @@ class FontDownloadSpec:
     asset_suffixes: tuple[str, ...]
     license_url: str
     family_hint: str
+    source_url: str = ""
+    direct_urls: tuple[str, ...] = ()
     reserved_font_name: str = ""
     note: str = ""
 
@@ -109,12 +112,66 @@ FONT_DOWNLOADS: dict[str, FontDownloadSpec] = {
         family_hint="Monaspace",
         note="modern coding font family with texture variants",
     ),
+    "noto-symbols": FontDownloadSpec(
+        key="noto-symbols",
+        name="Noto Sans Symbols 2",
+        repo="notofonts/symbols",
+        asset_prefixes=(),
+        asset_suffixes=(),
+        license_url="https://raw.githubusercontent.com/notofonts/symbols/main/OFL.txt",
+        family_hint="Noto Sans Symbols 2",
+        direct_urls=(
+            "https://raw.githubusercontent.com/notofonts/symbols/main/fonts/NotoSansSymbols2/full/ttf/NotoSansSymbols2-Regular.ttf",
+        ),
+        note="large technical, geometric, dingbat, and legacy symbol coverage",
+    ),
+    "noto-emoji": FontDownloadSpec(
+        key="noto-emoji",
+        name="Noto Color Emoji",
+        repo="googlefonts/noto-emoji",
+        asset_prefixes=(),
+        asset_suffixes=(),
+        license_url="https://raw.githubusercontent.com/googlefonts/noto-emoji/main/LICENSE",
+        family_hint="Noto Color Emoji",
+        direct_urls=(
+            "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/fonts/NotoColorEmoji.ttf",
+        ),
+        note="emoji fallback for chat-visible status and labels",
+    ),
+    "unifont": FontDownloadSpec(
+        key="unifont",
+        name="GNU Unifont",
+        repo="",
+        asset_prefixes=(),
+        asset_suffixes=(),
+        license_url="https://unifoundry.com/pub/unifont/unifont-17.0.04/LICENSE.txt",
+        family_hint="Unifont",
+        source_url="https://unifoundry.com/unifont/index.html",
+        direct_urls=(
+            "https://unifoundry.com/pub/unifont/unifont-17.0.04/font-builds/unifont-17.0.04.ttf",
+        ),
+        note="last-resort BMP coverage when a terminal has tofu fever",
+    ),
 }
 
 FONT_GROUPS: dict[str, tuple[str, ...]] = {
     "core": ("iosevka", "juliamono", "jetbrainsmono-nerd", "symbols-nerd-font"),
     "nerd": ("jetbrainsmono-nerd", "symbols-nerd-font", "firacode-nerd", "hack-nerd"),
     "programming": ("iosevka", "juliamono", "cascadia-code", "monaspace"),
+    "visual": ("noto-symbols", "noto-emoji", "unifont"),
+    "max": (
+        "iosevka",
+        "juliamono",
+        "jetbrainsmono-nerd",
+        "symbols-nerd-font",
+        "firacode-nerd",
+        "hack-nerd",
+        "cascadia-code",
+        "monaspace",
+        "noto-symbols",
+        "noto-emoji",
+        "unifont",
+    ),
 }
 FONT_GROUPS["all"] = tuple(FONT_DOWNLOADS)
 
@@ -130,13 +187,24 @@ def install_fonts(fonts: list[str], dest: Path | None = None) -> int:
     for spec in selected:
         target = dest / spec.key
         target.mkdir(parents=True, exist_ok=True)
-        asset_name, asset_url = _latest_asset(spec)
-        archive = target / asset_name
-        print(f"[glyph-arts] download {spec.name}: {asset_url}")
-        _download(asset_url, archive)
-        extracted = _extract_fonts(archive, target)
-        _download(spec.license_url, target / "LICENSE")
-        _write_notice(spec, target, asset_url, extracted)
+        downloaded_urls: list[str] = []
+        extracted: list[Path] = []
+        if spec.direct_urls:
+            for url in spec.direct_urls:
+                font_file = target / _filename_from_url(url)
+                print(f"[glyph-arts] download {spec.name}: {url}")
+                _download(url, font_file)
+                downloaded_urls.append(url)
+                extracted.extend(_materialize_font_file(font_file, target))
+        else:
+            asset_name, asset_url = _latest_asset(spec)
+            archive = target / asset_name
+            print(f"[glyph-arts] download {spec.name}: {asset_url}")
+            _download(asset_url, archive)
+            downloaded_urls.append(asset_url)
+            extracted.extend(_extract_fonts(archive, target))
+        _download_license(spec, target)
+        _write_notice(spec, target, downloaded_urls, extracted)
         print(f"[glyph-arts] installed {spec.name}: {target}")
     print(_terminal_hint(selected, dest), end="")
     return 0
@@ -231,6 +299,8 @@ def _font_record(spec: FontDownloadSpec, dest: Path) -> dict[str, object]:
 
 
 def _latest_asset(spec: FontDownloadSpec) -> tuple[str, str]:
+    if not spec.repo:
+        raise RuntimeError(f"{spec.name} uses direct download URLs, not GitHub release assets")
     api_url = f"https://api.github.com/repos/{spec.repo}/releases/latest"
     with urllib.request.urlopen(_request(api_url), timeout=30) as response:
         payload = json.loads(response.read().decode("utf-8"))
@@ -246,6 +316,21 @@ def _latest_asset(spec: FontDownloadSpec) -> tuple[str, str]:
 def _download(url: str, dest: Path) -> None:
     with urllib.request.urlopen(_request(url), timeout=120) as response:
         dest.write_bytes(response.read())
+
+
+def _download_license(spec: FontDownloadSpec, dest: Path) -> None:
+    try:
+        _download(spec.license_url, dest / "LICENSE")
+    except Exception as exc:
+        (dest / "LICENSE.url").write_text(f"{spec.license_url}\n# download failed: {exc}\n", encoding="utf-8")
+
+
+def _materialize_font_file(path: Path, dest: Path) -> list[Path]:
+    if path.name.endswith(".tar.xz") or path.suffix.lower() == ".zip":
+        return _extract_fonts(path, dest)
+    if path.suffix.lower() not in FONT_SUFFIXES:
+        raise RuntimeError(f"downloaded file is not a supported font/archive: {path.name}")
+    return [path]
 
 
 def _extract_fonts(archive: Path, dest: Path) -> list[Path]:
@@ -294,13 +379,16 @@ def _extract_tar_fonts(archive: Path, dest: Path) -> list[Path]:
     return extracted
 
 
-def _write_notice(spec: FontDownloadSpec, dest: Path, asset_url: str, fonts: list[Path]) -> None:
+def _write_notice(spec: FontDownloadSpec, dest: Path, asset_urls: list[str], fonts: list[Path]) -> None:
     reserved = f"\nReserved Font Name: {spec.reserved_font_name}" if spec.reserved_font_name else ""
+    source = spec.source_url or f"https://github.com/{spec.repo}"
+    assets = "\n".join(f"- {url}" for url in asset_urls)
     files = "\n".join(f"- {path.name}" for path in fonts)
     notice = (
         f"{spec.name}\n"
-        f"Source: https://github.com/{spec.repo}\n"
-        f"Downloaded asset: {asset_url}\n"
+        f"Source: {source}\n"
+        "Downloaded assets:\n"
+        f"{assets}\n"
         "License: SIL Open Font License 1.1\n"
         f"Suggested terminal family: {spec.family_hint}"
         f"{reserved}\n\n"
@@ -321,6 +409,13 @@ def _terminal_hint(specs: list[FontDownloadSpec], dest: Path) -> str:
 
 def _request(url: str) -> urllib.request.Request:
     return urllib.request.Request(url, headers={"User-Agent": "glyph-arts-font-downloader"})
+
+
+def _filename_from_url(url: str) -> str:
+    name = Path(urlparse(url).path).name
+    if not name:
+        raise RuntimeError(f"cannot infer filename from URL: {url}")
+    return name
 
 
 def main(argv: list[str] | None = None) -> int:

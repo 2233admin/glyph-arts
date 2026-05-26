@@ -128,19 +128,22 @@ fonts on demand:
 glyph-arts fonts list
 glyph-arts fonts status
 glyph-arts fonts install core
+glyph-arts fonts install visual
+glyph-arts fonts install max
 glyph-arts fonts install iosevka juliamono
 glyph-arts fonts remove firacode-nerd
 
-# same path through the backend installer:
+# same path through the backend installer; uses the broad max pack:
 glyph-arts install-backends --target fonts --manager download --run --yes
 ```
 
 The default `core` pack downloads Iosevka, JuliaMono, JetBrainsMono Nerd Font,
 and Symbols Nerd Font under `~/.glyph-arts/fonts`, including `LICENSE` and
-`NOTICE.txt` files. The expanded `all` group also includes FiraCode Nerd Font,
-Hack Nerd Font, Cascadia Code, and Monaspace. Select the downloaded font in
-your terminal profile after the download finishes; `glyph-arts doctor` reports
-the downloaded-font status.
+`NOTICE.txt` files. The `visual` pack adds Noto Sans Symbols 2, Noto Color
+Emoji, and GNU Unifont for broad chat glyph fallback. The `max` pack combines
+core, visual, FiraCode Nerd Font, Hack Nerd Font, Cascadia Code, and Monaspace.
+Select the downloaded font or fallback chain in your terminal profile after the
+download finishes; `glyph-arts doctor` reports the downloaded-font status.
 
 `glyph-arts doctor` also reports a first-class terminal profile. The profile
 decides how `chafa` is invoked and what symbol tier is safe:

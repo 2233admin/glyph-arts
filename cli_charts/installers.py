@@ -399,9 +399,9 @@ def _font_download_step() -> InstallStep:
             "-m",
             "cli_charts.font_downloads",
             "install",
-            "core",
+            "max",
         ],
-        "Downloads the core OFL font pack to "
+        "Downloads the max OFL font pack to "
         f"{default_font_dir()} with LICENSE and NOTICE files; select the font in your terminal.",
     )
 
