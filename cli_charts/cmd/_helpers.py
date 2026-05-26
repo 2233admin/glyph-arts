@@ -1886,6 +1886,11 @@ def install_backends_command(d, title, w, h, theme, **kw):
     raise RuntimeError("install-backends is dispatched by main()")
 
 
+def fonts_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("fonts is dispatched by main()")
+
+
 def wave_command(d, title, w, h, theme, **kw):
     """Placeholder registry entry; dispatched specially by main()."""
     raise RuntimeError("wave is dispatched by main()")
@@ -1999,6 +2004,7 @@ CMDS = {
     'live':        live_command,
     'doctor':      doctor_command,
     'install-backends': install_backends_command,
+    'fonts':       fonts_command,
     'wave':        wave_command,
 }
 
@@ -2017,7 +2023,7 @@ CHART_TYPES_BY_ENGINE: dict[str, list[str]] = {
     'plotille': ['plotille'],
     'uniplot': ['uniplot'],
     'textcharts': ['comparison', 'diverging', 'summary', 'sparkline-table', 'cdf', 'rank', 'percentile', 'boxplot', 'stacked-text'],
-    'misc': ['graph', 'effect', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'wave', 'calibrate'],
+    'misc': ['graph', 'effect', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'fonts', 'wave', 'calibrate'],
     'media': ['image', 'video'],
 }
 
@@ -2084,6 +2090,7 @@ EXPECTED_SCHEMAS = {
     'live':        'glyph-arts live random --duration 10 --interval 0.2',
     'doctor':      'glyph-arts doctor',
     'install-backends': 'glyph-arts install-backends --target all [--run --yes]',
+    'fonts':       'glyph-arts fonts install core',
     'wave':        'glyph-arts wave render bar --json \'{"labels":["A"],"values":[3]}\'',
 }
 
@@ -2122,7 +2129,7 @@ def _require_ascii_motion_npx():
 def _render_ascii_motion_frames(chart_type, data, args, adapter, no_color=False):
     if chart_type not in CMDS or chart_type in {
         'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion',
-    'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'wave',
+    'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'fonts', 'wave',
     }:
         print('ERROR:schema: to-ascii-motion needs a renderable chart type argument', file=sys.stderr)
         sys.exit(1)
@@ -2382,7 +2389,7 @@ Examples:
     p.add_argument(
         '--manager',
         choices=[
-            'auto', 'scoop', 'choco', 'winget', 'brew', 'apt-get',
+            'auto', 'download', 'scoop', 'choco', 'winget', 'brew', 'apt-get',
             'dnf', 'pacman', 'snap', 'x-cmd',
         ],
         default='auto',
@@ -2392,6 +2399,8 @@ Examples:
                    help='TYPE=install-backends execute the generated install commands')
     p.add_argument('--yes', action='store_true',
                    help='TYPE=install-backends confirm execution when used with --run')
+    p.add_argument('--font-dir', default='',
+                   help='TYPE=fonts download/status directory (default: ~/.glyph-arts/fonts)')
     p.add_argument('--dry-run', action='store_true',
                    help='TYPE=wave print planned chart/wsh commands without running them')
     p.add_argument('--wave-format', choices=['html', 'txt', 'ansi'], default='html',
@@ -2465,6 +2474,10 @@ Examples:
             sys.exit(run_install_plan(args.target, manager, yes=args.yes))
         print(render_install_plan(args.target, manager), end='')
         sys.exit(0)
+
+    if args.type == 'fonts':
+        from cli_charts.font_downloads import run_fonts_command
+        sys.exit(run_fonts_command(args))
 
     if args.type == 'wave':
         from cli_charts.adapters.waveterm import run_wave_command

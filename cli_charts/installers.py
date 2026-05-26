@@ -115,6 +115,16 @@ def detect_symbols_font() -> BackendStatus:
     return BackendStatus("symbols-font", False, "No Symbols Nerd Font files found in common font directories")
 
 
+def detect_downloaded_fonts() -> BackendStatus:
+    try:
+        from cli_charts.font_downloads import downloaded_font_status
+
+        ok, detail = downloaded_font_status()
+    except Exception as exc:  # pragma: no cover - defensive doctor output
+        return BackendStatus("downloaded-fonts", False, f"probe failed: {exc}")
+    return BackendStatus("downloaded-fonts", ok, detail)
+
+
 def detect_terminal_probe() -> BackendStatus:
     try:
         from cli_charts.font_tier import detect_font_tier
@@ -149,6 +159,7 @@ def backend_statuses() -> list[BackendStatus]:
         detect_ffmpeg(),
         detect_nerd_font(),
         detect_symbols_font(),
+        detect_downloaded_fonts(),
         detect_terminal_probe(),
     ]
 
@@ -337,6 +348,8 @@ def _diagon_steps(key: str, manager: str) -> list[InstallStep]:
 
 
 def _font_steps(key: str, manager: str) -> list[InstallStep]:
+    if manager == "download":
+        return [_font_download_step()]
     if manager == "x-cmd":
         return [InstallStep(
             "font",
@@ -374,6 +387,23 @@ def _font_steps(key: str, manager: str) -> list[InstallStep]:
             "then run fc-cache -fv.",
         )]
     return []
+
+
+def _font_download_step() -> InstallStep:
+    from cli_charts.font_downloads import default_font_dir
+
+    return InstallStep(
+        "font-downloads",
+        [
+            sys.executable,
+            "-m",
+            "cli_charts.font_downloads",
+            "install",
+            "core",
+        ],
+        "Downloads the core OFL font pack to "
+        f"{default_font_dir()} with LICENSE and NOTICE files; select the font in your terminal.",
+    )
 
 
 def _tool_status(name: str, purpose: str, *, executable: str | None = None) -> BackendStatus:

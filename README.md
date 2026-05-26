@@ -121,6 +121,27 @@ block elements, and dense terminal glyphs. Also install Symbols Nerd Font as a
 fallback for private-use icons. `install-backends --target fonts` uses Scoop on
 Windows or Homebrew on macOS when available.
 
+You can also keep fonts out of the package and download open OFL programming
+fonts on demand:
+
+```bash
+glyph-arts fonts list
+glyph-arts fonts status
+glyph-arts fonts install core
+glyph-arts fonts install iosevka juliamono
+glyph-arts fonts remove firacode-nerd
+
+# same path through the backend installer:
+glyph-arts install-backends --target fonts --manager download --run --yes
+```
+
+The default `core` pack downloads Iosevka, JuliaMono, JetBrainsMono Nerd Font,
+and Symbols Nerd Font under `~/.glyph-arts/fonts`, including `LICENSE` and
+`NOTICE.txt` files. The expanded `all` group also includes FiraCode Nerd Font,
+Hack Nerd Font, Cascadia Code, and Monaspace. Select the downloaded font in
+your terminal profile after the download finishes; `glyph-arts doctor` reports
+the downloaded-font status.
+
 `glyph-arts doctor` also reports a first-class terminal profile. The profile
 decides how `chafa` is invoked and what symbol tier is safe:
 
@@ -488,7 +509,7 @@ glyph-arts --check-deps --all
 | misc | `graph` `effect` `sparkline` `banner` `art` `animate` `record` `record-replay` `to-hyperframes` `to-ascii-motion` `code` `status` `splash` `demo` `gallery` `auto` `live` `doctor` `install-backends` `wave` |
 | media *(image uses Pillow/chafa; video requires chafa + ffmpeg)* | `image` `video` |
 
-Total: **71 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
+Total: **72 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
 
 For the chat-vs-ANSI-vs-artifact boundary, see
 [`docs/capability_matrix.md`](docs/capability_matrix.md).
