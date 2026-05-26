@@ -151,7 +151,7 @@ def test_markdown_table_gfm_output() -> None:
     from cli_charts.render.markdown_export import table_to_markdown
 
     rendered = table_to_markdown({"columns": ["A", "B"], "rows": [["x", "1"]]})
-    assert rendered == "| A | B |\n| --- | --- |\n| x | 1 |\n"
+    assert rendered == "| A   | B   |\n|-----|-----|\n| x   | 1   |\n"
 
 
 def test_markdown_table_via_output_md_suffix() -> None:
@@ -161,4 +161,4 @@ def test_markdown_table_via_output_md_suffix() -> None:
     )
 
     assert result.returncode == 0, result.stderr
-    assert output.read_text(encoding="utf-8") == "| A | B |\n| --- | --- |\n| x | 1 |\n"
+    assert output.read_text(encoding="utf-8") == "| A   | B   |\n|-----|-----|\n| x   | 1   |\n"

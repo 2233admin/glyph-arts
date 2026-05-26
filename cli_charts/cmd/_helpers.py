@@ -99,29 +99,17 @@ def _canvas_line(canvas, x0, y0, x1, y1):
 _MEDIA_TYPES = {'image', 'video'}
 
 
-def _render_image(path, w, h, symbols='braille', no_color=False):
+def _render_image(path, w, h, symbols='braille', no_color=False, fit='contain',
+                  image_filter='none'):
     """Render an image file to the terminal by shelling out to chafa.
 
     Why chafa instead of reinventing: chafa 1.18 ships 2x4 braille sub-pixels
     with 24-bit truecolor, outperforming any pure-Python renderer. See HANDOFF
     2026-04-14 for the architectural split (charts = native, media = chafa).
     """
-    import subprocess
-    if not shutil.which('chafa'):
-        print('ERROR:dep: chafa not found -- install from https://hpjansson.org/chafa/',
-              file=sys.stderr)
-        sys.exit(2)
-    cmd = ['chafa', '--size', f'{w}x{h}', '--symbols', symbols]
-    if no_color:
-        cmd += ['--colors', 'none']
-    cmd.append(path)
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        lines = (result.stderr or '').strip().splitlines()
-        msg = lines[-1] if lines else 'chafa exited non-zero'
-        print(f'ERROR:render: {msg}', file=sys.stderr)
-        sys.exit(4)
-    sys.stdout.write(result.stdout)
+    from cli_charts.media_render import render_image
+
+    render_image(path, w, h, symbols, no_color, fit, image_filter)
 
 
 def _render_video(path, w, h, fps=12, symbols='braille', duration=0.0, no_color=False):
@@ -449,6 +437,392 @@ def line(d, title, w, h, theme, **kw):
     _plt_finalize(plt, title, w, h, theme, kw)
 
 
+def _sdr_chars(kw):
+    if _symbol_tier(kw) == 'ascii':
+        return {
+            'point': '.',
+            'avg': '+',
+            'hold': '*',
+            'peak': '^',
+            'center': '|',
+            'vfo': '|',
+            'band': ':',
+            'noise': '-',
+            'squelch': '=',
+            'h': '-',
+            'v': '|',
+            'tl': '+',
+            'tr': '+',
+            'bl': '+',
+            'br': '+',
+        }
+    return {
+        'point': '·',
+        'avg': '+',
+        'hold': '◆',
+        'peak': '▲',
+        'center': '│',
+        'vfo': '┃',
+        'band': '┆',
+        'noise': '╌',
+        'squelch': '═',
+        'h': '─',
+        'v': '│',
+        'tl': '┌',
+        'tr': '┐',
+        'bl': '└',
+        'br': '┘',
+    }
+
+
+def _sdr_style(text, role, kw):
+    if kw.get('no_color') or not text:
+        return text
+    colors = {
+        'trace': '38;5;45',
+        'avg': '38;5;39',
+        'hold': '38;5;201',
+        'peak': '1;38;5;226',
+        'center': '1;38;5;46',
+        'vfo': '1;38;5;196',
+        'band': '38;5;82',
+        'noise': '38;5;244',
+        'squelch': '38;5;214',
+        'hot': '1;38;5;196',
+        'warm': '38;5;208',
+        'mid': '38;5;226',
+        'cool': '38;5;45',
+        'cold': '38;5;240',
+    }
+    code = colors.get(role)
+    return f'\033[{code}m{text}\033[0m' if code else text
+
+
+def _sdr_cell_style(ch, chars, kw):
+    if ch == ' ' or kw.get('no_color'):
+        return ch
+    role = 'trace'
+    if ch == chars.get('avg'):
+        role = 'avg'
+    if ch == chars.get('hold'):
+        role = 'hold'
+    if ch == chars.get('peak'):
+        role = 'peak'
+    if ch == chars.get('center'):
+        role = 'center'
+    if ch == chars.get('vfo'):
+        role = 'vfo'
+    if ch == chars.get('band'):
+        role = 'band'
+    if ch == chars.get('noise'):
+        role = 'noise'
+    if ch == chars.get('squelch'):
+        role = 'squelch'
+    return _sdr_style(ch, role, kw)
+
+
+def _sdr_join_cells(cells, chars, kw):
+    return ''.join(_sdr_cell_style(ch, chars, kw) for ch in cells)
+
+
+def _sdr_ramp_style(ch, ramp_index, ramp_size, kw):
+    if ch == ' ' or kw.get('no_color'):
+        return ch
+    denom = max(ramp_size - 1, 1)
+    pct = ramp_index / denom
+    if pct >= 0.82:
+        role = 'hot'
+    elif pct >= 0.62:
+        role = 'warm'
+    elif pct >= 0.42:
+        role = 'mid'
+    elif pct >= 0.22:
+        role = 'cool'
+    else:
+        role = 'cold'
+    return _sdr_style(ch, role, kw)
+
+
+def _first_present(d, *names):
+    for name in names:
+        if name in d and d[name] is not None:
+            return d[name]
+    return None
+
+
+def _sdr_bandwidth(d):
+    return _first_present(d, 'bandwidth', 'bw', 'span', 'filter_width', 'passband')
+
+
+def _sdr_center(d):
+    return _first_present(d, 'center', 'center_freq', 'carrier', 'tuned')
+
+
+def _sdr_vfo_markers(d):
+    markers = []
+
+    def add(value, label='vfo'):
+        if value is None:
+            return
+        if isinstance(value, dict):
+            freq = _first_present(value, 'freq', 'frequency', 'hz', 'mhz', 'bin', 'x', 'value')
+            if freq is None:
+                return
+            markers.append((float(freq), str(value.get('label') or value.get('name') or label)))
+            return
+        markers.append((float(value), label))
+
+    add(d.get('vfo'), 'vfo')
+    for key in ('vfos', 'markers', 'cursors'):
+        value = d.get(key)
+        if value is None:
+            continue
+        if isinstance(value, list):
+            for item in value:
+                add(item, key[:-1] if key.endswith('s') else key)
+        else:
+            add(value, key)
+    return markers
+
+
+def _sdr_trace_xy(trace, default_x=None):
+    x = _first_present(trace, 'freq', 'frequency', 'bins', 'x')
+    y = _first_present(trace, 'db', 'power', 'magnitude', 'y')
+    if y is None:
+        return None
+    if x is None:
+        x = default_x if default_x is not None else list(range(len(y)))
+    if len(x) != len(y):
+        raise ValueError('spectrum trace x/y arrays must have equal length')
+    return [float(v) for v in x], [float(v) for v in y]
+
+
+def _sdr_spectrum_traces(d, x, y, chars):
+    traces = []
+    default_x = x
+    for trace in d.get('traces', []):
+        parsed = _sdr_trace_xy(trace, default_x=default_x)
+        if parsed is None:
+            continue
+        traces.append({
+            'x': parsed[0],
+            'y': parsed[1],
+            'label': trace.get('label', trace.get('name', f'trace{len(traces) + 1}')),
+            'char': str(trace.get('char', chars['point']))[:1],
+        })
+
+    if y is not None:
+        traces.append({'x': [float(v) for v in x], 'y': [float(v) for v in y], 'label': 'live', 'char': chars['point']})
+
+    for names, label, char_key in (
+        (('avg', 'average', 'mean'), 'avg', 'avg'),
+        (('max_hold', 'hold', 'peak_hold'), 'hold', 'hold'),
+    ):
+        values = _first_present(d, *names)
+        if values is not None:
+            if default_x is None:
+                default_x = list(range(len(values)))
+            if len(default_x) != len(values):
+                raise ValueError(f'spectrum {label} array must match frequency/bin length')
+            traces.insert(0, {'x': [float(v) for v in default_x], 'y': [float(v) for v in values], 'label': label, 'char': chars[char_key]})
+
+    return traces
+
+
+def _sdr_signal_markers(d):
+    result = []
+    for item in d.get('signals', []):
+        if not isinstance(item, dict):
+            continue
+        freq = _first_present(item, 'freq', 'frequency', 'hz', 'mhz', 'bin', 'x')
+        if freq is None:
+            continue
+        result.append((
+            float(freq),
+            _first_present(item, 'db', 'power', 'magnitude', 'y'),
+            str(item.get('label') or item.get('name') or 'signal'),
+        ))
+    return result
+
+
+def spectrum(d, title, w, h, theme, **kw):
+    """SDR FFT spectrum: frequency/bin values on x, dB/power on y.
+
+    Schema: {"freq":[...], "db":[...]} or {"bins":[...], "power":[...]}.
+    Optional: {"center": 99.5, "bandwidth": 0.2, "vfo": 99.5, "peaks":[...]}.
+    """
+    chars = _sdr_chars(kw)
+    x = d.get('freq', d.get('frequency', d.get('bins')))
+    y = d.get('db', d.get('power', d.get('magnitude')))
+    derived_from_traces = False
+    if (x is None or y is None) and d.get('traces'):
+        first_trace = d['traces'][0]
+        x = _first_present(first_trace, 'freq', 'frequency', 'bins', 'x')
+        y = _first_present(first_trace, 'db', 'power', 'magnitude', 'y')
+        derived_from_traces = True
+    if x is None and y is not None:
+        x = list(range(len(y)))
+    if y is not None and len(x) != len(y):
+        raise ValueError('spectrum x/y arrays must have equal length')
+
+    traces = _sdr_spectrum_traces(d, x, None if derived_from_traces else y, chars)
+    if not traces:
+        raise ValueError('spectrum needs freq/db, bins/power, traces, or a numeric sequence')
+
+    all_x = [value for trace in traces for value in trace['x']]
+    all_y = [value for trace in traces for value in trace['y']]
+    x_min, x_max = min(all_x), max(all_x)
+    min_value = _first_present(d, 'min_db', 'min')
+    max_value = _first_present(d, 'max_db', 'max')
+    y_min = float(kw.get('ylim')[0]) if kw.get('ylim') else float(min_value if min_value is not None else min(all_y))
+    y_max = float(kw.get('ylim')[1]) if kw.get('ylim') else float(max_value if max_value is not None else max(all_y))
+    if y_min == y_max:
+        y_min -= 1
+        y_max += 1
+
+    left_w = 7
+    plot_w = max(20, w - left_w - 3)
+    plot_h = max(6, h - 5)
+    canvas = [[' ' for _ in range(plot_w)] for _ in range(plot_h)]
+
+    def x_pos(value):
+        if x_max == x_min:
+            return plot_w // 2
+        return max(0, min(plot_w - 1, round((value - x_min) / (x_max - x_min) * (plot_w - 1))))
+
+    def y_pos(value):
+        return max(0, min(plot_h - 1, round((y_max - value) / (y_max - y_min) * (plot_h - 1))))
+
+    for trace in traces:
+        trace_xs = trace['x']
+        trace_ys = trace['y']
+        trace_char = trace['char']
+        if len(trace_xs) == 1:
+            canvas[y_pos(trace_ys[0])][x_pos(trace_xs[0])] = trace_char
+        else:
+            for idx in range(len(trace_xs) - 1):
+                x0, y0 = x_pos(trace_xs[idx]), y_pos(trace_ys[idx])
+                x1, y1 = x_pos(trace_xs[idx + 1]), y_pos(trace_ys[idx + 1])
+                _draw_ascii_line(canvas, x0, y0, x1, y1, trace_char)
+
+    for level_key, char_key in (('noise_floor', 'noise'), ('noise', 'noise'), ('squelch', 'squelch'), ('threshold', 'squelch')):
+        level = d.get(level_key)
+        if level is None:
+            continue
+        row_idx = y_pos(float(level))
+        for col_idx, cell in enumerate(canvas[row_idx]):
+            if cell == ' ':
+                canvas[row_idx][col_idx] = chars[char_key]
+
+    center = _sdr_center(d)
+    if center is not None:
+        cx = x_pos(float(center))
+        for row in canvas:
+            row[cx] = chars['center']
+
+    bandwidth = _sdr_bandwidth(d)
+    if center is not None and bandwidth:
+        half = float(bandwidth) / 2
+        for edge in (float(center) - half, float(center) + half):
+            bx = x_pos(edge)
+            for row in canvas:
+                if row[bx] == ' ':
+                    row[bx] = chars['band']
+
+    vfo_markers = _sdr_vfo_markers(d)
+    for value, _label in vfo_markers:
+        vx = x_pos(value)
+        for row in canvas:
+            row[vx] = chars['vfo']
+
+    for peak in d.get('peaks', []):
+        if isinstance(peak, dict):
+            px = peak.get('freq', peak.get('bin'))
+            py = peak.get('db', peak.get('power'))
+        else:
+            px, py = peak, None
+        if px is None:
+            continue
+        if py is None:
+            nearest = min(
+                ((abs(xv - float(px)), yv) for trace in traces for xv, yv in zip(trace['x'], trace['y'], strict=False)),
+                key=lambda item: item[0],
+            )
+            py = nearest[1]
+        canvas[y_pos(float(py))][x_pos(float(px))] = chars['peak']
+
+    signal_markers = _sdr_signal_markers(d)
+    for px, py, _label in signal_markers:
+        if py is None:
+            nearest = min(
+                ((abs(xv - px), yv) for trace in traces for xv, yv in zip(trace['x'], trace['y'], strict=False)),
+                key=lambda item: item[0],
+            )
+            py = nearest[1]
+        canvas[y_pos(float(py))][x_pos(px)] = chars['peak']
+
+    if title:
+        print(title.center(left_w + 1 + plot_w))
+    if len(traces) > 1 or traces[0].get('label') not in {'live', 'spectrum', ''}:
+        legend = '  '.join(
+            f"{_sdr_cell_style(trace['char'], chars, kw)} {trace['label']}" for trace in traces
+        )
+        legend_line = ' ' * left_w + legend
+        print(legend_line[:left_w + 1 + plot_w] if kw.get('no_color') else legend_line)
+    print(' ' * left_w + chars['tl'] + chars['h'] * plot_w + chars['tr'])
+    for row_idx, row in enumerate(canvas):
+        if row_idx == 0:
+            label = f'{y_max:g}'
+        elif row_idx == plot_h - 1:
+            label = f'{y_min:g}'
+        elif row_idx == plot_h // 2:
+            label = f'{(y_max + y_min) / 2:g}'
+        else:
+            label = ''
+        print(f'{label:>{left_w}}{chars["v"]}' + _sdr_join_cells(row, chars, kw) + chars['v'])
+    print(' ' * left_w + chars['bl'] + chars['h'] * plot_w + chars['br'])
+    left = f'{x_min:g}'
+    right = f'{x_max:g}'
+    pad = max(1, plot_w - len(left) - len(right))
+    print(' ' * left_w + ' ' + left + ' ' * pad + right)
+    if center is not None:
+        meta = f'center={float(center):g}'
+        if bandwidth:
+            meta += f' bw={float(bandwidth):g}'
+        if vfo_markers:
+            meta += ' ' + ' '.join(f'{label}={value:g}' for value, label in vfo_markers)
+        if signal_markers:
+            meta += ' ' + ' '.join(f'{label}@{value:g}' for value, _db, label in signal_markers)
+        print(' ' * left_w + ' ' + meta)
+    elif vfo_markers:
+        meta = ' '.join(f'{label}={value:g}' for value, label in vfo_markers)
+        if signal_markers:
+            meta += ' ' + ' '.join(f'{label}@{value:g}' for value, _db, label in signal_markers)
+        print(' ' * left_w + ' ' + meta)
+    elif signal_markers:
+        meta = ' '.join(f'{label}@{value:g}' for value, _db, label in signal_markers)
+        print(' ' * left_w + ' ' + meta)
+
+
+def _draw_ascii_line(canvas, x0, y0, x1, y1, char):
+    dx = abs(x1 - x0)
+    dy = abs(y1 - y0)
+    sx = 1 if x0 < x1 else -1
+    sy = 1 if y0 < y1 else -1
+    err = dx - dy
+    while True:
+        canvas[y0][x0] = char
+        if x0 == x1 and y0 == y1:
+            break
+        e2 = 2 * err
+        if e2 > -dy:
+            err -= dy
+            x0 += sx
+        if e2 < dx:
+            err += dx
+            y0 += sy
+
+
 def scatter(d, title, w, h, theme, **kw):
     """plotext scatter plot. Same schema as line."""
     import plotext as plt
@@ -615,6 +989,109 @@ def heatmap(d, title, w, h, theme, **kw):
     _plt_finalize(plt, title, w, h, theme, kw)
 
 
+def waterfall(d, title, w, h, theme, **kw):
+    """SDR waterfall spectrogram: matrix rows are time frames, columns are frequency bins.
+
+    Schema: {"matrix":[[...]], "freq":[...], "time":[...]}.
+    Also accepts heatmap-style xlabels/ylabels.
+    """
+    matrix = d.get('matrix')
+    if not matrix:
+        raise ValueError('waterfall needs a non-empty matrix')
+    xlabels = d.get('freq', d.get('frequency', d.get('xlabels')))
+    ylabels = d.get('time', d.get('frames', d.get('ylabels')))
+    rows = len(matrix)
+    cols = max((len(row) for row in matrix), default=0)
+    if rows == 0 or cols == 0:
+        raise ValueError('waterfall matrix must have at least one row and one column')
+
+    values = [float(value) for row in matrix for value in row]
+    min_value = _first_present(d, 'min', 'min_db')
+    max_value = _first_present(d, 'max', 'max_db')
+    lo = float(min_value if min_value is not None else min(values))
+    hi = float(max_value if max_value is not None else max(values))
+    span = hi - lo if hi != lo else 1.0
+    ramp = d.get('ramp', ' .:-=+*#%@')
+    if not ramp:
+        ramp = ' .:-=+*#%@'
+    chars = _sdr_chars(kw)
+
+    label_width = max([len(str(label)) for label in (ylabels or [])] + [4])
+    min_plot_width = 24
+    if xlabels:
+        min_plot_width = max(min_plot_width, len(str(xlabels[0])) + len(str(xlabels[-1])) + 1)
+    plot_width = max(min_plot_width, w - label_width - 3)
+
+    def cell(value):
+        idx = round((float(value) - lo) / span * (len(ramp) - 1))
+        idx = max(0, min(len(ramp) - 1, idx))
+        return ramp[idx], idx
+
+    def x_value_pos(value):
+        if not xlabels:
+            return None
+        try:
+            x_values = [float(v) for v in xlabels]
+            if not x_values or x_values[-1] == x_values[0]:
+                return None
+            return max(0, min(plot_width - 1, round((float(value) - x_values[0]) / (x_values[-1] - x_values[0]) * (plot_width - 1))))
+        except (TypeError, ValueError):
+            return None
+
+    center = _sdr_center(d)
+    bandwidth = _sdr_bandwidth(d)
+    overlays = []
+    if center is not None:
+        pos = x_value_pos(center)
+        if pos is not None:
+            overlays.append((pos, chars['center']))
+    if center is not None and bandwidth:
+        half = float(bandwidth) / 2
+        for edge in (float(center) - half, float(center) + half):
+            pos = x_value_pos(edge)
+            if pos is not None:
+                overlays.append((pos, chars['band']))
+    vfo_markers = _sdr_vfo_markers(d)
+    for value, _label in vfo_markers:
+        pos = x_value_pos(value)
+        if pos is not None:
+            overlays.append((pos, chars['vfo']))
+
+    if title:
+        print(title.center(label_width + 1 + plot_width))
+    max_rows = max(1, h - (3 if title else 2))
+    start_row = max(0, rows - max_rows)
+    for row_idx, row in enumerate(matrix[start_row:], start=start_row):
+        if len(row) != cols:
+            raise ValueError('waterfall matrix rows must have equal length')
+        label = str(ylabels[row_idx]) if ylabels and row_idx < len(ylabels) else str(row_idx)
+        step = len(row) / plot_width
+        sampled = [row[min(len(row) - 1, int(i * step))] for i in range(plot_width)]
+        cells = [cell(value) for value in sampled]
+        for pos, overlay_char in overlays:
+            cells[pos] = (overlay_char, None)
+        rendered = ''.join(
+            _sdr_cell_style(ch, chars, kw) if idx is None else _sdr_ramp_style(ch, idx, len(ramp), kw)
+            for ch, idx in cells
+        )
+        print(f"{label:>{label_width}} " + rendered)
+
+    if xlabels:
+        left = str(xlabels[0])
+        right = str(xlabels[-1])
+        if len(left) + len(right) + 1 <= plot_width:
+            pad = plot_width - len(left) - len(right)
+            print(' ' * (label_width + 1) + left + ' ' * pad + right)
+    print(f"{'range':>{label_width}} {lo:g}..{hi:g} dB")
+    meta = []
+    if center is not None:
+        center_text = f'center={float(center):g}'
+        if bandwidth:
+            center_text += f' bw={float(bandwidth):g}'
+        meta.append(center_text)
+    meta.extend(f'{label}={value:g}' for value, label in vfo_markers)
+    if meta:
+        print(f"{'tune':>{label_width}} " + ' '.join(meta))
 def box(d, title, w, h, theme, **kw):
     """plotext box plot (median/quartile/whisker).
     x-labels passed as first positional arg; data matrix as second.
@@ -677,30 +1154,87 @@ def sparkline(d, title, w, h, theme, **kw):
 
 
 def table(d, title, w, h, theme, **kw):
-    """rich double-edge formatted table."""
+    """Chat-safe wcwidth-aware text table."""
     output = kw.get('output')
     if output and str(output).lower().endswith('.md'):
         from cli_charts.render.markdown_export import export_table
         export_table(d, output)
         return
-    from rich import box as richbox
-    from rich.console import Console
-    from rich.table import Table
-    no_color = kw.get('no_color', False)
-    c = Console(no_color=no_color)
-    box_style = getattr(richbox, d.get('box', 'DOUBLE_EDGE'), richbox.DOUBLE_EDGE)
-    t = Table(title=title, box=box_style,
-              caption=d.get('caption'),
-              row_styles=d.get('row_styles'))
-    for col in d.get('columns') or d.get('headers', []):
-        if isinstance(col, dict):
-            t.add_column(col['name'], style=col.get('style', 'white'),
-                         footer=str(col.get('footer', '')))
+    from cli_charts.markup import render_table
+    if title:
+        print(title)
+    table_format = d.get('format') or kw.get('table_format') or 'rounded_grid'
+    maxcolwidths = d.get('maxcolwidths') or kw.get('maxcolwidths')
+    print(render_table(d, format=table_format, maxcolwidths=maxcolwidths), end='')
+
+
+def chat(d, title, w, h, theme, **kw):
+    """Structured markup for chat windows."""
+    from cli_charts.markup import (
+        build_mermaid_flowchart,
+        render_chat_calibration,
+        render_formula_panel,
+        render_formula_pretty,
+        render_markdown_panel,
+        render_raster_textual,
+        render_svg_card,
+        render_svg_fallback,
+        render_table,
+    )
+    kind = kw.get('chat_kind') or (d.get('kind') if isinstance(d, dict) else '') or 'table'
+    if kind in {'calibrate', 'calibration', 'ruler'}:
+        spec = dict(d) if isinstance(d, dict) else {}
+        spec.setdefault('from', kw.get('calibrate_from', 96))
+        spec.setdefault('to', kw.get('calibrate_to', 160))
+        spec.setdefault('step', kw.get('calibrate_step', 8))
+        spec.setdefault('glyph', kw.get('calibrate_glyph', 'all'))
+        spec.setdefault('terminal', kw.get('terminal', False))
+        spec.setdefault('recommend', kw.get('recommend', False))
+        print(render_chat_calibration(spec), end='')
+        return
+    if kind == 'table':
+        if title:
+            print(title)
+        table_format = d.get('format', 'rounded_grid') if isinstance(d, dict) else 'rounded_grid'
+        maxcolwidths = d.get('maxcolwidths') if isinstance(d, dict) else None
+        print(render_table(d, format=table_format, maxcolwidths=maxcolwidths), end='')
+        return
+    if kind in {'mermaid', 'flowchart'}:
+        spec = d.get('spec', d) if isinstance(d, dict) else d
+        mermaid_theme = d.get('theme', theme if theme != 'pro' else 'default') if isinstance(d, dict) else theme
+        print(build_mermaid_flowchart(spec, theme=mermaid_theme), end='')
+        return
+    if kind in {'svg', 'svg-card', 'card'}:
+        spec = d if isinstance(d, dict) else {'title': str(d)}
+        svg = render_svg_card(spec)
+        if spec.get('fallback') == 'chafa':
+            print(render_svg_fallback(svg, width=w, no_color=kw.get('no_color') or spec.get('no_color', False)), end='')
         else:
-            t.add_column(str(col))
-    for row in d['rows']:
-        t.add_row(*[str(v) for v in row])
-    c.print(t)
+            print(svg, end='')
+        return
+    if kind in {'image', 'raster'}:
+        spec = d if isinstance(d, dict) else {'path': str(d)}
+        path = spec.get('path') or spec.get('file')
+        if not path:
+            raise ValueError("chat image needs a path")
+        engine = spec.get('engine', 'textual')
+        if engine != 'textual':
+            raise ValueError(f"unknown chat image engine: {engine!r}")
+        print(render_raster_textual(path, width=int(spec.get('width', w)), height=spec.get('height')), end='')
+        return
+    if kind in {'formula', 'math', 'latex'}:
+        spec = d if isinstance(d, (dict, list, str)) else str(d)
+        print(render_formula_panel(spec), end='')
+        return
+    if kind in {'formula-pretty', 'math-pretty', 'pretty-formula'}:
+        spec = d if isinstance(d, (dict, list, str)) else str(d)
+        print(render_formula_pretty(spec), end='')
+        return
+    if kind in {'markdown', 'markdown-panel', 'panel'}:
+        spec = d if isinstance(d, dict) else {'body': str(d)}
+        print(render_markdown_panel(spec), end='')
+        return
+    raise ValueError(f"unknown chat markup kind: {kind!r}")
 
 
 def tree(d, title, w, h, theme, **kw):
@@ -1730,9 +2264,15 @@ def gallery_command(d, title, w, h, theme, **kw):
     raise RuntimeError("gallery is dispatched by main()")
 
 
+def plot_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("plot is dispatched by main()")
+
+
 CMDS = {
     'kline':      kline,
     'line':       line,
+    'spectrum':   spectrum,
     'scatter':    scatter,
     'step':       step,
     'bar':        bar,
@@ -1742,12 +2282,14 @@ CMDS = {
     'stackedbar': stackedbar,
     'hist':       hist,
     'heatmap':    heatmap,
+    'waterfall':  waterfall,
     'box':        box,
     'indicator':  indicator,
     'event':      event,
     'confusion':  confusion,
     'sparkline':  sparkline,
     'table':      table,
+    'chat':       chat,
     'tree':       tree,
     'panel':      panel,
     'gauge':      gauge,
@@ -1782,6 +2324,7 @@ CMDS = {
     'splash':      splash_command,
     'demo':        demo_command,
     'gallery':     gallery_command,
+    'plot':        plot_command,
 }
 
 # Single source of truth for chart-type docs. Order is intentional.
@@ -1791,12 +2334,13 @@ CHART_TYPES_BY_ENGINE: dict[str, list[str]] = {
         'stackedbar', 'hist', 'heatmap', 'box', 'indicator', 'event',
         'confusion',
     ],
+    'sdr': ['spectrum', 'waterfall'],
     'rich': ['table', 'tree', 'panel', 'gauge', 'pie', 'dashboard', 'rich_live'],
     'drawille': ['curve', 'hires', 'radar'],
     'plotille': ['plotille'],
     'uniplot': ['uniplot'],
     'textcharts': ['comparison', 'diverging', 'summary', 'sparkline-table', 'cdf', 'rank', 'percentile', 'boxplot', 'stacked-text'],
-    'misc': ['graph', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery'],
+    'misc': ['plot', 'graph', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery', 'chat'],
     'media': ['image', 'video'],
 }
 
@@ -1809,6 +2353,7 @@ CHART_TYPE_COUNT: int = len(_CHART_TYPE_KEYS)
 EXPECTED_SCHEMAS = {
     'kline':      '{"dates":["DD/MM/YYYY",...], "open":[...], "high":[...], "low":[...], "close":[...]}',
     'line':       '[{"label":"A","x":[...],"y":[...]}] or {"label":"A","y":[...]}',
+    'spectrum':   '{"freq":[...], "db":[...], "center":99.5, "bandwidth":0.2, "vfo":99.5, "peaks":[...]}',
     'scatter':    '[{"label":"A","x":[...],"y":[...]}] or {"label":"A","y":[...]}',
     'step':       '[{"label":"A","x":[...],"y":[...]}] or {"label":"A","y":[...]}',
     'bar':        '{"labels":[...], "values":[...]}',
@@ -1817,12 +2362,14 @@ EXPECTED_SCHEMAS = {
     'stackedbar': '{"labels":[...], "series":[{"label":"A","values":[...]}, ...]}',
     'hist':       '{"values":[...], "bins":20} or [{"label":"A","values":[...]}, ...]',
     'heatmap':    '{"matrix":[[...]], "xlabels":[...], "ylabels":[...]}',
+    'waterfall':  '{"matrix":[[...]], "freq":[...], "time":[...]}',
     'box':        '{"data":[[s1_vals],[s2_vals],...], "labels":["A","B",...]}',
     'indicator':  '{"value":23.4, "label":"Total Return %"}',
     'event':      '{"data":[x1,x2,...]}',
     'confusion':  '{"actual":[0,1,2,0], "predicted":[0,2,1,0], "labels":["Cat","Dog","Bird"]}',
     'sparkline':  '{"values":[1,3,5,2,8,4,6]}',
     'table':      '{"columns":[...], "rows":[[...], ...]}',
+    'chat':       'glyph-arts chat table|mermaid|svg-card|markdown-panel --json {...}',
     'tree':       '{"label":"root","children":[{"label":"A","children":[...]}]}',
     'panel':      '{"content":"text here", "title":"optional", "box":"ROUNDED"}',
     'gauge':      '[{"label":"CPU","value":75,"max":100,"color":"red"}, ...] or {"metrics":[...]}',
@@ -1847,6 +2394,7 @@ EXPECTED_SCHEMAS = {
     'splash':      'glyph-arts splash',
     'demo':        'glyph-arts demo --speed fast',
     'gallery':     'glyph-arts gallery --output gallery.html',
+    'plot':        'glyph-arts plot < data.csv  # auto-detects CSV/TSV/JSON/JSONL and chart type',
 }
 
 # Types where --width/--height/--theme have no effect
@@ -1884,7 +2432,7 @@ def _require_ascii_motion_npx():
 def _render_ascii_motion_frames(chart_type, data, args, adapter, no_color=False):
     if chart_type not in CMDS or chart_type in {
         'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion',
-        'code', 'status', 'splash', 'demo', 'gallery',
+        'code', 'status', 'splash', 'demo', 'gallery', 'plot',
     }:
         print('ERROR:schema: to-ascii-motion needs a renderable chart type argument', file=sys.stderr)
         sys.exit(1)
@@ -1933,6 +2481,7 @@ Examples:
   python chart.py multibar --json '{"labels":["Q1","Q2"],"series":[{"label":"Rev","values":[10,12]},{"label":"Cost","values":[8,9]}]}'
   python chart.py event --json '{"data":[1,3,5,8,13]}'
   python chart.py line --duckdb "SELECT trade_date, close FROM stock_daily LIMIT 60" --db /path/to/data.duckdb
+  cat data.csv | python chart.py plot
   cat data.json | python chart.py line
 """)
     epilog = '\n'.join(epilog_lines)
@@ -1999,8 +2548,10 @@ Examples:
                    default='vertical', help='Bar orientation (bar/multibar/stackedbar)')
     p.add_argument('--output',      default='',
                    help='Save chart to file (.png with pixel engine; .txt/.ansi/.html with ascii engine; .md for table)')
-    p.add_argument('--format',      default=None,
-                   help="Output format (reserved for future use)")
+    p.add_argument('--format',      choices=['auto', 'json', 'jsonl', 'csv', 'tsv'], default='auto',
+                   help='TYPE=plot/spectrum/waterfall input format override (default: auto)')
+    p.add_argument('--as',          dest='as_type', default='',
+                   help='TYPE=plot force chart type, e.g. bar, line, scatter, heatmap')
     p.add_argument('--output-dir',  default='',
                    help='TYPE=to-hyperframes/to-ascii-motion output directory')
     p.add_argument('--out-dir',     dest='output_dir',
@@ -2020,6 +2571,26 @@ Examples:
     p.add_argument('--symbols',     default=None, metavar='SET',
                    help='TYPE=bar symbol set (block, progress, braille, arrows); '
                         'image/video chafa --symbols value (default: braille)')
+    p.add_argument('--fit', choices=['contain', 'subject'], default='contain',
+                   help='TYPE=image fit mode; subject trims background before rendering')
+    p.add_argument('--filter', choices=['none', 'anime', 'ink'], default='none',
+                   help='TYPE=image preprocess filter; anime sharpens line art; ink inverts white-page formulas/documents')
+    p.add_argument('--preset', choices=['raw', 'chat', 'chat-hd', 'chat-max', 'chat-4k', 'terminal'], default='raw',
+                   help='TYPE=image preset; terminal fits current terminal/--cols; chat=72x36, chat-hd=96x48, chat-max=120x60, chat-4k=132x66')
+    p.add_argument('--cols', type=int, default=0,
+                   help='TYPE=image terminal columns override for --preset terminal')
+    p.add_argument('--calibrate-from', dest='calibrate_from', type=int, default=96,
+                   help='TYPE=chat calibrate starting ruler width (default: 96)')
+    p.add_argument('--calibrate-to', dest='calibrate_to', type=int, default=160,
+                   help='TYPE=chat calibrate ending ruler width (default: 160)')
+    p.add_argument('--calibrate-step', dest='calibrate_step', type=int, default=8,
+                   help='TYPE=chat calibrate ruler width step (default: 8)')
+    p.add_argument('--calibrate-glyph', choices=['all', 'ascii', 'digits', 'braille', 'solid', 'mixed'], default='all',
+                   help='TYPE=chat calibrate glyph family to print')
+    p.add_argument('--terminal', action='store_true',
+                   help='TYPE=chat calibrate measure current terminal columns')
+    p.add_argument('--recommend', action='store_true',
+                   help='TYPE=chat calibrate print preset recommendation rules')
     p.add_argument('--candle-style', choices=['default', 'geom'], default='default',
                    help='TYPE=kline candle glyph style')
     p.add_argument('--gauge-style', choices=['bar', 'half-circle', 'full-circle', 'braille'],
@@ -2178,7 +2749,12 @@ Examples:
         no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
         try:
             if args.type == 'image':
-                _render_image(path, args.width, args.height, args.symbols or 'braille', no_color)
+                from cli_charts.media_render import resolve_image_options
+                image_w, image_h, image_symbols, image_no_color, image_fit, image_filter = resolve_image_options(
+                    args.width, args.height, args.symbols, no_color, args.fit, args.filter, args.preset, args.cols,
+                )
+                _render_image(path, image_w, image_h, image_symbols,
+                              image_no_color, image_fit, image_filter)
             else:
                 _render_video(path, args.width, args.height, args.fps,
                               args.symbols or 'braille', args.duration, no_color)
@@ -2356,33 +2932,69 @@ Examples:
     no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
 
     try:
+        chart_type = args.type
+        chat_kind = args.art_text[0] if chart_type == 'chat' and args.art_text else ''
         if args.duckdb:
             if not args.db:
                 print('ERROR:schema: --db is required when using --duckdb '
                       '(e.g. --db /path/to/data.duckdb)', file=sys.stderr)
                 sys.exit(1)
             import duckdb as _duckdb_mod  # noqa: F401
-            data = load_duckdb(args.duckdb, args.db, args.type)
+            if chart_type == 'plot':
+                print('ERROR:schema: plot does not support --duckdb; choose an explicit chart type',
+                      file=sys.stderr)
+                sys.exit(1)
+            data = load_duckdb(args.duckdb, args.db, chart_type)
         else:
             if args.file:
-                with open(args.file) as _f:
+                with open(args.file, encoding='utf-8', errors='replace') as _f:
                     raw = _f.read().strip()
             elif args.data:
                 raw = args.data
             else:
                 raw = sys.stdin.read().strip()
             if not raw:
-                print('ERROR:schema: Provide --json, --file, --duckdb, or pipe JSON to stdin',
-                      file=sys.stderr)
-                sys.exit(1)
-            try:
-                data = json.loads(raw)
-            except json.JSONDecodeError as exc:
-                print(f'ERROR:json: {exc}', file=sys.stderr)
-                sys.exit(1)
+                if chart_type == 'chat' and chat_kind in {'calibrate', 'calibration', 'ruler'}:
+                    data = {}
+                else:
+                    print('ERROR:schema: Provide --json, --file, --duckdb, or pipe JSON to stdin',
+                          file=sys.stderr)
+                    sys.exit(1)
+            elif chart_type == 'plot':
+                from cli_charts.auto import AutoPlotError, build_auto_plot
+                try:
+                    auto = build_auto_plot(
+                        raw,
+                        input_format=args.format,
+                        forced_type=args.as_type or None,
+                    )
+                except AutoPlotError as exc:
+                    print(f'ERROR:schema: {exc}', file=sys.stderr)
+                    sys.exit(1)
+                chart_type = auto.chart_type
+                data = auto.data
+            elif chart_type in {'spectrum', 'waterfall'}:
+                from cli_charts.auto import AutoPlotError, normalize_data, parse_input
+                try:
+                    parsed = parse_input(raw, input_format=args.format)
+                    data = normalize_data(parsed, chart_type)
+                except AutoPlotError as exc:
+                    print(f'ERROR:schema: {exc}', file=sys.stderr)
+                    sys.exit(1)
+            else:
+                try:
+                    data = json.loads(raw)
+                except json.JSONDecodeError as exc:
+                    if chart_type == 'chat' and (chat_kind in {'mermaid', 'flowchart'} or raw.lstrip().startswith(('flowchart', 'graph', 'sequenceDiagram', '%%'))):
+                        data = raw
+                    elif chart_type == 'chat' and chat_kind in {'formula', 'math', 'latex', 'formula-pretty', 'math-pretty', 'pretty-formula'}:
+                        data = raw
+                    else:
+                        print(f'ERROR:json: {exc}', file=sys.stderr)
+                        sys.exit(1)
 
         if args.sample > 0:
-            data = _sample_data(data, args.sample, chart_type=args.type)
+            data = _sample_data(data, args.sample, chart_type=chart_type)
 
         kw = dict(
             xlabel=args.xlabel,
@@ -2396,22 +3008,29 @@ Examples:
             format=args.format,
             no_color=no_color,
             link_data=args.link_data,
-            link_title=args.link_title,
-            statusline=args.statusline,
-            rich_progress=args.rich_progress,
-            font_tier=args.font_tier,
-            marker=args.marker if args.type == 'scatter' else None,
-            symbol_set=args.symbols if args.type == 'bar' else None,
-            candle_style=args.candle_style if args.type == 'kline' else 'default',
-            gauge_style=args.gauge_style if args.type == 'gauge' else 'bar',
-        )
+        link_title=args.link_title,
+        statusline=args.statusline,
+        rich_progress=args.rich_progress,
+        font_tier=args.font_tier,
+        marker=args.marker if chart_type == 'scatter' else None,
+        symbol_set=args.symbols if chart_type == 'bar' else None,
+        candle_style=args.candle_style if chart_type == 'kline' else 'default',
+        gauge_style=args.gauge_style if chart_type == 'gauge' else 'bar',
+        chat_kind=chat_kind,
+        calibrate_from=args.calibrate_from,
+        calibrate_to=args.calibrate_to,
+        calibrate_step=args.calibrate_step,
+        calibrate_glyph=args.calibrate_glyph,
+        terminal=args.terminal,
+        recommend=args.recommend,
+    )
 
         # Style routing: redirect to alternate engine if --style is set
-        _resolved_engine = resolve_engine(args.type, args.style) if args.style else None
+        _resolved_engine = resolve_engine(chart_type, args.style) if args.style else None
         if _resolved_engine and args.engine == 'ascii':
             from cli_charts.render.style_router import render_styled
             rc = render_styled(
-                args.type, _resolved_engine, args.style,
+                chart_type, _resolved_engine, args.style,
                 data, args.title, args.width, args.height, args.theme, **kw
             )
             if rc is not None:
@@ -2420,14 +3039,14 @@ Examples:
 
         try:
             if args.engine == 'pixel':
-                if args.type not in PIXEL_SUPPORTED:
-                    print(f'WARNING: --engine pixel does not yet support {args.type!r} '
+                if chart_type not in PIXEL_SUPPORTED:
+                    print(f'WARNING: --engine pixel does not yet support {chart_type!r} '
                           f'(Phase A: {sorted(PIXEL_SUPPORTED)}); falling back to ascii',
                           file=sys.stderr)
                 else:
                     from cli_charts.render.matplotlib_engine import render_pixel
                     rc = render_pixel(
-                        args.type, data, args.width, args.height,
+                        chart_type, data, args.width, args.height,
                         title=args.title, theme=args.theme,
                         output=args.output, no_color=no_color, art=args.art,
                     )
@@ -2435,7 +3054,7 @@ Examples:
             if args.engine == 'interactive':
                 from cli_charts.render.interactive_engine import render_interactive
                 rc = render_interactive(
-                    args.type, data, args.width, args.height,
+                    chart_type, data, args.width, args.height,
                     title=args.title, theme=args.theme, no_color=no_color,
                 )
                 sys.exit(rc)
@@ -2443,7 +3062,7 @@ Examples:
             if args.polish == 'ascii-motion':
                 adapter = _load_ascii_motion_adapter()
                 _require_ascii_motion_npx()
-                output = _capture_stdout(lambda: CMDS[args.type](data, args.title, args.width, args.height, args.theme, **kw))
+                output = _capture_stdout(lambda: CMDS[chart_type](data, args.title, args.width, args.height, args.theme, **kw))
                 cells = adapter.text_to_cells(output)
                 project_dir = tempfile.mkdtemp(prefix='glyph-arts-ascii-motion-')
                 import asyncio
@@ -2454,23 +3073,23 @@ Examples:
                     asyncio.run(adapter.to_ascii_motion(project_dir, [cells], formats, os.path.dirname(args.output) or '.'))
                 return
 
-            if args.output and args.type == 'table' and args.output.lower().endswith('.md'):
-                CMDS[args.type](data, args.title, args.width, args.height, args.theme, **kw)
+            if args.output and chart_type == 'table' and args.output.lower().endswith('.md'):
+                CMDS[chart_type](data, args.title, args.width, args.height, args.theme, **kw)
             elif args.output:
                 from cli_charts.render.export_engine import export_to_path
 
                 kw["output"] = ""
                 buf = io.StringIO()
                 with contextlib.redirect_stdout(buf):
-                    CMDS[args.type](
+                    CMDS[chart_type](
                         data, args.title, args.width, args.height, args.theme, **kw
                     )
                 export_to_path(buf.getvalue(), args.output, no_color)
             else:
-                CMDS[args.type](data, args.title, args.width, args.height, args.theme, **kw)
+                CMDS[chart_type](data, args.title, args.width, args.height, args.theme, **kw)
         except (KeyError, IndexError, TypeError, ValueError) as exc:
-            print(f'ERROR:schema: Invalid {args.type} data schema: {exc}\n'
-                  f'Expected: {EXPECTED_SCHEMAS.get(args.type, "?")}',
+            print(f'ERROR:schema: Invalid {chart_type} data schema: {exc}\n'
+                  f'Expected: {EXPECTED_SCHEMAS.get(chart_type, "?")}',
                   file=sys.stderr)
             sys.exit(1)
 
@@ -2478,7 +3097,7 @@ Examples:
             try:
                 entry = json.dumps({
                     'ts': datetime.datetime.now().isoformat(),
-                    'type': args.type,
+                    'type': chart_type,
                     'title': args.title,
                 })
                 with open('.chart_history.jsonl', 'a') as _lf:

@@ -18,8 +18,8 @@ MAX_HTML_BYTES = 2 * 1024 * 1024
 ANSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 
 GALLERY_CHARTS = [
-    "kline", "line", "scatter", "step", "bar", "pie", "multibar", "stackedbar",
-    "hist", "heatmap", "box", "indicator", "event", "confusion", "sparkline",
+    "kline", "line", "spectrum", "scatter", "step", "bar", "pie", "multibar", "stackedbar",
+    "hist", "heatmap", "waterfall", "box", "indicator", "event", "confusion", "sparkline",
     "table", "tree", "panel", "gauge", "dashboard", "graph", "curve", "uniplot",
     "banner", "radar",
 ]
@@ -27,6 +27,19 @@ GALLERY_CHARTS = [
 SAMPLES = {
     "kline": {"dates": ["01/01/2026", "02/01/2026", "03/01/2026"], "open": [10, 12, 11], "high": [13, 14, 15], "low": [9, 10, 10], "close": [12, 11, 14]},
     "line": [{"label": "A", "x": [1, 2, 3, 4], "y": [2, 5, 3, 7]}],
+    "spectrum": {
+        "freq": [99.0, 99.05, 99.1, 99.15, 99.2, 99.25, 99.3, 99.35, 99.4, 99.45, 99.5, 99.55, 99.6],
+        "db": [-92, -89, -84, -78, -62, -45, -38, -50, -67, -81, -86, -90, -93],
+        "avg": [-91, -89, -86, -80, -66, -51, -45, -55, -70, -82, -87, -90, -92],
+        "max_hold": [-90, -87, -81, -73, -58, -42, -35, -47, -63, -78, -84, -88, -91],
+        "noise_floor": -88,
+        "squelch": -60,
+        "center": 99.3,
+        "bandwidth": 0.2,
+        "vfos": [{"freq": 99.38, "label": "rx"}],
+        "peaks": [99.3],
+        "signals": [{"freq": 99.3, "label": "FM"}],
+    },
     "scatter": [{"label": "A", "x": [1, 2, 3, 4], "y": [4, 2, 6, 5]}],
     "step": [{"label": "A", "x": [1, 2, 3, 4], "y": [1, 3, 2, 5]}],
     "bar": {"labels": ["A", "B", "C"], "values": [4, 7, 5]},
@@ -35,6 +48,21 @@ SAMPLES = {
     "stackedbar": {"labels": ["Q1", "Q2"], "series": [{"label": "Core", "values": [6, 9]}, {"label": "Plus", "values": [3, 4]}]},
     "hist": {"values": [1, 2, 2, 3, 3, 3, 4, 5], "bins": 5},
     "heatmap": {"matrix": [[1, 2], [3, 4]], "xlabels": ["A", "B"], "ylabels": ["X", "Y"]},
+    "waterfall": {
+        "freq": ["99.0", "99.1", "99.2", "99.3", "99.4", "99.5", "99.6"],
+        "time": ["t-5", "t-4", "t-3", "t-2", "t-1", "now"],
+        "matrix": [
+            [-92, -88, -76, -54, -71, -85, -91],
+            [-90, -86, -70, -44, -65, -84, -90],
+            [-91, -87, -78, -50, -62, -80, -89],
+            [-93, -89, -82, -58, -48, -72, -88],
+            [-92, -88, -84, -66, -42, -64, -86],
+            [-94, -90, -86, -72, -55, -47, -82],
+        ],
+        "center": 99.3,
+        "bandwidth": 0.2,
+        "vfos": [{"freq": 99.5, "label": "rx"}],
+    },
     "box": {"data": [[1, 2, 3, 4], [2, 3, 5, 6]], "labels": ["A", "B"]},
     "indicator": {"value": 72, "label": "Health"},
     "event": {"data": [1, 3, 5, 8, 13]},

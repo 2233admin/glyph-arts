@@ -27,6 +27,11 @@ pip install "glyph-arts[all]"
 ## See it in action
 
 ```bash
+glyph-arts plot < data.csv  # auto-detect input format and chart type
+glyph-arts plot --file metrics.json --title "Metrics"
+glyph-arts plot --as scatter < points.tsv
+glyph-arts spectrum --file examples/sdr/spectrum.json --title RF-Spectrum
+glyph-arts waterfall --file examples/sdr/waterfall.json --title RF-Waterfall
 glyph-arts demo              # 30s auto reel
 glyph-arts demo --speed fast # 10s for impatient viewers
 glyph-arts gallery           # browse 25 renderable charts interactively
@@ -48,6 +53,34 @@ Install them once before using those types:
 | macOS | `brew install chafa ffmpeg` |
 | Linux (Debian/Ubuntu) | `apt install chafa ffmpeg` |
 | Linux (Homebrew) | `brew install chafa ffmpeg` |
+
+For chat-window image previews, `glyph-arts image --file avatar.jpg --fit subject
+--symbols braille --no-color --filter anime` trims background, sharpens line
+art, and renders pure monospace symbols.
+Use `--filter ink` for white-page material such as formulas, scans, and
+documents; it inverts the page so dark terminal backgrounds show ink instead
+of paper.
+If formula source is available, prefer text rendering:
+`echo "\int exp(-x^2) dx = \sqrt{\pi}" | glyph-arts chat formula`.
+For multi-line terminal math layout, use SymPy-backed pretty rendering:
+`echo "(a+b)/(c+d)" | glyph-arts chat formula-pretty`.
+
+Use `--preset chat`, `--preset chat-hd`, `--preset chat-max`, or `--preset chat-4k`
+for the same pipeline at 72x36, 96x48, 120x60, or 132x66 terminal cells.
+For terminal panes such as Warp, use `--preset terminal`; add `--cols N` when
+the subprocess cannot read the real pane width.
+On Windows Terminal, ConPTY usually reports columns correctly when attached to
+the terminal; if a runner/capture layer reports 80, use `--cols N` or set
+`GLYPH_ARTS_COLS=N`.
+Agents should prefer `glyph-arts image --file avatar.jpg --preset terminal` for
+terminal conversations; fixed presets are for portable screenshots or narrow
+chat surfaces.
+Run `glyph-arts chat calibrate` to print ASCII and braille width rulers for
+measuring the current chat window before choosing a preset.
+If the target is a real terminal, `glyph-arts chat calibrate --terminal` reads
+the current terminal column count and prints rulers around that width.
+For wide windows, use
+`glyph-arts chat calibrate --calibrate-from 160 --calibrate-to 240 --calibrate-step 8 --calibrate-glyph braille --recommend`.
 
 All other chart types are pure-Python and work after `pip install glyph-arts` alone.
 
@@ -224,14 +257,73 @@ glyph-arts --check-deps --all
 | Engine | Types |
 |--------|-------|
 | plotext | `kline` `candlestick` `line` `scatter` `step` `bar` `multibar` `stackedbar` `hist` `heatmap` `box` `indicator` `event` `confusion` |
+| sdr | `spectrum` `waterfall` |
 | rich | `table` `tree` `panel` `gauge` `pie` `dashboard` `rich_live` |
 | drawille *(optional `[braille]`)* | `curve` `hires` `radar` |
 | plotille | `plotille` |
 | uniplot | `uniplot` |
-| misc | `graph` `sparkline` `banner` `art` `animate` `record` `record-replay` `to-hyperframes` `to-ascii-motion` |
+| misc | `plot` `graph` `sparkline` `banner` `art` `animate` `record` `record-replay` `to-hyperframes` `to-ascii-motion` `chat` |
 | media *(requires chafa + ffmpeg)* | `image` `video` |
 
-Total: **52 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
+Total: **56 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
+
+## SDR plots
+
+`spectrum` and `waterfall` cover SDR-style terminal visualization without
+owning SDR hardware, drivers, or demodulation. Feed them FFT/spectrogram output
+from sdrrat, GNU Radio, SoapySDR, or a Python script. Both commands accept JSON,
+JSONL/NDJSON, CSV, or TSV through `--format`, and `plot` auto-detects SDR-shaped
+input.
+
+```bash
+glyph-arts spectrum --file examples/sdr/spectrum.json --title RF-Spectrum
+glyph-arts waterfall --file examples/sdr/waterfall.json --title RF-Waterfall
+glyph-arts spectrum --format csv < examples/sdr/spectrum.csv
+glyph-arts waterfall --format csv < examples/sdr/waterfall.csv
+glyph-arts plot < examples/sdr/spectrum.csv
+```
+
+Supported SDR overlays: `center`/`center_freq`, `bandwidth`/`span`, `vfo` or
+`vfos`, `markers`, `signals`, `peaks`, `avg`, `max_hold`, `noise_floor`, and
+`squelch`. Waterfall uses ANSI intensity colors by default; add `--no-color` for
+plain logs, or `--font-tier ascii` for strict ASCII terminals.
+
+Spectrum output:
+
+```text
+                               RF-Spectrum
+       ◆ hold  + avg  · live
+       ┌──────────────────────────────────────────────────────────────────┐
+    -35│                      ┆       ◆◆▲◆       ┃ ┆                      │
+       │                      ┆    ◆◆◆··│·◆◆◆    ┃ ┆                      │
+       │                      ┆  ◆◆···++│+···◆◆  ┃ ┆                      │
+       │                      ┆◆◆··+++  │   +··◆◆┃ ┆                      │
+       │══════════════════════◆··+══════│══════··┃◆═══════════════════════│
+    -64│                    ◆··+        │        ┃·◆◆                     │
+       │                  ···+┆         │        ┃ ··◆◆◆                  │
+       │              ····++  ┆         │        ┃ ┆ ···◆◆◆◆              │
+       │         ·····++++    ┆         │        ┃ ┆    ····◆◆◆◆◆◆        │
+       │◆◆◆······+++++╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌│╌╌╌╌╌╌╌╌┃╌╌╌╌╌╌╌╌╌╌···········╌╌╌│
+    -93│···                   ┆         │        ┃ ┆                   ···│
+       └──────────────────────────────────────────────────────────────────┘
+        99                                                            99.6
+        center=99.3 bw=0.2 rx=99.38 FM@99.3
+```
+
+Waterfall output:
+
+```text
+                               RF-Waterfall
+ t-5           ..........----------##########==========::::::::::.........
+ t-4 ....................==========@@@@@@@@@@++++++++++::::::::::.........
+ t-3 ....................----------%%%%%%%%%%**********::::::::::.........
+ t-2           ..........::::::::::**********%%%%%%%%%%==========.........
+ t-1           ..........::::::::::++++++++++@@@@@@@@@@++++++++++.........
+ now           ....................==========##########%%%%%%%%%%:::::::::
+     99.0                                                             99.6
+range -94..-42 dB
+ tune center=99.3 bw=0.2 rx=99.5
+```
 
 ## All flags
 
@@ -241,7 +333,7 @@ glyph-arts <type> [--json JSON | --file PATH | --duckdb SQL --db PATH]
                   [--sample N] [--xlabel X] [--ylabel Y]
                   [--xlim MIN MAX] [--ylim MIN MAX]
                   [--xscale linear|log] [--yscale linear|log]
-                  [--orientation vertical|horizontal]
+                  [--orientation vertical|horizontal] [--format auto|json|jsonl|csv|tsv]
                   [--output FILE] [--no-color]
 ```
 
@@ -252,6 +344,11 @@ glyph-arts <type> [--json JSON | --file PATH | --duckdb SQL --db PATH]
 ## Pipe / file input
 
 ```bash
+# auto-detect JSON, JSONL/NDJSON, CSV, or TSV and pick a chart
+cat metrics.csv | glyph-arts plot --title "Benchmark"
+glyph-arts plot --file metrics.json
+glyph-arts plot --as bar --file metrics.tsv
+
 # stdin pipe (for large data)
 cat metrics.json | glyph-arts bar --title "Benchmark"
 

@@ -53,6 +53,15 @@ def test_gallery_html_output(tmp_path, monkeypatch):
     assert 100 < output.stat().st_size < 2 * 1024 * 1024
 
 
+def test_gallery_includes_sdr_plots():
+    from cli_charts import gallery_engine
+
+    assert "spectrum" in gallery_engine.GALLERY_CHARTS
+    assert "waterfall" in gallery_engine.GALLERY_CHARTS
+    assert gallery_engine.render_preview("spectrum", "pro", 60, 12).strip()
+    assert gallery_engine.render_preview("waterfall", "pro", 60, 12).strip()
+
+
 def test_demo_keyboard_interrupt_clean(capsys, monkeypatch):
     from cli_charts import demo_engine
 

@@ -1,6 +1,6 @@
 ---
 name: glyph-arts
-description: glyph-arts -- terminal-visible chart toolkit. All chart types directly in the CLI -- no files, no GUI. plotext (kline/candlestick/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), rich (table/tree/panel/gauge/pie/dashboard/rich_live), drawille (curve/hires/radar), plotille (composable braille Figure), uniplot scientific line, media image/video (via chafa+ffmpeg, 2x4 braille sub-pixel with 24-bit truecolor), ASCII network graph, sparkline, pyfiglet banner, composable art text, cursor-home animate for line/bar/scatter/sparkline, asciinema record/replay export via record and record-replay. LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
+description: glyph-arts -- terminal-visible chart toolkit. All chart types directly in the CLI -- no files, no GUI. plotext (kline/candlestick/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), sdr (spectrum/waterfall), rich (table/tree/panel/gauge/pie/dashboard/rich_live), drawille (curve/hires/radar), plotille (composable braille Figure), uniplot scientific line, media image/video (via chafa+ffmpeg, 2x4 braille sub-pixel with 24-bit truecolor), ASCII network graph, sparkline, pyfiglet banner, composable art text, cursor-home animate for line/bar/scatter/sparkline, asciinema record/replay export via record and record-replay. LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
 version: 3.0.1
 ---
 
@@ -127,7 +127,7 @@ Need output inside Claude Code?
 
 ## Chart Types Reference
 
-### Engine: plotext (13 types)
+### Engine: plotext
 | Type | JSON keys | Notes |
 |------|-----------|-------|
 | `kline` | `dates[], open[], high[], low[], close[]` | dates must be DD/MM/YYYY |
@@ -144,6 +144,12 @@ Need output inside Claude Code?
 | `indicator` | `{"value":23.4, "label":"Return %"}` | big KPI number |
 | `event` | `{"data":[x1,x2,...]}` | timeline plot |
 | `confusion` | `{"actual":[], "predicted":[], "labels":[]}` | ML confusion matrix |
+
+### Engine: sdr
+| Type | JSON keys | Notes |
+|------|-----------|-------|
+| `spectrum` | `{"freq":[...], "db":[...], "avg":[...], "max_hold":[...], "noise_floor":-88, "squelch":-60, "center":99.5, "bandwidth":0.2, "vfo":99.55, "signals":[...]}` | FFT spectrum with live/avg/hold traces, center/span, VFO/marker, threshold, and peak overlays; JSON/JSONL/CSV/TSV |
+| `waterfall` | `{"matrix":[[...]], "freq":[...], "time":[...], "center":99.5, "vfos":[...]}` | spectrogram rows over time; maps dB to ANSI/ASCII intensity and overlays tuning cursors |
 
 ### Engine: rich (7 types)
 | Type | JSON keys |
@@ -205,8 +211,49 @@ JSON data.
 
 | Type | Input | Notes |
 |------|-------|-------|
-| `image` | `--file path/to.png` | any format chafa accepts (PNG/JPEG/GIF/BMP/WebP/SVG). Size via `--width`/`--height`. `--symbols SET` picks chafa symbol set (default `braille`; also `block`, `ascii`, `half`, `all`). `--no-color` forces monochrome |
+| `image` | `--file path/to.png` | any format chafa accepts (PNG/JPEG/GIF/BMP/WebP/SVG). Size via `--width`/`--height`. `--symbols SET` picks chafa symbol set (default `braille`; also `block`, `ascii`, `half`, `all`). `--fit subject` trims background before rendering portraits/objects. `--filter anime` sharpens line art for dense chat output. `--filter ink` inverts white-page formulas/scans/documents so dark terminal backgrounds show ink instead of paper. `--preset terminal` fits the current terminal pane, and `--cols N` overrides the detected width. `--preset chat/chat-hd/chat-max/chat-4k` applies fixed pipelines at 72x36, 96x48, 120x60, or 132x66. `--no-color` forces monochrome |
 | `video` | `--file path/to.mp4` | ffmpeg extracts frames to tempdir then chafa renders each. `--fps N` (default 12) paces playback. `--duration SEC` clips (else plays to EOF). Ctrl-C exits cleanly, cursor restored |
+
+Use `glyph-arts chat calibrate` to print ASCII and braille rulers that measure
+the active chat window width before selecting `chat-hd`, `chat-max`, or `chat-4k`.
+Use `glyph-arts chat calibrate --terminal` when the output target is the current
+terminal; it reads the terminal column count directly. On Windows Terminal,
+ConPTY usually reports columns correctly when attached; if a runner reports 80,
+use `--cols N` or set `GLYPH_ARTS_COLS=N`.
+For 4K panes, run `glyph-arts chat calibrate --calibrate-from 160 --calibrate-to
+240 --calibrate-step 8 --calibrate-glyph braille --recommend`.
+
+#### Agent operating rules for terminal image previews
+
+When the user asks to "draw", "show in chat", "preview this image", "render this
+material", or similar, and the target surface is a terminal conversation such as
+Warp, Windows Terminal, Claude Code, or Codex CLI:
+
+1. Prefer the terminal-fit path, not fixed chat presets:
+   `glyph-arts image --file IMAGE --preset terminal`.
+2. If the command runs inside an agent runner and reports a fake 80-column
+   terminal, ask for or infer the pane width, then use
+   `glyph-arts image --file IMAGE --preset terminal --cols N`.
+3. On Windows/PowerShell, the equivalent persistent override is
+   `$env:GLYPH_ARTS_COLS="N"` followed by
+   `glyph-arts image --file IMAGE --preset terminal`.
+4. Use fixed presets only when the user explicitly wants a portable size:
+   `chat` for narrow inline output, `chat-hd` for medium, `chat-max` for wide,
+   `chat-4k` for known 4K panes.
+5. Do not hand-assemble `--fit subject --filter anime --symbols braille
+   --no-color`; `--preset terminal` already applies that tuned pipeline.
+6. For white-page formulas, scans, screenshots, and documents, add
+   `--filter ink` to the terminal preset:
+   `glyph-arts image --file FORMULA.png --preset terminal --filter ink`.
+7. If formula source text is available, do not rasterize it. Use
+   `glyph-arts chat formula` and pipe LaTeX-ish/plain formula text; raster
+   formula rendering is only a screenshot fallback.
+   For fractions, integrals, matrices, and algebra that need real terminal
+   layout, use `glyph-arts chat formula-pretty` (SymPy pretty printer).
+8. To discover a terminal pane limit, run
+   `glyph-arts chat calibrate --terminal --calibrate-glyph braille --recommend`;
+   if captured output says 80 but the pane is visibly wider, use `--cols N` or
+   `GLYPH_ARTS_COLS=N`.
 
 Rationale for chart/media split: the native `curve` renderer connects
 every consecutive point-pair via Bresenham, which fills silhouettes into

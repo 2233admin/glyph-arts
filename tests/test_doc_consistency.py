@@ -42,6 +42,15 @@ def test_readme_chart_count_matches_code():
         )
 
 
+def test_demo_chart_count_matches_code():
+    from cli_charts import demo_engine
+    from cli_charts.chart import CHART_TYPE_COUNT
+
+    src = (ROOT / 'cli_charts' / 'demo_engine.py').read_text(encoding='utf-8')
+    assert '31 chart types' not in src
+    assert demo_engine.SAMPLES['banner']['text'] == f'{CHART_TYPE_COUNT} chart types'
+
+
 def test_readme_no_demo_placeholder():
     readme = (ROOT / 'README.md').read_text(encoding='utf-8')
     assert 'demo.gif  <-- record with' not in readme
