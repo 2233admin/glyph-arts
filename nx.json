@@ -1,0 +1,49 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "defaultBase": "master",
+  "namedInputs": {
+    "default": [
+      "{projectRoot}/**/*",
+      "!{projectRoot}/.venv/**/*",
+      "!{projectRoot}/.nx/**/*",
+      "!{projectRoot}/_temp/**/*",
+      "!{projectRoot}/export_test_outputs/**/*",
+      "!{projectRoot}/dist/**/*",
+      "!{projectRoot}/build/**/*",
+      "!{projectRoot}/glyph_arts.egg-info/**/*"
+    ],
+    "production": [
+      "default",
+      "!{projectRoot}/tests/**/*",
+      "!{projectRoot}/docs/**/*"
+    ]
+  },
+  "targetDefaults": {
+    "lint": {
+      "cache": true,
+      "inputs": ["default"]
+    },
+    "typecheck": {
+      "cache": true,
+      "inputs": ["default"]
+    },
+    "test": {
+      "cache": true,
+      "inputs": ["default"],
+      "outputs": ["{projectRoot}/.pytest_cache"]
+    },
+    "docs-check": {
+      "cache": true,
+      "inputs": ["default"]
+    },
+    "doctor": {
+      "cache": true,
+      "inputs": ["default"]
+    },
+    "build": {
+      "cache": true,
+      "inputs": ["production"],
+      "outputs": ["{projectRoot}/dist"]
+    }
+  }
+}

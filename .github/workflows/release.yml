@@ -17,10 +17,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install build deps
-        run: pip install build
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - name: Sync build deps
+        run: uv sync --frozen --extra dev
       - name: Build sdist + wheel
-        run: python -m build
+        run: uv run python -m build
       - uses: actions/upload-artifact@v4
         with:
           name: dist
@@ -35,6 +38,14 @@ jobs:
         with:
           name: dist
           path: dist/
+      - name: Validate PyPI API token
+        env:
+          PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          if [ -z "$PYPI_API_TOKEN" ]; then
+            echo "::error::Missing GitHub secret PYPI_API_TOKEN. Create a PyPI API token that starts with 'pypi-' and save it as this repository secret."
+            exit 1
+          fi
       - uses: pypa/gh-action-pypi-publish@release/v1
         with:
           user: __token__

@@ -1,6 +1,6 @@
 ---
 name: glyph-arts
-description: glyph-arts -- terminal-visible chart toolkit. All chart types directly in the CLI -- no files, no GUI. plotext (kline/candlestick/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion), sdr (spectrum/waterfall), rich (table/tree/panel/gauge/pie/dashboard/rich_live), drawille (curve/hires/radar), plotille (composable braille Figure), uniplot scientific line, media image/video (via chafa+ffmpeg, 2x4 braille sub-pixel with 24-bit truecolor), ASCII network graph, sparkline, pyfiglet banner, composable art text, cursor-home animate for line/bar/scatter/sparkline, asciinema record/replay export via record and record-replay. LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
+description: glyph-arts -- terminal-visible chart toolkit. All chart types directly in the CLI -- no files, no GUI. incplot-style auto plotting (JSON/JSONL/CSV/TSV inference), plotext (kline/candlestick/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion/plotext overlays), SDR spectrum/waterfall, Diagon-style diagram (math/sequence/tree/table/frame/flowchart/GraphDAG/GraphPlanar), Mermaid/beautiful-mermaid-style diagrams, rich (table/tree/panel/gauge/pie/dashboard/rich_live), drawille/textplots Braille (curve/hires/radar/textplot/turtle), plotille (composable braille Figure), uniplot scientific line, media image via Pillow chat-safe ASCII or chafa truecolor, terminal host profiles for Windows Terminal/Preview/Canary and Warp, WaveTerm adapter via `wave doctor/view/render`, video via ffmpeg+chafa, backend doctor/install helpers for chafa/ffmpeg/Graphviz/Diagon/Nerd Fonts/Symbols Nerd Font/terminal probes, ASCII network graph, chat effect presets, sparkline, pyfiglet banner, composable art text, cursor-home animate for line/bar/scatter/sparkline, asciinema record/replay export via record and record-replay. LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
 version: 3.0.1
 ---
 
@@ -36,6 +36,26 @@ python $SKILL/scripts/chart.py to-hyperframes \
   --frames 30 --duration 5 --output-dir ./hf-demo
 ```
 
+Chat drawing front door:
+
+```bash
+python $SKILL/scripts/chart.py chat image --file photo.jpg --width 80 --height 30
+python $SKILL/scripts/chart.py chat photo.jpg --image-style retro-art
+python $SKILL/scripts/chart.py chat incplot --json 'name,value\nA,3\nB,7'
+python $SKILL/scripts/chart.py chat sdr spectrum --json '{"freq":[99.0,99.3],"power":[-93,-42]}'
+python $SKILL/scripts/chart.py chat sequence --json 'Client->Server: GET /health'
+python $SKILL/scripts/chart.py chat mermaid --json 'graph LR\nA[开始] --> B[完成]'
+python $SKILL/scripts/chart.py chat diagram note --json 'NOTE\nCache refresh required'
+python $SKILL/scripts/chart.py chat textplot --json '{"expr":"sin(x) / x","xmin":-20,"xmax":20}'
+python $SKILL/scripts/chart.py chat turtle --json '{"commands":[["forward",30],["right",90],["forward",20]]}'
+python $SKILL/scripts/chart.py chat graph --json 'Client -> API\nAPI -> DB'
+python $SKILL/scripts/chart.py chat formula --json '\int exp(-x^2) dx = \sqrt{\pi}'
+python $SKILL/scripts/chart.py chat formula-pretty --json '(a+b)/(c+d)'
+python $SKILL/scripts/chart.py chat effects
+```
+
+`chat image` implies `--chat`; chart commands imply `--no-color`.
+
 **stdin pipe (for large data):**
 ```bash
 echo '<json>' | python $SKILL/scripts/chart.py <type>
@@ -62,6 +82,7 @@ Width defaults to terminal width (`$COLUMNS`). Override with `--width 120`.
 What is your data shape?
 |
 +-- Time series / sequence
+|   +-- Unknown JSON/CSV/TSV shape     -> incplot
 |   +-- Trend over time              -> plotext line
 |   +-- Volume/count per period      -> plotext bar
 |   +-- OHLC financial data          -> plotext kline
@@ -81,8 +102,14 @@ What is your data shape?
 |
 +-- Density / matrix
 |   +-- 2D correlation matrix         -> plotext heatmap
+|   +-- RF spectrum trace             -> spectrum
+|   +-- RF waterfall history          -> waterfall
 |
-+-- Continuous curve (hi-res)         -> drawille curve
++-- Structure / diagram text
+|   +-- Formula / sequence / tree     -> diagram (Diagon backend when installed)
+|   +-- Flowchart / DAG / planar graph -> diagram
+|
++-- Continuous curve / function       -> drawille curve / textplot / turtle
 |
 +-- Multiple metrics at once          -> rich dashboard
 |
@@ -115,6 +142,7 @@ Claude decision tree:
 ```
 Need output inside Claude Code?
 |
++-- Draw in the chat transcript        -> chat image|bar|line|spectrum|waterfall ...
 +-- Status line shell command         -> sparkline/indicator/gauge --statusline
 +-- Clickable terminal reference      -> --link-title URL or --link-data URL
 +-- Match current Claude ANSI theme   -> --theme claude-dark-ansi or claude-light-ansi
@@ -127,7 +155,12 @@ Need output inside Claude Code?
 
 ## Chart Types Reference
 
-### Engine: plotext
+### Engine: incplot (1 type)
+| Type | Input | Notes |
+|------|-------|-------|
+| `incplot` | raw JSON, JSONL, CSV, TSV | Auto-detects sparkline, bar, multibar, line, scatter, hist, table, and OHLC candlestick payloads. Use `--prefer` to override. |
+
+### Engine: plotext (15 types)
 | Type | JSON keys | Notes |
 |------|-----------|-------|
 | `kline` | `dates[], open[], high[], low[], close[]` | dates must be DD/MM/YYYY |
@@ -144,12 +177,13 @@ Need output inside Claude Code?
 | `indicator` | `{"value":23.4, "label":"Return %"}` | big KPI number |
 | `event` | `{"data":[x1,x2,...]}` | timeline plot |
 | `confusion` | `{"actual":[], "predicted":[], "labels":[]}` | ML confusion matrix |
+| `plotext` | `{"series":[{"type":"error","x":[],"y":[],"yerr":[]}],"texts":[],"vlines":[],"hlines":[],"shapes":[]}` | plotext overlay API: error bars, date plots, labels, lines, rectangles, polygons |
 
-### Engine: sdr
+### Engine: SDR (2 types)
 | Type | JSON keys | Notes |
 |------|-----------|-------|
-| `spectrum` | `{"freq":[...], "db":[...], "avg":[...], "max_hold":[...], "noise_floor":-88, "squelch":-60, "center":99.5, "bandwidth":0.2, "vfo":99.55, "signals":[...]}` | FFT spectrum with live/avg/hold traces, center/span, VFO/marker, threshold, and peak overlays; JSON/JSONL/CSV/TSV |
-| `waterfall` | `{"matrix":[[...]], "freq":[...], "time":[...], "center":99.5, "vfos":[...]}` | spectrogram rows over time; maps dB to ANSI/ASCII intensity and overlays tuning cursors |
+| `spectrum` | `{"freq":[], "power":[], "center":99.3, "bandwidth":0.2}` | chat-safe RF spectrum with center line, band edges, peak marker |
+| `waterfall` | `{"matrix":[[]], "xlabels":[], "ylabels":[], "min":-94, "max":-42}` | dense ASCII intensity map for terminal/chat panes |
 
 ### Engine: rich (7 types)
 | Type | JSON keys |
@@ -162,10 +196,17 @@ Need output inside Claude Code?
 | `dashboard` | `{"panels":[{"type":"gauge","data":{...},"title":"CPU"},...]}` — delegates to scripts/dashboard.py |
 | `rich_live` | `{"panels":[{"type":"sparkline","data":{...},"title":"Left"},...],"layout":"row","frames":1}` — multi-panel Rich Layout, `layout:"row"` or `"column"`, `frames:1` for pipe-safe snapshot |
 
-### Engine: drawille (1 type)
+### Engine: diagram (1 type)
+| Type | Input | Notes |
+|------|-------|-------|
+| `diagram` | `diagram sequence --json 'A->B: msg'` or `{"kind":"flowchart","text":"A -> B"}` | Uses Diagon binary when installed for math/sequence/tree/table/frame/flowchart/GraphDAG/GraphPlanar. Builtin chat-safe fallback covers sequence/tree/table/frame/note/flowchart/graphdag. `chat sequence ...` aliases to `chat diagram sequence ...` |
+
+### Engine: drawille / textplots Braille (3 types)
 | Type | JSON keys |
 |------|-----------|
 | `curve` | `{"points":[[x,y],...]}` -- Braille Unicode, highest resolution |
+| `textplot` | `{"expr":"sin(x) / x","xmin":-20,"xmax":20}` -- textplots-rs-style continuous function plot |
+| `turtle` | `{"commands":[["forward",30],["right",90],["forward",20]]}` -- drawille-style Turtle/Canvas path drawing |
 
 ### Engine: hires (1 type) — 24-bit Braille
 | Type | JSON keys | Notes |
@@ -202,58 +243,22 @@ Zero-dependency, 15 chart types with ANSI colors. Install: `pip install "glyph-a
 | `boxplot` | `{"series":[{"name":"A","values":[...]}]}` | statistical box plots |
 | `stacked-text` | `{"data":[{"label":"A","segments":[{"label":"X","value":30}]}]}` | stacked composition bars |
 
-### Engine: media (chafa + ffmpeg) -- 2 types
-Charts use a native Python engine. Media (image/video) shells out to
-`chafa` (pre-installed via `scoop install chafa` on Windows, distro
-package elsewhere) for 24-bit truecolor braille rendering. Video also
-needs `ffmpeg`. These types take a filesystem path via `--file`, not
-JSON data.
+### Engine: media (Pillow/chafa + ffmpeg) -- 2 types
+Charts use a native Python engine. Image can render through Pillow as
+plain chat-safe text, or through `chafa` for 24-bit truecolor terminal
+rendering. Video needs `ffmpeg` plus `chafa`. These types take a
+filesystem path via `--file`, not JSON data.
 
 | Type | Input | Notes |
 |------|-------|-------|
-| `image` | `--file path/to.png` | any format chafa accepts (PNG/JPEG/GIF/BMP/WebP/SVG). Size via `--width`/`--height`. `--symbols SET` picks chafa symbol set (default `braille`; also `block`, `ascii`, `half`, `all`). `--fit subject` trims background before rendering portraits/objects. `--filter anime` sharpens line art for dense chat output. `--filter ink` inverts white-page formulas/scans/documents so dark terminal backgrounds show ink instead of paper. `--preset terminal` fits the current terminal pane, and `--cols N` overrides the detected width. `--preset chat/chat-hd/chat-max/chat-4k` applies fixed pipelines at 72x36, 96x48, 120x60, or 132x66. `--no-color` forces monochrome |
+| `image` | `--file path/to.png` | PNG/JPEG/GIF/BMP/WebP via Pillow or chafa. Size via `--width`/`--height`. `--chat` emits plain ASCII for Claude/Codex chat panes and auto-crops/suppresses flat backgrounds. `--image-style classic/braille/block/edge/dot-cross/halftone/particles/retro-art/terminal` mirrors the ascii-art skill styles. `--color-mode grayscale/original/matrix/amber/custom`, `--custom-color`, `--background`, `--ratio`, `--dither`, and `.txt/.md/.html/.svg/.png/.gif/.tsx` exports are supported. `--image-mode raw/detail/edge/silhouette` controls the Pillow preprocessing; `--no-trim` keeps the full frame. `--media-engine pillow --symbols half` emits ANSI half-block color; `--media-engine chafa --symbols braille` uses chafa |
 | `video` | `--file path/to.mp4` | ffmpeg extracts frames to tempdir then chafa renders each. `--fps N` (default 12) paces playback. `--duration SEC` clips (else plays to EOF). Ctrl-C exits cleanly, cursor restored |
 
-Use `glyph-arts chat calibrate` to print ASCII and braille rulers that measure
-the active chat window width before selecting `chat-hd`, `chat-max`, or `chat-4k`.
-Use `glyph-arts chat calibrate --terminal` when the output target is the current
-terminal; it reads the terminal column count directly. On Windows Terminal,
-ConPTY usually reports columns correctly when attached; if a runner reports 80,
-use `--cols N` or set `GLYPH_ARTS_COLS=N`.
-For 4K panes, run `glyph-arts chat calibrate --calibrate-from 160 --calibrate-to
-240 --calibrate-step 8 --calibrate-glyph braille --recommend`.
-
-#### Agent operating rules for terminal image previews
-
-When the user asks to "draw", "show in chat", "preview this image", "render this
-material", or similar, and the target surface is a terminal conversation such as
-Warp, Windows Terminal, Claude Code, or Codex CLI:
-
-1. Prefer the terminal-fit path, not fixed chat presets:
-   `glyph-arts image --file IMAGE --preset terminal`.
-2. If the command runs inside an agent runner and reports a fake 80-column
-   terminal, ask for or infer the pane width, then use
-   `glyph-arts image --file IMAGE --preset terminal --cols N`.
-3. On Windows/PowerShell, the equivalent persistent override is
-   `$env:GLYPH_ARTS_COLS="N"` followed by
-   `glyph-arts image --file IMAGE --preset terminal`.
-4. Use fixed presets only when the user explicitly wants a portable size:
-   `chat` for narrow inline output, `chat-hd` for medium, `chat-max` for wide,
-   `chat-4k` for known 4K panes.
-5. Do not hand-assemble `--fit subject --filter anime --symbols braille
-   --no-color`; `--preset terminal` already applies that tuned pipeline.
-6. For white-page formulas, scans, screenshots, and documents, add
-   `--filter ink` to the terminal preset:
-   `glyph-arts image --file FORMULA.png --preset terminal --filter ink`.
-7. If formula source text is available, do not rasterize it. Use
-   `glyph-arts chat formula` and pipe LaTeX-ish/plain formula text; raster
-   formula rendering is only a screenshot fallback.
-   For fractions, integrals, matrices, and algebra that need real terminal
-   layout, use `glyph-arts chat formula-pretty` (SymPy pretty printer).
-8. To discover a terminal pane limit, run
-   `glyph-arts chat calibrate --terminal --calibrate-glyph braille --recommend`;
-   if captured output says 80 but the pane is visibly wider, use `--cols N` or
-   `GLYPH_ARTS_COLS=N`.
+Formula source is not an image. If source text is available, use
+`glyph-arts chat formula` for compact Unicode math or
+`glyph-arts chat formula-pretty` for SymPy-backed multi-line fractions,
+integrals, sums, and roots. Rasterize only screenshots/scans; for white-page
+material in dark terminals, use the image path with `--invert`.
 
 Rationale for chart/media split: the native `curve` renderer connects
 every consecutive point-pair via Bresenham, which fills silhouettes into
@@ -264,7 +269,7 @@ decision.
 ### Misc (4 types)
 | Type | JSON keys |
 |------|-----------|
-| `graph` | `{"edges":[["A","B"]],"directed":true,"node_style":"ROUND"}` |
+| `graph` | `{"edges":[["A","B"]],"directed":true,"node_style":"ROUND"}` or edge-list/DOT/GraphML text | PHART backend. Use `chat graph --json 'A -> B\nB -> C'`, `--graph-format dot`, `--graph-style round`, `--graph-charset ascii` |
 | `sparkline` | `{"values":[1,3,5,2,8]}` -- single-row inline |
 | `banner` | `{"text":"PROFIT","font":"big","color":"green"}` |
 | `art` | positional text: `art SHIP IT --font slant --decor barcode --frame double --gradient sunset` |
@@ -315,6 +320,7 @@ Video output decision tree:
 | Engine | Recommended max data points | Hard limit |
 |--------|----------------------------|------------|
 | plotext | 10,000 | 50,000 |
+| sdr spectrum/waterfall | 5,000 points / 500 rows | resampled to terminal width/height |
 | rich table | 500 rows | 2,000 rows |
 | drawille | 50,000 | 200,000 |
 | uniplot | 100,000 | -- |
@@ -331,6 +337,7 @@ Video output decision tree:
 - Use `--file` or stdin pipe when data exceeds 200 characters in JSON string form
 - Use `drawille curve` when signal continuity matters (audio, sensor, physics)
 - Use `rich table` when the user needs to read exact values
+- Use `chat graph` for network topology, DAGs, dependency maps, and DOT/GraphML
 - Use `--sample N` to downsample large datasets before rendering
 
 ### DO NOT
@@ -450,6 +457,8 @@ python $SKILL/scripts/chart.py --check-deps
 | table | all columns as-is |
 | hist | all columns as value series |
 | heatmap | matrix from .values, col names as xlabels |
+| spectrum | col0=frequency, col1=power |
+| waterfall | matrix-shaped values only; prefer JSON/file input |
 | curve | col0=x, col1=y |
 | sparkline | col0 values |
 | confusion | col0=actual, col1=predicted |

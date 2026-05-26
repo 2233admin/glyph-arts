@@ -13,6 +13,11 @@ venv/
 .venv-*-backup/
 .venv.bak/
 
+# Node / Nx task runner artifacts
+node_modules/
+.nx/cache/
+.nx/workspace-data/
+
 # Test / lint / type-check caches
 .pytest_cache/
 .ruff_cache/
@@ -22,6 +27,8 @@ htmlcov/
 coverage.xml
 .coverage
 .coverage.*
+_temp/
+export_test_outputs/phase7a/
 
 # Editor / OS
 .env

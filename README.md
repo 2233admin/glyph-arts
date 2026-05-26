@@ -2,8 +2,10 @@
 
 > When AI lives in the terminal, visualization must live there too.
 
-All chart types rendered natively in the terminal -- no browser, no generated files, no context switch.
-`pip install glyph-arts` and your AI agent has a native sense of sight inside the CLI.
+glyph-arts is terminal-first by default: core charts render directly in the
+CLI, with optional export and media adapters when you need files, images, or
+recordings. `pip install glyph-arts` gives your AI agent a native sense of
+sight inside the terminal.
 
 ![demo](demo/chartex-demo.gif)
 
@@ -24,65 +26,257 @@ pip install "glyph-arts[tui]"
 pip install "glyph-arts[all]"
 ```
 
+## Product layers
+
+glyph-arts is intentionally layered so the default install stays useful and
+the heavier integrations remain opt-in.
+
+| Layer | What belongs here | Examples |
+|---|---|---|
+| Core charts | Pure-Python terminal rendering that works after `pip install glyph-arts` | bar, line, scatter, pie, table, sparkline, gauge, indicator |
+| Optional engines | Better fidelity or interaction when extra Python packages are installed | LTTB downsampling, Textual dashboard, pixel engine |
+| Media/export adapters | File, image, video, and recording workflows that may need system tools | `.txt`, `.ansi`, `.html`, `.md`, `.png`, `record`, `record-replay` |
+| Experimental/agent integrations | Integrations for agent, motion, or external rendering workflows | Claude Code flags, HyperFrames, ASCII Motion |
+
+## Windows support
+
+Core chart rendering is supported on Windows. CI gates Windows on Python 3.12
+for the default supported path; Linux and macOS cover Python 3.10 through 3.14.
+Optional Windows combinations involving Python 3.13/3.14 plus numpy,
+matplotlib, or lttb are useful when they work, but they are not release gates
+until their upstream wheels are consistently available.
+
+Then run the backend doctor. It checks the system pieces that Python wheels
+cannot reliably provide: `chafa`, `Graphviz`, `Diagon`, `ffmpeg`, Nerd Font
+coverage, Symbols Nerd Font coverage, and the current terminal host profile.
+
+```bash
+glyph-arts doctor
+
+# print the chat-quality backend pack:
+glyph-arts install-backends --target chat
+
+# execute the plan explicitly:
+glyph-arts install-backends --target chat --run --yes
+```
+
 ## See it in action
 
 ```bash
-glyph-arts plot < data.csv  # auto-detect input format and chart type
-glyph-arts plot --file metrics.json --title "Metrics"
-glyph-arts plot --as scatter < points.tsv
-glyph-arts spectrum --file examples/sdr/spectrum.json --title RF-Spectrum
-glyph-arts waterfall --file examples/sdr/waterfall.json --title RF-Waterfall
-glyph-arts demo              # 30s auto reel
-glyph-arts demo --speed fast # 10s for impatient viewers
-glyph-arts gallery           # browse 25 renderable charts interactively
-glyph-arts gallery --output gallery.html  # static HTML demo
+echo '[3,7,4,9,6,12]' | glyph-arts auto
+glyph-arts chat image --file photo.jpg --width 80 --height 30
+glyph-arts chat incplot --json 'name,value\nA,3\nB,7'
+glyph-arts chat sdr spectrum --json '{"freq":[99.0,99.3,99.6],"power":[-93,-42,-93],"center":99.3,"bandwidth":0.2}'
+glyph-arts chat sequence --json 'Client->Server: GET /health'
+glyph-arts chat mermaid --json 'graph LR\nA[开始] --> B[完成]'
+glyph-arts chat diagram note --json 'NOTE\nCache refresh required before reading results.'
+glyph-arts chat graph --json 'Client -> API\nAPI -> DB'
+glyph-arts chat plotext --json '{"series":[{"type":"error","x":[1,2,3],"y":[2,5,3],"yerr":[0.3,0.8,0.4],"label":"err"}],"texts":[{"text":"peak","x":2,"y":5}],"vlines":[2]}'
+glyph-arts chat textplot --json '{"expr":"sin(x) / x","xmin":-20,"xmax":20}'
+glyph-arts chat turtle --json '{"commands":[["forward",30],["right",90],["forward",20]]}'
+glyph-arts chat effects
+glyph-arts live random
+glyph-arts dashboard --demo --no-interactive
+glyph-arts bar --json '{"labels":["A","B"],"values":[3,7]}'
+glyph-arts spectrum --json '{"freq":[99.0,99.3,99.6],"power":[-93,-42,-93],"center":99.3,"bandwidth":0.2}'
 ```
 
 ![demo](docs/demo.gif)
 <!-- TODO: record actual demo.gif via asciinema/agg, see
      docs/recording-demo.md (P13). -->
 
-## System dependencies (image / video charts only)
+## Image / Video Dependencies
 
-The `image` and `video` chart types shell out to `chafa` and `ffmpeg`.
-Install them once before using those types:
+The `image` chart type has a built-in Pillow text renderer for AI chat panes
+and Markdown code blocks:
+
+```bash
+glyph-arts chat image --file photo.jpg --width 80 --height 30
+glyph-arts chat photo.jpg --image-style retro-art --width 80 --height 30
+glyph-arts image --file photo.jpg --chat --width 80 --height 30
+glyph-arts image --file photo.jpg --chat --image-style braille --width 80 --height 30
+glyph-arts image --file photo.jpg --chat --image-style retro-art --dither atkinson --width 80 --height 30
+glyph-arts image --file photo.jpg --media-engine pillow --symbols half --width 80 --height 30
+glyph-arts image --file photo.jpg --chat --image-mode silhouette --width 80 --height 30
+glyph-arts image --file photo.jpg --image-style terminal --color-mode matrix --output art.html
+echo "\int exp(-x^2) dx = \sqrt{\pi}" | glyph-arts chat formula
+echo "(a+b)/(c+d)" | glyph-arts chat formula-pretty
+```
+
+Install `chafa` for higher-fidelity terminal image rendering. `video` still
+requires both `ffmpeg` and `chafa`, but the chat-quality install target keeps
+video/recording tools out of the first path. `glyph-arts doctor` detects the
+current state, and `glyph-arts install-backends` prints an install plan:
 
 | OS | Command |
 |---|---|
-| Windows | `scoop install chafa ffmpeg` or `choco install chafa ffmpeg` |
-| macOS | `brew install chafa ffmpeg` |
-| Linux (Debian/Ubuntu) | `apt install chafa ffmpeg` |
-| Linux (Homebrew) | `brew install chafa ffmpeg` |
+| Windows | `scoop install chafa graphviz JetBrainsMono-NF NerdFontsSymbolsOnly` |
+| macOS | `brew install chafa graphviz` plus Nerd Font casks |
+| Linux (Debian/Ubuntu) | `apt install chafa graphviz` |
+| Linux (Arch) | `pacman -S chafa graphviz ttf-jetbrains-mono-nerd ttf-nerd-fonts-symbols` |
 
-For chat-window image previews, `glyph-arts image --file avatar.jpg --fit subject
---symbols braille --no-color --filter anime` trims background, sharpens line
-art, and renders pure monospace symbols.
-Use `--filter ink` for white-page material such as formulas, scans, and
-documents; it inverts the page so dark terminal backgrounds show ink instead
-of paper.
-If formula source is available, prefer text rendering:
-`echo "\int exp(-x^2) dx = \sqrt{\pi}" | glyph-arts chat formula`.
-For multi-line terminal math layout, use SymPy-backed pretty rendering:
-`echo "(a+b)/(c+d)" | glyph-arts chat formula-pretty`.
+For glyph-heavy terminal output, install a Nerd Font such as JetBrainsMono Nerd
+Font and select it in the terminal. This covers Powerline/PUA icons, Braille,
+block elements, and dense terminal glyphs. Also install Symbols Nerd Font as a
+fallback for private-use icons. `install-backends --target fonts` uses Scoop on
+Windows or Homebrew on macOS when available.
 
-Use `--preset chat`, `--preset chat-hd`, `--preset chat-max`, or `--preset chat-4k`
-for the same pipeline at 72x36, 96x48, 120x60, or 132x66 terminal cells.
-For terminal panes such as Warp, use `--preset terminal`; add `--cols N` when
-the subprocess cannot read the real pane width.
-On Windows Terminal, ConPTY usually reports columns correctly when attached to
-the terminal; if a runner/capture layer reports 80, use `--cols N` or set
-`GLYPH_ARTS_COLS=N`.
-Agents should prefer `glyph-arts image --file avatar.jpg --preset terminal` for
-terminal conversations; fixed presets are for portable screenshots or narrow
-chat surfaces.
-Run `glyph-arts chat calibrate` to print ASCII and braille width rulers for
-measuring the current chat window before choosing a preset.
-If the target is a real terminal, `glyph-arts chat calibrate --terminal` reads
-the current terminal column count and prints rulers around that width.
-For wide windows, use
-`glyph-arts chat calibrate --calibrate-from 160 --calibrate-to 240 --calibrate-step 8 --calibrate-glyph braille --recommend`.
+`glyph-arts doctor` also reports a first-class terminal profile. The profile
+decides how `chafa` is invoked and what symbol tier is safe:
 
-All other chart types are pure-Python and work after `pip install glyph-arts` alone.
+| Profile | Detection / override | Image path |
+|---|---|---|
+| Windows Terminal | `WT_SESSION` or `GLYPH_ARTS_TERMINAL_PROFILE=windows-terminal` | truecolor symbols/blocks |
+| Windows Terminal Preview/Canary | `GLYPH_ARTS_TERMINAL_PROFILE=windows-terminal-preview` or `windows-terminal-canary` | Sixel via `chafa --format sixels` |
+| Warp | `TERM_PROGRAM=WarpTerminal` or `GLYPH_ARTS_TERMINAL_PROFILE=warp` | truecolor symbols/blocks |
+
+Use the explicit profile override when the terminal does not expose enough
+environment detail, especially for Windows Terminal Preview.
+
+Formula source should stay textual. Use `glyph-arts chat formula` for compact
+Unicode math, and `glyph-arts chat formula-pretty` for SymPy-backed multi-line
+fractions, roots, sums, and integrals. Only use image rendering for formula
+screenshots or scans; add `--invert` for white-page material in dark terminals.
+
+If you run `bash` inside WSL from Warp, treat it as two layers: host profile
+`warp`, runtime `wsl`, shell `bash`. Install `chafa`, Graphviz, and Diagon in
+WSL, but configure Nerd Fonts in Warp. In that case `install-backends` uses the
+Linux-side package context instead of Windows Scoop/Chocolatey. If a Windows
+process inherits WSL environment variables through interop, force the intended
+runtime with `GLYPH_ARTS_RUNTIME=wsl` or `GLYPH_ARTS_RUNTIME=windows`.
+
+All non-video chart types are pure-Python and work after `pip install glyph-arts` alone.
+
+## Developer Workflow
+
+The project uses `uv` for Python dependency locking and `Nx` as a thin CI task
+runner:
+
+```bash
+uv sync --extra all --extra test --extra dev
+npm ci
+npx nx run glyph-arts:test
+npx nx run glyph-arts:lint
+npx nx run glyph-arts:docs-check
+```
+
+Nx targets call `uv run ...`; Python dependencies still live in
+`pyproject.toml` and `uv.lock`.
+
+## Diagrams / Diagon
+
+`diagram` brings Diagon-style structure drawings into the same chat drawing
+surface:
+
+```bash
+glyph-arts chat sequence --json 'Client->Server: GET /health'
+glyph-arts chat diagram flowchart --json 'Capture -> Render -> Reply'
+glyph-arts chat diagram note --json 'NOTE\nCache refresh required before reading results.'
+glyph-arts diagram math --diagram-engine diagon --json '1/2 + sqrt(x)'
+glyph-arts chat diagram graphplanar --json 'A -- B\nB -- C\nC -- D\nD -- A'
+```
+
+## Mermaid / Beautiful Mermaid
+
+`mermaid` restores the beautiful-mermaid-style contract inside the same chat
+surface: Mermaid source in, chat-visible ASCII/Unicode diagram out.
+
+```bash
+glyph-arts chat mermaid --json 'graph LR\nA[开始] -->|是| B{判断}\nB --> C[完成]'
+glyph-arts mermaid --mermaid-ascii --json 'sequenceDiagram\nAlice->>Bob: Hello'
+glyph-arts mermaid --mermaid-theme tokyo-night --mermaid-padding-x 8 --json 'stateDiagram-v2\nIdle --> Running: start'
+glyph-arts chat mermaid --json 'xychart-beta horizontal\nx-axis [Python, Rust, Go]\nbar [30, 22, 18]\nline [28, 24, 16]'
+```
+
+The builtin fallback handles `graph`/`flowchart`, `sequenceDiagram`,
+`stateDiagram-v2`, `classDiagram`, `erDiagram`, and `xychart-beta`, with
+Unicode/ASCII output, display-width-safe Chinese labels, theme names compatible
+with the beautiful-mermaid convention, and spacing controls. `xychart-beta`
+supports rounded columns, horizontal bars, line overlays, legends, named series,
+and CJK-safe labels.
+
+When the `diagon` binary is installed, `--diagram-engine auto` delegates to
+Diagon for `math`, `sequence`, `tree`, `table`, `frame`, `flowchart`,
+`graphdag`, and `graphplanar`. Without Diagon, glyph-arts keeps a small
+chat-safe builtin fallback for `sequence`, `tree`, `table`, `frame`,
+`math`, `note`, `flowchart`, `graphdag`, and `graphplanar`.
+`glyph-arts doctor` reports both `graphviz` (`dot`) and `diagon`, while
+`install-backends --target diagrams` installs Graphviz where a package-manager
+path is known and prints the Diagon upstream install note when it is optional.
+
+For network graphs, `graph` uses PHART and accepts JSON edges, simple edge-list
+text, DOT, and GraphML:
+
+```bash
+glyph-arts chat graph --json 'Client -> API\nAPI -> DB'
+glyph-arts chat graph --graph-format dot --json 'digraph { Client -> API; API -> DB; }'
+glyph-arts graph --json '{"edges":[["Client","API"],["API","DB"]]}'
+```
+
+For plotext-specific power features, `plotext` exposes the upstream overlay API
+inside the chat-safe CLI surface: error bars, date-time series, candlesticks,
+histograms, text annotations, vertical/horizontal guide lines, rectangles,
+polygons, and colorized strings. Video/audio/YouTube streaming remains outside
+the chat contract.
+
+```bash
+glyph-arts chat plotext --json '{"series":[{"type":"line","x":[1,2,3],"y":[2,5,3],"label":"signal"},{"type":"error","x":[1,2,3],"y":[2,5,3],"yerr":[0.3,0.8,0.4],"label":"err"}],"texts":[{"text":"peak","x":2,"y":5}],"vlines":[2],"hlines":[4],"shapes":[{"type":"rectangle","x":[1.5,2.5],"y":[2.5,5.5],"lines":true}]}'
+glyph-arts chat plotext --json '{"colorize":"OK","color":"green","style":"bold"}'
+```
+
+For incplot-style input, `incplot` is the automatic plotting door for raw
+JSON, JSONL, CSV, and TSV. It infers category bars, grouped bars, temporal
+lines, numeric scatter, histograms, tables, and OHLC candlesticks:
+
+```bash
+cat data.csv | glyph-arts chat incplot
+glyph-arts chat incplot --json '{"x":1,"y":2}\n{"x":2,"y":5}\n{"x":3,"y":3}'
+glyph-arts chat incplot --prefer line --json 'x,y\n1,2\n2,5\n3,3'
+```
+
+For textplots-rs and drawille-style Braille drawing, use `textplot` for
+continuous function plots and `turtle` for path/canvas commands:
+
+```bash
+glyph-arts chat textplot --json '{"expr":"sin(x) / x","xmin":-20,"xmax":20}'
+glyph-arts chat turtle --json '{"commands":[["forward",30],["right",90],["forward",20],["right",90],["forward",30]]}'
+```
+
+For other agents, the installable skill package is
+[`skills/chat-drawing`](skills/chat-drawing). The short transferable instruction
+packet is [`docs/agent_chat_drawing_skill.md`](docs/agent_chat_drawing_skill.md),
+with a machine-readable capability map at
+[`docs/chat_drawing_capabilities.json`](docs/chat_drawing_capabilities.json).
+The skill ships an anti-lazy gate so copied agent adapters cannot quietly skip
+rendering, verification, or reply-with-visible-output:
+
+```bash
+python skills/chat-drawing/scripts/verify_agent_contract.py
+```
+
+## Chat Effects
+
+`effect` is the preset layer for richer chat drawings. It composes the lower
+level chart, diagram, graph, SDR, and density-map renderers into reusable visual
+recipes:
+
+```bash
+glyph-arts chat effects
+glyph-arts effect pipeline --json '{"steps":["Input","Route","Render","Verify","Reply"]}'
+glyph-arts effect metrics
+glyph-arts effect system-map
+glyph-arts effect signal-panel
+glyph-arts effect timeline
+glyph-arts effect matrix
+glyph-arts effect comparison
+glyph-arts effect swimlane
+glyph-arts effect kanban
+glyph-arts effect quadrant
+glyph-arts effect mindmap
+```
+
+Use `chat effects` when the user asks "what can you draw?" or when a plain chart
+is technically correct but visually too thin.
 
 ## Art tiers (--engine pixel)
 
@@ -154,6 +348,33 @@ glyph-arts animate line --duration 5 --frames 30 \
 ```
 
 Ctrl-C exits cleanly and leaves the complete final chart on screen.
+
+## Live Demo
+
+`live` renders a sliding-window line chart with no system-monitoring dependency:
+
+```bash
+glyph-arts live random --duration 10 --interval 0.2
+seq 1 100 | glyph-arts live stdin --interval 0.1
+```
+
+Real `cpu`, `mem`, and `ping` sources are future work.
+
+## WaveTerm Adapter
+
+`wave` keeps ordinary chat output as plain text, but adds a WaveTerm-native
+preview path when `wsh` is available:
+
+```bash
+glyph-arts wave doctor
+glyph-arts wave view --file chart.html
+glyph-arts wave render bar --json '{"labels":["A","B"],"values":[3,7]}'
+glyph-arts wave render diagram sequence --json 'A->B: hello' --wave-format html
+```
+
+`wave render` exports the selected chart to `.html`, `.txt`, or `.ansi`, then
+opens it with `wsh view` so WaveTerm can show it as a rich block. Add
+`--dry-run` to print the planned chart and `wsh` commands without running them.
 
 ## Recording
 
@@ -256,74 +477,21 @@ glyph-arts --check-deps --all
 
 | Engine | Types |
 |--------|-------|
-| plotext | `kline` `candlestick` `line` `scatter` `step` `bar` `multibar` `stackedbar` `hist` `heatmap` `box` `indicator` `event` `confusion` |
+| incplot | `incplot` |
+| plotext | `kline` `candlestick` `line` `scatter` `step` `bar` `multibar` `stackedbar` `hist` `heatmap` `box` `indicator` `event` `confusion` `plotext` |
 | sdr | `spectrum` `waterfall` |
 | rich | `table` `tree` `panel` `gauge` `pie` `dashboard` `rich_live` |
-| drawille *(optional `[braille]`)* | `curve` `hires` `radar` |
+| diagram | `diagram` `mermaid` |
+| drawille / braille | `curve` `hires` `radar` `textplot` `turtle` |
 | plotille | `plotille` |
 | uniplot | `uniplot` |
-| misc | `plot` `graph` `sparkline` `banner` `art` `animate` `record` `record-replay` `to-hyperframes` `to-ascii-motion` `chat` |
-| media *(requires chafa + ffmpeg)* | `image` `video` |
+| misc | `graph` `effect` `sparkline` `banner` `art` `animate` `record` `record-replay` `to-hyperframes` `to-ascii-motion` `code` `status` `splash` `demo` `gallery` `auto` `live` `doctor` `install-backends` `wave` |
+| media *(image uses Pillow/chafa; video requires chafa + ffmpeg)* | `image` `video` |
 
-Total: **56 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
+Total: **71 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
 
-## SDR plots
-
-`spectrum` and `waterfall` cover SDR-style terminal visualization without
-owning SDR hardware, drivers, or demodulation. Feed them FFT/spectrogram output
-from sdrrat, GNU Radio, SoapySDR, or a Python script. Both commands accept JSON,
-JSONL/NDJSON, CSV, or TSV through `--format`, and `plot` auto-detects SDR-shaped
-input.
-
-```bash
-glyph-arts spectrum --file examples/sdr/spectrum.json --title RF-Spectrum
-glyph-arts waterfall --file examples/sdr/waterfall.json --title RF-Waterfall
-glyph-arts spectrum --format csv < examples/sdr/spectrum.csv
-glyph-arts waterfall --format csv < examples/sdr/waterfall.csv
-glyph-arts plot < examples/sdr/spectrum.csv
-```
-
-Supported SDR overlays: `center`/`center_freq`, `bandwidth`/`span`, `vfo` or
-`vfos`, `markers`, `signals`, `peaks`, `avg`, `max_hold`, `noise_floor`, and
-`squelch`. Waterfall uses ANSI intensity colors by default; add `--no-color` for
-plain logs, or `--font-tier ascii` for strict ASCII terminals.
-
-Spectrum output:
-
-```text
-                               RF-Spectrum
-       ◆ hold  + avg  · live
-       ┌──────────────────────────────────────────────────────────────────┐
-    -35│                      ┆       ◆◆▲◆       ┃ ┆                      │
-       │                      ┆    ◆◆◆··│·◆◆◆    ┃ ┆                      │
-       │                      ┆  ◆◆···++│+···◆◆  ┃ ┆                      │
-       │                      ┆◆◆··+++  │   +··◆◆┃ ┆                      │
-       │══════════════════════◆··+══════│══════··┃◆═══════════════════════│
-    -64│                    ◆··+        │        ┃·◆◆                     │
-       │                  ···+┆         │        ┃ ··◆◆◆                  │
-       │              ····++  ┆         │        ┃ ┆ ···◆◆◆◆              │
-       │         ·····++++    ┆         │        ┃ ┆    ····◆◆◆◆◆◆        │
-       │◆◆◆······+++++╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌│╌╌╌╌╌╌╌╌┃╌╌╌╌╌╌╌╌╌╌···········╌╌╌│
-    -93│···                   ┆         │        ┃ ┆                   ···│
-       └──────────────────────────────────────────────────────────────────┘
-        99                                                            99.6
-        center=99.3 bw=0.2 rx=99.38 FM@99.3
-```
-
-Waterfall output:
-
-```text
-                               RF-Waterfall
- t-5           ..........----------##########==========::::::::::.........
- t-4 ....................==========@@@@@@@@@@++++++++++::::::::::.........
- t-3 ....................----------%%%%%%%%%%**********::::::::::.........
- t-2           ..........::::::::::**********%%%%%%%%%%==========.........
- t-1           ..........::::::::::++++++++++@@@@@@@@@@++++++++++.........
- now           ....................==========##########%%%%%%%%%%:::::::::
-     99.0                                                             99.6
-range -94..-42 dB
- tune center=99.3 bw=0.2 rx=99.5
-```
+For the chat-vs-ANSI-vs-artifact boundary, see
+[`docs/capability_matrix.md`](docs/capability_matrix.md).
 
 ## All flags
 
@@ -333,22 +501,51 @@ glyph-arts <type> [--json JSON | --file PATH | --duckdb SQL --db PATH]
                   [--sample N] [--xlabel X] [--ylabel Y]
                   [--xlim MIN MAX] [--ylim MIN MAX]
                   [--xscale linear|log] [--yscale linear|log]
-                  [--orientation vertical|horizontal] [--format auto|json|jsonl|csv|tsv]
-                  [--output FILE] [--no-color]
+                  [--orientation vertical|horizontal]
+                  [--output FILE] [--no-color] [--chat]
 ```
 
 **Width** defaults to `$COLUMNS` (terminal width). Override with `--width 120`.
+
+**`--chat`** forces plain text output for AI chat panes. For `image`, it uses
+the Pillow ASCII renderer so the result survives Markdown code blocks. The
+default image path auto-crops the foreground, suppresses flat backgrounds, and
+boosts contrast/edges. Use `--image-mode raw` to get the old whole-image
+luminance path, `--image-mode edge` for outlines, `--image-mode silhouette` for
+a readable subject mask, or `--no-trim` to keep the full frame.
+
+`image` also includes the ascii-art skill style set:
+`classic`, `braille`, `block`, `edge`, `dot-cross`, `halftone`, `particles`,
+`retro-art`, and `terminal`. Pair them with
+`--color-mode grayscale|original|matrix|amber|custom`, `--custom-color coral`,
+`--background dark|light|transparent`, `--ratio original|16:9|4:3|1:1|3:4|9:16`,
+`--dither none|floyd-steinberg|bayer|atkinson`, and static exports via
+`.txt`, `.md`, `.html`, `.svg`, `.png`, `.gif`, or `.tsx`.
+
+**`chat` mode** is the short front door for chat drawing. It rewrites to the
+plain-text-safe command:
+
+```bash
+glyph-arts chat image --file photo.jpg
+glyph-arts chat photo.jpg
+glyph-arts chat sequence --json 'Alice->Bob: Hello'
+glyph-arts chat mermaid --json 'graph LR\nA[开始] --> B[完成]'
+glyph-arts chat graph --json 'A -> B\nB -> C'
+glyph-arts chat incplot --json 'x,y\n1,2\n2,5\n3,3'
+glyph-arts chat textplot --json '{"expr":"sin(x)"}'
+glyph-arts chat turtle --json '{"commands":[["forward",30],["right",90],["forward",20]]}'
+glyph-arts chat effects
+glyph-arts chat sdr spectrum --json '{"freq":[99.0,99.3],"power":[-93,-42]}'
+glyph-arts chat waterfall --json '{"matrix":[[-94,-42],[-90,-50]]}'
+```
+
+`chat image` implies `--chat`; chart commands imply `--no-color`.
 
 **`--sample N`** uses LTTB (Largest-Triangle-Three-Buckets) downsampling — shape-preserving, not random stride. Falls back to uniform stride if `lttb` not installed.
 
 ## Pipe / file input
 
 ```bash
-# auto-detect JSON, JSONL/NDJSON, CSV, or TSV and pick a chart
-cat metrics.csv | glyph-arts plot --title "Benchmark"
-glyph-arts plot --file metrics.json
-glyph-arts plot --as bar --file metrics.tsv
-
 # stdin pipe (for large data)
 cat metrics.json | glyph-arts bar --title "Benchmark"
 
@@ -373,6 +570,8 @@ glyph-arts kline \
 | table | all columns as-is |
 | hist | all columns as value series |
 | heatmap | matrix from .values, col names as xlabels |
+| spectrum | frequency/power series via `freq`/`power` or `x`/`y` |
+| waterfall | matrix rows plus optional `xlabels`, `ylabels`, `min`, `max` |
 | curve | col0=x, col1=y |
 | sparkline | col0 values |
 | confusion | col0=actual, col1=predicted |
@@ -409,6 +608,18 @@ glyph-arts dashboard --json '{
 ## For Claude Code / AI agents
 
 See [SKILL.md](SKILL.md) for the full AI usage contract: decision tree, schema reference, DO/DO NOT rules, and anti-patterns.
+
+For Codex/Claude/OpenCode-style agents that support local skills, copy or link
+[`skills/chat-drawing`](skills/chat-drawing) into that agent's skills directory.
+It contains the closed loop: choose a `glyph-arts chat ...` route, render to
+stdout, verify with `scripts/verify_chat_art.py`, rerender or fallback on
+failure, then reply with the verified visible drawing. The portable cross-agent prompt is
+[`references/agent-contract.md`](skills/chat-drawing/references/agent-contract.md);
+route selection is in
+[`references/decision-tree.md`](skills/chat-drawing/references/decision-tree.md),
+with adapters under [`skills/chat-drawing/agents`](skills/chat-drawing/agents).
+Run `python skills/chat-drawing/scripts/verify_agent_contract.py` after editing
+those adapters; CI uses the same gate.
 
 ```bash
 # Claude Code skill (no pip required — uses scripts/ shims):
