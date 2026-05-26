@@ -51,7 +51,7 @@ interactive = ["textual>=0.50"]
 ai-motion = ["mcp>=1.0,<2"]
 dev     = ["build>=1.2", "mypy>=1.8", "pytest-cov>=4", "ruff>=0.6"]
 textcharts = ["textcharts>=0.1.2"]
-all     = ["art>=6.0", "drawille>=0.2", "Pygments>=2.16", "lttb>=0.3", "matplotlib>=3.7", "textual>=0.50", "textcharts>=0.1.2", "drawsvg>=2.4.1", "mermaid-py>=0.8.4", "sympy>=1.14.0", "texttable>=1.7.0"]
+all     = ["art>=6.0", "drawille>=0.2", "Pygments>=2.16", "lttb>=0.3", "matplotlib>=3.7", "textual>=0.50", "textcharts>=0.1.2", "drawsvg>=2.4.1", "mermaid-py>=0.8.4", "sympy>=1.14.0", "texttable>=1.7.0", "textual-image>=0.12.0"]
 markup = [
     "drawsvg>=2.4.1",
     "mermaid-py>=0.8.4",

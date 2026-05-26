@@ -844,6 +844,7 @@ all = [
     { name = "textcharts" },
     { name = "texttable" },
     { name = "textual" },
+    { name = "textual-image" },
 ]
 art = [
     { name = "art" },
@@ -934,6 +935,7 @@ requires-dist = [
     { name = "textual", marker = "extra == 'all'", specifier = ">=0.50" },
     { name = "textual", marker = "extra == 'interactive'", specifier = ">=0.50" },
     { name = "textual", marker = "extra == 'tui'", specifier = ">=0.50" },
+    { name = "textual-image", marker = "extra == 'all'", specifier = ">=0.12.0" },
     { name = "textual-image", marker = "extra == 'markup'", specifier = ">=0.12.0" },
     { name = "uniplot", specifier = ">=0.5" },
     { name = "wcwidth", specifier = ">=0.7.0" },
