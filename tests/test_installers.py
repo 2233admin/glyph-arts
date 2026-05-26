@@ -182,6 +182,23 @@ def test_font_downloader_installs_direct_font_urls(monkeypatch, tmp_path) -> Non
     assert "Downloaded assets:" in notice
 
 
+def test_noto_direct_downloads_use_noto_fonts_repository() -> None:
+    from cli_charts.font_downloads import FONT_DOWNLOADS
+
+    assert FONT_DOWNLOADS["noto-math"].direct_urls == (
+        "https://raw.githubusercontent.com/notofonts/noto-fonts/main/hinted/ttf/NotoSansMath/NotoSansMath-Regular.ttf",
+    )
+    assert FONT_DOWNLOADS["noto-symbols-legacy"].direct_urls == (
+        "https://raw.githubusercontent.com/notofonts/noto-fonts/main/hinted/ttf/NotoSansSymbols/NotoSansSymbols-Regular.ttf",
+    )
+    assert FONT_DOWNLOADS["noto-symbols"].direct_urls == (
+        "https://raw.githubusercontent.com/notofonts/noto-fonts/main/hinted/ttf/NotoSansSymbols2/NotoSansSymbols2-Regular.ttf",
+    )
+    assert FONT_DOWNLOADS["unifont"].direct_urls == (
+        "https://unifoundry.com/pub/unifont/unifont-17.0.04/font-builds/unifont-17.0.04.otf",
+    )
+
+
 def test_font_downloader_extracts_tar_xz(tmp_path) -> None:
     from cli_charts import font_downloads
 

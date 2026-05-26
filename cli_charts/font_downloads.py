@@ -141,13 +141,13 @@ FONT_DOWNLOADS: dict[str, FontDownloadSpec] = {
     "noto-math": FontDownloadSpec(
         key="noto-math",
         name="Noto Sans Math",
-        repo="notofonts/math",
+        repo="notofonts/noto-fonts",
         asset_prefixes=(),
         asset_suffixes=(),
-        license_url="https://raw.githubusercontent.com/notofonts/math/main/OFL.txt",
+        license_url="https://raw.githubusercontent.com/notofonts/noto-fonts/main/LICENSE",
         family_hint="Noto Sans Math",
         direct_urls=(
-            "https://raw.githubusercontent.com/notofonts/math/main/fonts/NotoSansMath/full/ttf/NotoSansMath-Regular.ttf",
+            "https://raw.githubusercontent.com/notofonts/noto-fonts/main/hinted/ttf/NotoSansMath/NotoSansMath-Regular.ttf",
         ),
         note="mathematical operators, alphabets, and formula fallback",
     ),
@@ -160,7 +160,7 @@ FONT_DOWNLOADS: dict[str, FontDownloadSpec] = {
         license_url="https://raw.githubusercontent.com/notofonts/symbols/main/OFL.txt",
         family_hint="Noto Sans Symbols",
         direct_urls=(
-            "https://raw.githubusercontent.com/notofonts/symbols/main/fonts/NotoSansSymbols/full/ttf/NotoSansSymbols-Regular.ttf",
+            "https://raw.githubusercontent.com/notofonts/noto-fonts/main/hinted/ttf/NotoSansSymbols/NotoSansSymbols-Regular.ttf",
         ),
         note="older symbol-plane companion to Noto Sans Symbols 2",
     ),
@@ -173,7 +173,7 @@ FONT_DOWNLOADS: dict[str, FontDownloadSpec] = {
         license_url="https://raw.githubusercontent.com/notofonts/symbols/main/OFL.txt",
         family_hint="Noto Sans Symbols 2",
         direct_urls=(
-            "https://raw.githubusercontent.com/notofonts/symbols/main/fonts/NotoSansSymbols2/full/ttf/NotoSansSymbols2-Regular.ttf",
+            "https://raw.githubusercontent.com/notofonts/noto-fonts/main/hinted/ttf/NotoSansSymbols2/NotoSansSymbols2-Regular.ttf",
         ),
         note="large technical, geometric, dingbat, and legacy symbol coverage",
     ),
@@ -213,7 +213,7 @@ FONT_DOWNLOADS: dict[str, FontDownloadSpec] = {
         family_hint="Unifont",
         source_url="https://unifoundry.com/unifont/index.html",
         direct_urls=(
-            "https://unifoundry.com/pub/unifont/unifont-17.0.04/font-builds/unifont-17.0.04.ttf",
+            "https://unifoundry.com/pub/unifont/unifont-17.0.04/font-builds/unifont-17.0.04.otf",
         ),
         note="last-resort BMP coverage when a terminal has tofu fever",
     ),
