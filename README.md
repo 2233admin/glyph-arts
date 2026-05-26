@@ -512,7 +512,7 @@ glyph-arts --check-deps --all
 | misc | `graph` `effect` `sparkline` `banner` `art` `animate` `record` `record-replay` `to-hyperframes` `to-ascii-motion` `code` `status` `splash` `demo` `gallery` `auto` `live` `doctor` `install-backends` `wave` |
 | media *(image uses Pillow/chafa; video requires chafa + ffmpeg)* | `image` `video` |
 
-Total: **72 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
+Total: **73 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
 
 For the chat-vs-ANSI-vs-artifact boundary, see
 [`docs/capability_matrix.md`](docs/capability_matrix.md).
@@ -558,12 +558,17 @@ glyph-arts chat graph --json 'A -> B\nB -> C'
 glyph-arts chat incplot --json 'x,y\n1,2\n2,5\n3,3'
 glyph-arts chat textplot --json '{"expr":"sin(x)"}'
 glyph-arts chat turtle --json '{"commands":[["forward",30],["right",90],["forward",20]]}'
+glyph-arts chat probe
+glyph-arts chat profile
 glyph-arts chat effects
 glyph-arts chat sdr spectrum --json '{"freq":[99.0,99.3],"power":[-93,-42]}'
 glyph-arts chat waterfall --json '{"matrix":[[-94,-42],[-90,-50]]}'
 ```
 
 `chat image` implies `--chat`; chart commands imply `--no-color`.
+Use `--chat-profile ascii|safe|rich|max` to force a glyph tier for a render.
+`glyph-arts doctor --fix-chat` prints the font fallback chain and setup plan for
+the current terminal.
 
 **`--sample N`** uses LTTB (Largest-Triangle-Three-Buckets) downsampling — shape-preserving, not random stride. Falls back to uniform stride if `lttb` not installed.
 

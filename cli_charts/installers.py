@@ -192,12 +192,16 @@ def build_install_plan(target: str = "all", manager: str = "") -> list[InstallSt
     return _dedupe_steps(steps)
 
 
-def render_doctor() -> str:
+def render_doctor(*, fix_chat: bool = False) -> str:
     lines = ["glyph-arts backend doctor", ""]
     for status in backend_statuses():
         mark = "OK" if status.ok else "MISSING"
         lines.append(f"{status.name:<13} {mark:<7} {status.detail}")
     lines.extend(["", "Install plan (chat):", render_install_plan("chat")])
+    if fix_chat:
+        from cli_charts.chat_health import render_fix_chat_plan
+
+        lines.extend(["", render_fix_chat_plan()])
     return "\n".join(lines).rstrip() + "\n"
 
 

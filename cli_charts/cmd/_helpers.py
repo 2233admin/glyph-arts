@@ -135,6 +135,7 @@ _IMAGE_EXTENSIONS = {
 }
 _CHAT_GROUP_ALIASES = {'sdr'}
 _CHAT_EFFECT_ALIASES = {'effects'}
+_CHAT_HEALTH_ALIASES = {'probe', 'profile', 'profiles', 'fix', 'fix-chat'}
 _DIAGRAM_KIND_ALIASES = {
     'math', 'sequence', 'tree', 'table', 'frame', 'box', 'note', 'flowchart',
     'graphdag', 'dag', 'graphplanar', 'planar',
@@ -156,6 +157,8 @@ def _rewrite_chat_argv(argv):
         return ['--help']
 
     target = None
+    if rest and rest[0] in _CHAT_HEALTH_ALIASES:
+        return ['chat-health', rest[0], *rest[1:]]
     if rest and rest[0].lower() in _DIAGRAM_KIND_ALIASES:
         return ['diagram', '--no-color', '--diagram-kind', rest[0], *rest[1:]]
     if rest[0] in _CHAT_GROUP_ALIASES and len(rest) > 1:
@@ -1891,6 +1894,11 @@ def fonts_command(d, title, w, h, theme, **kw):
     raise RuntimeError("fonts is dispatched by main()")
 
 
+def chat_health_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("chat-health is dispatched by main()")
+
+
 def wave_command(d, title, w, h, theme, **kw):
     """Placeholder registry entry; dispatched specially by main()."""
     raise RuntimeError("wave is dispatched by main()")
@@ -2005,6 +2013,7 @@ CMDS = {
     'doctor':      doctor_command,
     'install-backends': install_backends_command,
     'fonts':       fonts_command,
+    'chat-health': chat_health_command,
     'wave':        wave_command,
 }
 
@@ -2023,7 +2032,7 @@ CHART_TYPES_BY_ENGINE: dict[str, list[str]] = {
     'plotille': ['plotille'],
     'uniplot': ['uniplot'],
     'textcharts': ['comparison', 'diverging', 'summary', 'sparkline-table', 'cdf', 'rank', 'percentile', 'boxplot', 'stacked-text'],
-    'misc': ['graph', 'effect', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'fonts', 'wave', 'calibrate'],
+    'misc': ['graph', 'effect', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'fonts', 'chat-health', 'wave', 'calibrate'],
     'media': ['image', 'video'],
 }
 
@@ -2091,6 +2100,7 @@ EXPECTED_SCHEMAS = {
     'doctor':      'glyph-arts doctor',
     'install-backends': 'glyph-arts install-backends --target all [--run --yes]',
     'fonts':       'glyph-arts fonts install core',
+    'chat-health': 'glyph-arts chat probe',
     'wave':        'glyph-arts wave render bar --json \'{"labels":["A"],"values":[3]}\'',
 }
 
@@ -2129,7 +2139,7 @@ def _require_ascii_motion_npx():
 def _render_ascii_motion_frames(chart_type, data, args, adapter, no_color=False):
     if chart_type not in CMDS or chart_type in {
         'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion',
-    'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'fonts', 'wave',
+    'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'fonts', 'chat-health', 'wave',
     }:
         print('ERROR:schema: to-ascii-motion needs a renderable chart type argument', file=sys.stderr)
         sys.exit(1)
@@ -2218,6 +2228,8 @@ Examples:
                    help='plotext theme: pro dark clear matrix retro elegant + brand palettes: claude linear tesla vercel (ignored for rich/graph/sparkline)')
     p.add_argument('--font-tier',   choices=['ascii', 'unicode', 'unicode-extended', 'nerd'],
                    default=None, help='Terminal font capability tier (default: auto-detect)')
+    p.add_argument('--chat-profile', choices=['auto', 'ascii', 'safe', 'rich', 'max'],
+                   default='auto', help='Chat glyph profile: auto, ascii, safe, rich, or max')
     p.add_argument('--font',        default='slant',
                    help='TYPE=art figlet font (default: slant). Use --list-fonts to see all.')
     p.add_argument('--decor',       default=None,
@@ -2399,6 +2411,8 @@ Examples:
                    help='TYPE=install-backends execute the generated install commands')
     p.add_argument('--yes', action='store_true',
                    help='TYPE=install-backends confirm execution when used with --run')
+    p.add_argument('--fix-chat', action='store_true',
+                   help='TYPE=doctor print chat glyph/font remediation plan')
     p.add_argument('--font-dir', default='',
                    help='TYPE=fonts download/status directory (default: ~/.glyph-arts/fonts)')
     p.add_argument('--dry-run', action='store_true',
@@ -2456,6 +2470,12 @@ Examples:
     args = p.parse_args(raw_argv)
     if args.font_tier is None:
         args.font_tier = detect_font_tier()
+    if args.chat_profile != 'auto':
+        from cli_charts.chat_health import chat_profile_tier
+
+        args.font_tier = chat_profile_tier(args.chat_profile, args.font_tier)
+        if args.chat_profile == 'ascii':
+            args.no_color = True
 
     if args.style is None:
         env_style = os.environ.get('GLYPH_ARTS_STYLE', '').strip().lower()
@@ -2464,7 +2484,7 @@ Examples:
 
     if args.type == 'doctor':
         from cli_charts.installers import render_doctor
-        print(render_doctor(), end='')
+        print(render_doctor(fix_chat=args.fix_chat), end='')
         sys.exit(0)
 
     if args.type == 'install-backends':
@@ -2478,6 +2498,10 @@ Examples:
     if args.type == 'fonts':
         from cli_charts.font_downloads import run_fonts_command
         sys.exit(run_fonts_command(args))
+
+    if args.type == 'chat-health':
+        from cli_charts.chat_health import run_chat_health_command
+        sys.exit(run_chat_health_command(args))
 
     if args.type == 'wave':
         from cli_charts.adapters.waveterm import run_wave_command
