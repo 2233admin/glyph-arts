@@ -116,6 +116,14 @@ def add_media_arguments(parser):
         help="TYPE=image font size in HTML/SVG/PNG exports",
     )
     parser.add_argument(
+        "--max-frames",
+        type=int,
+        default=0,
+        dest="max_frames",
+        metavar="N",
+        help="TYPE=video maximum number of frames to decode and render (0 = no limit)",
+    )
+    parser.add_argument(
         "--image-random",
         action="store_true",
         help="TYPE=image choose a deterministic random style/color/dither preset",
