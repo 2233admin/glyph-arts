@@ -1097,6 +1097,177 @@ def render_image(
     )
 
 
+_VIDEO_EXPORT_SUFFIXES = {".gif", ".mp4", ".webm", ".mov"}
+
+
+def render_video_export(
+    path: str,
+    output: str,
+    w: int,
+    h: int,
+    *,
+    fps: int = 12,
+    duration: float = 0.0,
+    max_frames: int = 0,
+    image_style: str = "classic",
+    color_mode: str = "original",
+    background: str = "dark",
+    custom_color: str | None = None,
+    dither: str = "none",
+    dither_strength: float = 0.8,
+    invert: bool = False,
+    trim: bool = False,
+    font_size: int = 14,
+) -> int:
+    """Export a video or animated GIF as an animated ASCII art file.
+
+    Each frame is rendered through the Pillow ASCII pipeline so all
+    ``--image-style``, ``--color-mode``, and ``--dither`` options apply.
+    Output format is determined by the *output* file suffix:
+
+    - ``.gif``  — Pillow animated GIF (no ffmpeg encoder needed for output)
+    - ``.mp4``  — H.264 yuv420p via ffmpeg (widest player support)
+    - ``.webm`` — VP9 yuv444p via ffmpeg (full-colour, no chroma sub-sampling)
+    - ``.mov``  — ProRes 4444 via ffmpeg (lossless-quality, professional)
+    """
+    Image, ImageOps = _load_pillow()
+    if Image is None:
+        print("ERROR:dep: Pillow not installed -- pip install Pillow", file=sys.stderr)
+        return 2
+    if not shutil.which("ffmpeg"):
+        print("ERROR:dep: ffmpeg not found -- required for video export", file=sys.stderr)
+        return 2
+
+    suffix = Path(output).suffix.lower()
+    if suffix not in _VIDEO_EXPORT_SUFFIXES:
+        print(
+            f"ERROR:schema: unsupported animation output suffix '{suffix}'; "
+            f"use one of: {', '.join(sorted(_VIDEO_EXPORT_SUFFIXES))}",
+            file=sys.stderr,
+        )
+        return 1
+
+    no_color = color_mode == "grayscale"
+
+    with tempfile.TemporaryDirectory(prefix="glyph_vanim_") as tmp:
+        # ── 1. Decode source into individual PNG frames ──────────────────────
+        src_path = Path(path)
+        animated_gif = False
+        try:
+            with Image.open(src_path) as probe:
+                animated_gif = probe.format == "GIF" and getattr(probe, "is_animated", False)
+        except OSError:
+            pass
+
+        frame_paths: list[str] = []
+        if animated_gif:
+            with Image.open(src_path) as gif:
+                total = getattr(gif, "n_frames", 1)
+                limit = max_frames if max_frames > 0 else total
+                for idx in range(min(total, limit)):
+                    gif.seek(idx)
+                    out_path = os.path.join(tmp, f"frame_{idx:06d}.png")
+                    gif.convert("RGB").save(out_path)
+                    frame_paths.append(out_path)
+        else:
+            ff_cmd = [
+                "ffmpeg", "-loglevel", "error", "-y",
+                "-i", str(src_path),
+                "-vf", f"fps={fps}",
+            ]
+            if duration and duration > 0:
+                ff_cmd += ["-t", str(duration)]
+            if max_frames and max_frames > 0:
+                ff_cmd += ["-frames:v", str(max_frames)]
+            ff_cmd.append(os.path.join(tmp, "frame_%06d.png"))
+            result = subprocess.run(ff_cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                lines = (result.stderr or "").strip().splitlines()
+                print(f"ERROR:render: {lines[-1] if lines else 'ffmpeg decode failed'}", file=sys.stderr)
+                return 4
+            frame_paths = sorted(glob.glob(os.path.join(tmp, "frame_*.png")))
+
+        if not frame_paths:
+            print("ERROR:render: source produced no frames", file=sys.stderr)
+            return 4
+
+        # ── 2. Render each frame through the ASCII pipeline ─────────────────
+        pil_frames: list[Any] = []
+        for frame_path in frame_paths:
+            try:
+                with Image.open(frame_path) as im:
+                    image = im.convert("RGB")
+            except OSError as exc:
+                print(f"ERROR:render: cannot read frame: {exc}", file=sys.stderr)
+                return 4
+            if trim:
+                image, _, _ = _prepare_image_layers(image, "auto", True)
+            cols, rows = _fit_style_size(image, w, h, image_style)
+            art = _build_ascii_image(
+                image, cols, rows,
+                style=image_style,
+                color_mode=color_mode,
+                background=background,
+                custom_color=custom_color,
+                dither=dither,
+                dither_strength=dither_strength,
+                invert=invert,
+            )
+            pil_frames.append(
+                _ascii_pil_image(art, background=background, no_color=no_color, font_size=font_size)
+            )
+
+        if not pil_frames:
+            print("ERROR:render: no frames rendered", file=sys.stderr)
+            return 4
+
+        # ── 3. Assemble output ───────────────────────────────────────────────
+        if suffix == ".gif":
+            frame_ms = max(20, round(1000 / max(fps, 1)))
+            first, *rest = pil_frames
+            first_rgb = first.convert("RGB") if first.mode == "RGBA" else first
+            rest_rgb = [f.convert("RGB") if f.mode == "RGBA" else f for f in rest]
+            first_rgb.save(
+                output,
+                format="GIF",
+                save_all=True,
+                append_images=rest_rgb,
+                duration=frame_ms,
+                loop=0,
+                optimize=False,
+            )
+            return 0
+
+        # Video via ffmpeg: write rendered PNGs then encode
+        enc_dir = os.path.join(tmp, "enc")
+        os.makedirs(enc_dir)
+        for idx, img in enumerate(pil_frames):
+            img.convert("RGB").save(os.path.join(enc_dir, f"r_{idx:06d}.png"))
+
+        if suffix == ".webm":
+            enc_args = ["-c:v", "libvpx-vp9", "-pix_fmt", "yuv444p", "-crf", "20", "-b:v", "0", "-row-mt", "1"]
+            tail_args: list[str] = []
+        elif suffix == ".mov":
+            enc_args = ["-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt", "yuva444p10le", "-q:v", "11"]
+            tail_args = []
+        else:
+            enc_args = ["-c:v", "libx264", "-pix_fmt", "yuv420p", "-crf", "18", "-preset", "slow"]
+            tail_args = ["-movflags", "+faststart"]
+
+        enc_cmd = (
+            ["ffmpeg", "-y", "-loglevel", "error", "-framerate", str(fps),
+             "-i", os.path.join(enc_dir, "r_%06d.png")]
+            + enc_args + tail_args + [output]
+        )
+        result = subprocess.run(enc_cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            lines = (result.stderr or "").strip().splitlines()
+            print(f"ERROR:render: {lines[-1] if lines else 'ffmpeg encode failed'}", file=sys.stderr)
+            return 4
+
+    return 0
+
+
 def render_video(
     path: str,
     w: int,
@@ -1105,13 +1276,46 @@ def render_video(
     fps: int = 12,
     symbols: str = "braille",
     duration: float = 0.0,
+    max_frames: int = 0,
+    output: str = "",
     no_color: bool = False,
     chat: bool = False,
+    image_style: str = "classic",
+    color_mode: str = "original",
+    background: str = "dark",
+    custom_color: str | None = None,
+    dither: str = "none",
+    dither_strength: float = 0.8,
+    invert: bool = False,
+    trim: bool = False,
+    font_size: int = 14,
     chafa_format: str = "symbols",
     chafa_colors: str = "auto",
     chafa_symbols: str | None = None,
     chafa_args: list[str] | None = None,
 ) -> int:
+    """Play a video in the terminal, or export to an animated file.
+
+    When *output* ends with ``.gif``, ``.mp4``, ``.webm``, or ``.mov`` the
+    video is rendered frame-by-frame and saved to that file instead of being
+    played in the terminal.
+    """
+    if output and Path(output).suffix.lower() in _VIDEO_EXPORT_SUFFIXES:
+        return render_video_export(
+            path, output, w, h,
+            fps=fps,
+            duration=duration,
+            max_frames=max_frames,
+            image_style=image_style,
+            color_mode=color_mode,
+            background=background,
+            custom_color=custom_color,
+            dither=dither,
+            dither_strength=dither_strength,
+            invert=invert,
+            trim=trim,
+            font_size=font_size,
+        )
     """Play a video in the terminal: ffmpeg extracts frames, chafa renders each."""
     if not shutil.which("chafa"):
         print("ERROR:dep: chafa not found", file=sys.stderr)
