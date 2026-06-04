@@ -31,15 +31,33 @@ from cli_charts.registry import STYLES as _STYLES
 from cli_charts.symbols import BLOCK, BRAILLE_ALL, get_symbol
 from cli_charts.themes import get_palette as _get_palette
 
-try:
-    from importlib.metadata import version as _pkg_version
-    _VERSION = _pkg_version("glyph-arts")
-except Exception:
+_VERSION: str | None = None
+
+
+def _load_version() -> str:
+    global _VERSION
+    if _VERSION is not None:
+        return _VERSION
     try:
         from pathlib import Path as _Path
-        _VERSION = (_Path(__file__).parent.parent / "VERSION").read_text().strip()
+
+        _VERSION = (_Path(__file__).parent.parent / "VERSION").read_text(encoding="utf-8").strip()
     except Exception:
-        _VERSION = "unknown"
+        try:
+            from importlib.metadata import version as _pkg_version
+
+            _VERSION = _pkg_version("glyph-arts")
+        except Exception:
+            _VERSION = "unknown"
+    return _VERSION
+
+
+class _LazyVersionAction(argparse.Action):
+    def __init__(self, option_strings, dest=argparse.SUPPRESS, default=argparse.SUPPRESS, **kwargs):
+        super().__init__(option_strings=option_strings, dest=dest, nargs=0, default=default, **kwargs)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        parser.exit(message=f"glyph-arts {_load_version()}\n")
 
 
 # -- helpers -----------------------------------------------------------------
@@ -2345,7 +2363,7 @@ Examples:
                    default='', help='TYPE=effect preset override')
     p.add_argument('--fps',         type=int, default=12, metavar='N',
                    help='Video playback frames/sec for type=video (default: 12)')
-    p.add_argument('--version',     action='version', version=f'glyph-arts {_VERSION}')
+    p.add_argument('--version',     action=_LazyVersionAction, help='Show glyph-arts version and exit')
     p.add_argument('--check-deps',  action='store_true',
                    help='Print dependency availability table and exit')
     p.add_argument('--all',         action='store_true',
