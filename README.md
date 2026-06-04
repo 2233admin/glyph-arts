@@ -36,7 +36,7 @@ the heavier integrations remain opt-in.
 | Core charts | Pure-Python terminal rendering that works after `pip install glyph-arts` | bar, line, scatter, pie, table, sparkline, gauge, indicator |
 | Optional engines | Better fidelity or interaction when extra Python packages are installed | LTTB downsampling, Textual dashboard, pixel engine |
 | Media/export adapters | File, image, video, and recording workflows that may need system tools | `.txt`, `.ansi`, `.html`, `.md`, `.png`, `record`, `record-replay` |
-| Experimental/agent integrations | Integrations for agent, motion, or external rendering workflows | Claude Code flags, HyperFrames, ASCII Motion |
+| Experimental/agent integrations | Integrations for agent, motion, or external rendering workflows | Claude Code flags, HyperFrames, ASCII Motion, draw.io MCP preview |
 
 ## Windows support
 
@@ -70,6 +70,8 @@ glyph-arts chat sdr spectrum --json '{"freq":[99.0,99.3,99.6],"power":[-93,-42,-
 glyph-arts chat sequence --json 'Client->Server: GET /health'
 glyph-arts chat mermaid --json 'graph LR\nA[开始] --> B[完成]'
 glyph-arts chat diagram note --json 'NOTE\nCache refresh required before reading results.'
+glyph-arts diagram drawio --json 'Client -> API -> DB' --output architecture.drawio
+glyph-arts to-drawio --json 'Client -> API -> DB' --output architecture.drawio
 glyph-arts chat graph --json 'Client -> API\nAPI -> DB'
 glyph-arts chat plotext --json '{"series":[{"type":"error","x":[1,2,3],"y":[2,5,3],"yerr":[0.3,0.8,0.4],"label":"err"}],"texts":[{"text":"peak","x":2,"y":5}],"vlines":[2]}'
 glyph-arts chat textplot --json '{"expr":"sin(x) / x","xmin":-20,"xmax":20}'
@@ -201,6 +203,18 @@ glyph-arts chat diagram flowchart --json 'Capture -> Render -> Reply'
 glyph-arts chat diagram note --json 'NOTE\nCache refresh required before reading results.'
 glyph-arts diagram math --diagram-engine diagon --json '1/2 + sqrt(x)'
 glyph-arts chat diagram graphplanar --json 'A -- B\nB -- C\nC -- D\nD -- A'
+```
+
+`drawio` is the file/preview escape hatch for diagrams that should keep living
+in diagrams.net/draw.io after the chat turn. It accepts simple edge-list text or
+existing draw.io XML, validates common `mxCell` mistakes, and can emit full
+`.drawio`, `mxGraphModel`, or MCP-friendly `mxCell` fragments:
+
+```bash
+glyph-arts diagram drawio --json 'Client -> API -> DB' --output architecture.drawio
+glyph-arts diagram drawio --drawio-graph-model --json 'Client -> API -> DB'
+glyph-arts diagram drawio --drawio-fragment --json 'Client -> API -> DB'
+glyph-arts diagram drawio --drawio-validate-only --file architecture.drawio
 ```
 
 ## Mermaid / Beautiful Mermaid
@@ -460,6 +474,24 @@ glyph-arts bar --json '{"labels":["A","B"],"values":[1,2]}' --polish ascii-motio
 glyph-arts to-ascii-motion bar --json '{"labels":["A","B"],"values":[1,2]}' --formats html,mp4,svg --output-dir ./out
 ```
 
+## Draw.io MCP integration
+
+glyph-arts can use the Next AI Draw.io MCP server as an opt-in browser preview
+and export bridge. Install the Python MCP client extra and keep Node/npm
+available for `npx`:
+
+```bash
+pip install "glyph-arts[drawio-mcp]"
+
+glyph-arts to-drawio --json 'Client -> API -> DB' --output architecture.drawio
+glyph-arts to-drawio --json 'Client -> API -> DB' --drawio-hold 60
+```
+
+`to-drawio` runs `npx @next-ai-drawio/mcp-server@latest`, opens the draw.io
+preview, pushes an `mxGraphModel`, and can export `.drawio`, `.png`, or `.svg`.
+Use `--drawio-base-url` to point the bridge at a self-hosted diagrams.net
+instance.
+
 ## Art command (Phase 2)
 
 The `art` command renders composable terminal text art: figlet font,
@@ -513,10 +545,10 @@ glyph-arts --check-deps --all
 | drawille / braille | `curve` `hires` `radar` `textplot` `turtle` |
 | plotille | `plotille` |
 | uniplot | `uniplot` |
-| misc | `graph` `effect` `sparkline` `banner` `art` `animate` `record` `record-replay` `to-hyperframes` `to-ascii-motion` `code` `status` `splash` `demo` `gallery` `auto` `live` `doctor` `install-backends` `wave` |
+| misc | `graph` `effect` `sparkline` `banner` `art` `animate` `record` `record-replay` `to-hyperframes` `to-ascii-motion` `to-drawio` `code` `status` `splash` `demo` `gallery` `auto` `live` `doctor` `install-backends` `fonts` `chat-health` `wave` `calibrate` |
 | media *(image uses Pillow/chafa; video requires chafa + ffmpeg)* | `image` `video` |
 
-Total: **73 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
+Total: **74 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
 
 For the chat-vs-ANSI-vs-artifact boundary, see
 [`docs/capability_matrix.md`](docs/capability_matrix.md).

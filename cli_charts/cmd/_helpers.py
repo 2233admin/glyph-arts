@@ -138,7 +138,7 @@ _CHAT_EFFECT_ALIASES = {'effects'}
 _CHAT_HEALTH_ALIASES = {'probe', 'profile', 'profiles', 'fix', 'fix-chat'}
 _DIAGRAM_KIND_ALIASES = {
     'math', 'sequence', 'tree', 'table', 'frame', 'box', 'note', 'flowchart',
-    'graphdag', 'dag', 'graphplanar', 'planar',
+    'graphdag', 'dag', 'graphplanar', 'planar', 'drawio',
 }
 
 
@@ -1379,6 +1379,9 @@ def diagram(d, title, w, h, theme, **kw):
         width=w,
         output=kw.get('output') or None,
         engine=kw.get('diagram_engine', 'auto'),
+        drawio_fragment=kw.get('drawio_fragment', False),
+        drawio_graph_model=kw.get('drawio_graph_model', False),
+        drawio_validate_only=kw.get('drawio_validate_only', False),
     )
     if rc:
         sys.exit(rc)
@@ -1844,6 +1847,11 @@ def to_ascii_motion_command(d, title, w, h, theme, **kw):
     raise RuntimeError("to-ascii-motion is dispatched by main()")
 
 
+def to_drawio_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("to-drawio is dispatched by main()")
+
+
 def code_command(d, title, w, h, theme, **kw):
     """Placeholder registry entry; dispatched specially by main()."""
     raise RuntimeError("code is dispatched by main()")
@@ -2003,6 +2011,7 @@ CMDS = {
     'record-replay': record_replay_command,
     'to-hyperframes': to_hyperframes_command,
     'to-ascii-motion': to_ascii_motion_command,
+    'to-drawio': to_drawio_command,
     'code':        code_command,
     'status':      status_command,
     'splash':      splash_command,
@@ -2032,7 +2041,7 @@ CHART_TYPES_BY_ENGINE: dict[str, list[str]] = {
     'plotille': ['plotille'],
     'uniplot': ['uniplot'],
     'textcharts': ['comparison', 'diverging', 'summary', 'sparkline-table', 'cdf', 'rank', 'percentile', 'boxplot', 'stacked-text'],
-    'misc': ['graph', 'effect', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'fonts', 'chat-health', 'wave', 'calibrate'],
+    'misc': ['graph', 'effect', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'to-drawio', 'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'fonts', 'chat-health', 'wave', 'calibrate'],
     'media': ['image', 'video'],
 }
 
@@ -2067,7 +2076,7 @@ EXPECTED_SCHEMAS = {
     'dashboard':  '{"panels":[{"type":"gauge","data":{"label":"CPU","value":72,"max":100},"title":"CPU"},{"type":"sparkline","data":{"values":[1,3,5,2,8]},"title":"Load"}]}',
     'incplot':    'Raw JSON/JSONL/CSV/TSV auto plot. Supports prefer=bar|multibar|stackedbar|line|scatter|hist|table|kline via --prefer.',
     'graph':      '{"edges":[["A","B"],...], "directed":true, "node_style":"ROUND"}',
-    'diagram':    'glyph-arts diagram sequence --json "Alice->Bob: Hello" or {"kind":"flowchart","text":"A -> B"}',
+    'diagram':    'glyph-arts diagram sequence --json "Alice->Bob: Hello" or glyph-arts diagram drawio --json "A -> B"',
     'formula':    'Raw formula text or {"items":["E = mc^2", "\\\\int exp(-x^2) dx"]}; emits compact Unicode math',
     'formula-pretty': 'Raw formula text or {"items":["(a+b)/(c+d)", "Integral(exp(-x^2), x)"]}; emits SymPy multi-line math',
     'calibrate':  'glyph-arts chat calibrate --terminal --calibrate-glyph braille',
@@ -2090,6 +2099,7 @@ EXPECTED_SCHEMAS = {
     'record-replay': 'glyph-arts record-replay demo.cast --output demo.gif',
     'to-hyperframes': "glyph-arts to-hyperframes --json '[{\"label\":\"x\",\"x\":[1,2],\"y\":[3,4]}]' --frames 30 --duration 5 --output-dir ./hf",
     'to-ascii-motion': "glyph-arts to-ascii-motion --json '[{\"label\":\"x\",\"x\":[1,2],\"y\":[3,4]}]' --formats html,mp4,svg --output-dir ./out",
+    'to-drawio':   'glyph-arts to-drawio --json "Client -> API -> DB" --output diagram.drawio',
     'code':        'glyph-arts code --file foo.py --lang python',
     'status':      'glyph-arts status --kind ok --message "All tests green"',
     'splash':      'glyph-arts splash',
@@ -2133,6 +2143,31 @@ def _require_ascii_motion_npx():
         sys.exit(3)
     if result.returncode != 0:
         print("error: ascii-motion-mcp not found; install via 'npm i -g ascii-motion-mcp'", file=sys.stderr)
+        sys.exit(3)
+
+
+def _load_drawio_adapter():
+    try:
+        adapter = importlib.import_module("cli_charts.adapters.drawio")
+        client = importlib.import_module("cli_charts.mcp_clients.drawio")
+    except ImportError:
+        print("error: to-drawio requires 'pip install glyph-arts[drawio-mcp]'", file=sys.stderr)
+        sys.exit(2)
+    if getattr(client, "ClientSession", None) is None:
+        print("error: to-drawio requires 'pip install glyph-arts[drawio-mcp]'", file=sys.stderr)
+        sys.exit(2)
+    return adapter
+
+
+def _require_drawio_npx():
+    npx = shutil.which("npx") or shutil.which("npx.cmd") or "npx"
+    try:
+        result = subprocess.run([npx, "--version"], capture_output=True, text=True)
+    except FileNotFoundError:
+        print("error: to-drawio requires npx; install Node.js/npm", file=sys.stderr)
+        sys.exit(3)
+    if result.returncode != 0:
+        print("error: to-drawio requires npx; install Node.js/npm", file=sys.stderr)
         sys.exit(3)
 
 
@@ -2313,10 +2348,24 @@ Examples:
                    help='TYPE=calibrate measure current terminal columns')
     p.add_argument('--recommend', action='store_true',
                    help='TYPE=calibrate print preset recommendation rules')
-    p.add_argument('--diagram-kind', choices=['math', 'sequence', 'tree', 'table', 'frame', 'box', 'note', 'flowchart', 'graphdag', 'dag', 'graphplanar', 'planar'],
+    p.add_argument('--diagram-kind', choices=['math', 'sequence', 'tree', 'table', 'frame', 'box', 'note', 'flowchart', 'graphdag', 'dag', 'graphplanar', 'planar', 'drawio'],
                    default='', help='TYPE=diagram generator override')
     p.add_argument('--diagram-engine', choices=['auto', 'diagon', 'builtin'], default='auto',
                    help='TYPE=diagram backend. auto uses Diagon when installed, else builtin fallback.')
+    p.add_argument('--drawio-fragment', action='store_true',
+                   help='TYPE=diagram drawio: output mxCell elements only, for draw.io MCP display tools')
+    p.add_argument('--drawio-graph-model', action='store_true',
+                   help='TYPE=diagram drawio: output mxGraphModel only, for draw.io MCP create_new_diagram')
+    p.add_argument('--drawio-validate-only', action='store_true',
+                   help='TYPE=diagram drawio: validate input and print drawio: valid')
+    p.add_argument('--drawio-mcp-package', default='@next-ai-drawio/mcp-server@latest',
+                   help='TYPE=to-drawio MCP package to run through npx')
+    p.add_argument('--drawio-base-url', default='',
+                   help='TYPE=to-drawio DRAWIO_BASE_URL for self-hosted diagrams.net')
+    p.add_argument('--drawio-port', type=int, default=0,
+                   help='TYPE=to-drawio embedded preview port override')
+    p.add_argument('--drawio-hold', type=float, default=0,
+                   help='TYPE=to-drawio keep the MCP preview session alive for SEC after rendering')
     p.add_argument('--mermaid-theme', choices=[
         'zinc-light', 'zinc-dark', 'tokyo-night', 'tokyo-night-storm',
         'tokyo-night-light', 'catppuccin-mocha', 'catppuccin-latte', 'nord',
@@ -2687,7 +2736,7 @@ Examples:
             data = parsed
             kind = kind or parsed.get('kind') or parsed.get('type') or ''
         if not kind:
-            print('ERROR:schema: diagram needs a kind: math, sequence, tree, table, frame, note, flowchart, graphdag, graphplanar',
+            print('ERROR:schema: diagram needs a kind: math, sequence, tree, table, frame, note, flowchart, graphdag, graphplanar, drawio',
                   file=sys.stderr)
             sys.exit(1)
         rc = diagram(
@@ -2699,6 +2748,9 @@ Examples:
             output=args.output,
             diagram_kind=kind,
             diagram_engine=args.diagram_engine,
+            drawio_fragment=args.drawio_fragment,
+            drawio_graph_model=args.drawio_graph_model,
+            drawio_validate_only=args.drawio_validate_only,
             statusline=args.statusline,
         )
         sys.exit(rc or 0)
@@ -2846,6 +2898,41 @@ Examples:
             no_color=no_color,
         )
         sys.exit(rc)
+
+    if args.type == 'to-drawio':
+        if args.file:
+            with open(args.file, encoding='utf-8') as _f:
+                raw = _f.read().strip()
+        elif args.data is not None:
+            raw = args.data
+        elif args.art_text:
+            raw = ' '.join(args.art_text)
+        else:
+            raw = sys.stdin.read().strip()
+        if not raw:
+            print('ERROR:schema: to-drawio needs --json TEXT, --file PATH, stdin, or trailing text', file=sys.stderr)
+            sys.exit(1)
+        adapter = _load_drawio_adapter()
+        _require_drawio_npx()
+        import asyncio
+
+        try:
+            result = asyncio.run(adapter.preview_drawio(
+                raw,
+                output=args.output or None,
+                package=args.drawio_mcp_package,
+                drawio_base_url=args.drawio_base_url or None,
+                port=args.drawio_port or None,
+                hold_seconds=args.drawio_hold,
+            ))
+        except Exception as exc:
+            print(f'ERROR:drawio-mcp: {exc}', file=sys.stderr)
+            sys.exit(4)
+        for key in ('start_session', 'create_new_diagram', 'export_diagram'):
+            text = result.get(key, '')
+            if text:
+                print(text.rstrip())
+        return
 
     if args.type == 'to-ascii-motion':
         if not args.data and not args.file:
