@@ -404,6 +404,22 @@ glyph-arts wave render diagram sequence --json 'A->B: hello' --wave-format html
 opens it with `wsh view` so WaveTerm can show it as a rich block. Add
 `--dry-run` to print the planned chart and `wsh` commands without running them.
 
+## Stdio Worker
+
+`serve --stdio` keeps one glyph-arts process alive for agents that render many
+small charts. Each input line is a JSON request with `argv` and optional
+`stdin`; each output line is a JSON response with `stdout`, `stderr`,
+`returncode`, and `duration_ms`.
+
+```bash
+printf '{"argv":["chat","mermaid","--json","graph LR\\nA[Start] --> B[Done]"]}\n' |
+  glyph-arts serve --stdio
+```
+
+The worker disables the first-run splash for requests so chart output stays
+machine-readable. Use normal chart flags in `argv`, including `--no-color` when
+you want plain text.
+
 ## Recording
 
 `record` and `record-replay` wrap optional system tools for terminal session
@@ -513,10 +529,10 @@ glyph-arts --check-deps --all
 | drawille / braille | `curve` `hires` `radar` `textplot` `turtle` |
 | plotille | `plotille` |
 | uniplot | `uniplot` |
-| misc | `graph` `effect` `sparkline` `banner` `art` `animate` `record` `record-replay` `to-hyperframes` `to-ascii-motion` `code` `status` `splash` `demo` `gallery` `auto` `live` `doctor` `install-backends` `wave` |
+| misc | `graph` `effect` `sparkline` `banner` `art` `animate` `record` `record-replay` `to-hyperframes` `to-ascii-motion` `code` `status` `splash` `demo` `gallery` `auto` `live` `doctor` `install-backends` `wave` `serve` |
 | media *(image uses Pillow/chafa; video requires chafa + ffmpeg)* | `image` `video` |
 
-Total: **73 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
+Total: **74 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
 
 For the chat-vs-ANSI-vs-artifact boundary, see
 [`docs/capability_matrix.md`](docs/capability_matrix.md).

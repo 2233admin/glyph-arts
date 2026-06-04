@@ -10,17 +10,20 @@ import time
 from collections.abc import Callable, Iterable
 from typing import Any
 
+from cli_charts.cmd._helpers import CHART_TYPE_COUNT
+
 SPEED_BUDGETS = {"fast": 10.0, "normal": 30.0, "slow": 60.0}
 OUTRO_TIPS = (
     "Try: glyph-arts gallery",
     "Try: glyph-arts art HELLO --gradient sunset",
     "Try: glyph-arts status",
 )
+CHART_COUNT_LABEL = f"{CHART_TYPE_COUNT} chart types"
 
 
 SAMPLES: dict[str, Any] = {
     "art": {"text": "GLYPH ARTS"},
-    "banner": {"text": "73 chart types", "font": "big", "color": "cyan"},
+    "banner": {"text": CHART_COUNT_LABEL, "font": "big", "color": "cyan"},
     "bar": {"labels": ["Q1", "Q2", "Q3", "Q4"], "values": [12, 18, 15, 24]},
     "pie": {"labels": ["CLI", "API", "Docs"], "values": [45, 35, 20]},
     "line": [{"label": "DAU", "x": [1, 2, 3, 4, 5, 6], "y": [8, 10, 9, 13, 15, 18]}],
@@ -45,7 +48,7 @@ SAMPLES: dict[str, Any] = {
 
 DEMO_SCRIPT = (
     ("art", "GLYPH ARTS", 3.0),
-    ("banner", "73 chart types", 2.0),
+    ("banner", CHART_COUNT_LABEL, 2.0),
     ("bar", "Sales by quarter", 3.0),
     ("pie", "Market share", 3.0),
     ("line", "Traffic", 3.0),

@@ -8,7 +8,7 @@ import cli_charts.cmd
 from cli_charts.registry import CMDS
 print(len(CMDS))
 cli_charts.cmd.bootstrap()
-print("bar" in CMDS, "mermaid" in CMDS)
+print("bar" in CMDS, "mermaid" in CMDS, "serve" in CMDS)
 """
     result = subprocess.run(
         [sys.executable, "-c", code],
@@ -19,7 +19,7 @@ print("bar" in CMDS, "mermaid" in CMDS)
     )
 
     lines = result.stdout.strip().splitlines()
-    assert lines == ["0", "True True"]
+    assert lines == ["0", "True True True"]
 
 
 def test_package_version_remains_available() -> None:

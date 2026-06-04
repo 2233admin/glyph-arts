@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 from cli_charts.cmd.media_args import add_media_arguments
 from cli_charts.cmd.media_dispatch import dispatch_media
@@ -1922,6 +1923,11 @@ def wave_command(d, title, w, h, theme, **kw):
     raise RuntimeError("wave is dispatched by main()")
 
 
+def serve_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("serve is dispatched by main()")
+
+
 def formula(d, title, w, h, theme, **kw):
     """Formula source -> compact Unicode math text."""
     from cli_charts.markup import render_formula_panel
@@ -2033,6 +2039,7 @@ CMDS = {
     'fonts':       fonts_command,
     'chat-health': chat_health_command,
     'wave':        wave_command,
+    'serve':       serve_command,
 }
 
 # Single source of truth for chart-type docs. Order is intentional.
@@ -2050,7 +2057,7 @@ CHART_TYPES_BY_ENGINE: dict[str, list[str]] = {
     'plotille': ['plotille'],
     'uniplot': ['uniplot'],
     'textcharts': ['comparison', 'diverging', 'summary', 'sparkline-table', 'cdf', 'rank', 'percentile', 'boxplot', 'stacked-text'],
-    'misc': ['graph', 'effect', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'fonts', 'chat-health', 'wave', 'calibrate'],
+    'misc': ['graph', 'effect', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'fonts', 'chat-health', 'wave', 'calibrate', 'serve'],
     'media': ['image', 'video'],
 }
 
@@ -2182,6 +2189,98 @@ def _render_ascii_motion_frames(chart_type, data, args, adapter, no_color=False)
 
 
 # -- main --------------------------------------------------------------------
+
+def _serve_error(message: str, *, returncode: int = 2, duration_ms: float = 0.0) -> dict:
+    return {
+        "ok": False,
+        "returncode": returncode,
+        "stdout": "",
+        "stderr": f"ERROR:serve: {message}\n",
+        "duration_ms": round(duration_ms, 3),
+    }
+
+
+def _coerce_serve_request(line: str) -> tuple[list[str], str] | dict:
+    try:
+        payload = json.loads(line)
+    except json.JSONDecodeError as exc:
+        return _serve_error(f"invalid JSON: {exc}")
+    if not isinstance(payload, dict):
+        return _serve_error("request must be a JSON object")
+
+    argv = payload.get("argv")
+    if not isinstance(argv, list) or not all(isinstance(item, str) for item in argv):
+        return _serve_error("request.argv must be a list of strings")
+    if argv and argv[0] == "serve":
+        return _serve_error("nested serve requests are not supported")
+
+    stdin_text = payload.get("stdin", "")
+    if stdin_text is None:
+        stdin_text = ""
+    if not isinstance(stdin_text, str):
+        return _serve_error("request.stdin must be a string when provided")
+    return argv, stdin_text
+
+
+def _run_serve_request(argv: list[str], stdin_text: str) -> dict:
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    old_stdin = sys.stdin
+    old_no_splash = os.environ.get("GLYPH_ARTS_NO_SPLASH")
+    start = time.perf_counter()
+    returncode = 0
+    try:
+        sys.stdin = io.StringIO(stdin_text)
+        os.environ["GLYPH_ARTS_NO_SPLASH"] = "1"
+        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
+            try:
+                main(argv)
+            except SystemExit as exc:
+                if exc.code is None:
+                    returncode = 0
+                elif isinstance(exc.code, int):
+                    returncode = exc.code
+                else:
+                    print(exc.code, file=sys.stderr)
+                    returncode = 1
+            except Exception:
+                import traceback
+
+                traceback.print_exc(file=sys.stderr)
+                returncode = 4
+    finally:
+        sys.stdin = old_stdin
+        if old_no_splash is None:
+            os.environ.pop("GLYPH_ARTS_NO_SPLASH", None)
+        else:
+            os.environ["GLYPH_ARTS_NO_SPLASH"] = old_no_splash
+
+    duration_ms = (time.perf_counter() - start) * 1000
+    return {
+        "ok": returncode == 0,
+        "returncode": returncode,
+        "stdout": stdout.getvalue(),
+        "stderr": stderr.getvalue(),
+        "duration_ms": round(duration_ms, 3),
+    }
+
+
+def run_stdio_server(input_stream=None, output_stream=None) -> int:
+    input_stream = input_stream or sys.stdin
+    output_stream = output_stream or sys.stdout
+    for line in input_stream:
+        line = line.strip()
+        if not line:
+            continue
+        request = _coerce_serve_request(line)
+        if isinstance(request, dict):
+            response = request
+        else:
+            argv, stdin_text = request
+            response = _run_serve_request(argv, stdin_text)
+        print(json.dumps(response, ensure_ascii=False), file=output_stream, flush=True)
+    return 0
+
 
 def main(argv=None):
     raw_argv = list(sys.argv[1:] if argv is None else argv)
@@ -2439,7 +2538,9 @@ Examples:
                    help='TYPE=wave render export format for wave render')
     p.add_argument('--wave-stdout', action='store_true',
                    help='TYPE=wave render also print the generated preview file')
-    if '--check-deps' in sys.argv:
+    p.add_argument('--stdio', action='store_true',
+                   help='TYPE=serve read newline-delimited JSON requests from stdin')
+    if '--check-deps' in raw_argv:
         _CORE = ['plotext', 'rich', 'uniplot', 'pyfiglet',
                  'sparklines', 'duckdb', 'pandas', 'networkx', 'phart']
         _OPT = [
@@ -2462,7 +2563,7 @@ Examples:
                               ('diagon', 'math/sequence/tree/flowchart diagrams')):
             status = 'OK' if shutil.which(tool) else 'MISSING'
             print(f'  {tool:<13} {status}  ({purpose})')
-        if '--all' in sys.argv:
+        if '--all' in raw_argv:
             print('[optional]')
             for pkg, purpose, install in _OPT:
                 try:
@@ -2486,6 +2587,12 @@ Examples:
         sys.exit(0)
 
     args = p.parse_args(raw_argv)
+    if args.type == 'serve':
+        if not args.stdio:
+            print('ERROR:schema: serve currently requires --stdio', file=sys.stderr)
+            sys.exit(1)
+        sys.exit(run_stdio_server())
+
     if args.font_tier is None:
         args.font_tier = detect_font_tier()
     if args.chat_profile != 'auto':
