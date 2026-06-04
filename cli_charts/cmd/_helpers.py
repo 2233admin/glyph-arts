@@ -134,7 +134,7 @@ _CHAT_EFFECT_ALIASES = {'effects'}
 _CHAT_HEALTH_ALIASES = {'probe', 'profile', 'profiles', 'fix', 'fix-chat'}
 _DIAGRAM_KIND_ALIASES = {
     'math', 'sequence', 'tree', 'table', 'frame', 'box', 'note', 'flowchart',
-    'graphdag', 'dag', 'graphplanar', 'planar',
+    'graphdag', 'dag', 'graphplanar', 'planar', 'drawio',
 }
 
 
@@ -1375,6 +1375,9 @@ def diagram(d, title, w, h, theme, **kw):
         width=w,
         output=kw.get('output') or None,
         engine=kw.get('diagram_engine', 'auto'),
+        drawio_fragment=kw.get('drawio_fragment', False),
+        drawio_graph_model=kw.get('drawio_graph_model', False),
+        drawio_validate_only=kw.get('drawio_validate_only', False),
     )
     if rc:
         sys.exit(rc)
@@ -1840,6 +1843,11 @@ def to_ascii_motion_command(d, title, w, h, theme, **kw):
     raise RuntimeError("to-ascii-motion is dispatched by main()")
 
 
+def to_drawio_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("to-drawio is dispatched by main()")
+
+
 def code_command(d, title, w, h, theme, **kw):
     """Placeholder registry entry; dispatched specially by main()."""
     raise RuntimeError("code is dispatched by main()")
@@ -2009,6 +2017,7 @@ CMDS = {
     'record-replay': record_replay_command,
     'to-hyperframes': to_hyperframes_command,
     'to-ascii-motion': to_ascii_motion_command,
+    'to-drawio':   to_drawio_command,
     'code':        code_command,
     'status':      status_command,
     'splash':      splash_command,
@@ -2040,7 +2049,7 @@ CHART_TYPES_BY_ENGINE: dict[str, list[str]] = {
     'plotille': ['plotille'],
     'uniplot': ['uniplot'],
     'textcharts': ['comparison', 'diverging', 'summary', 'sparkline-table', 'cdf', 'rank', 'percentile', 'boxplot', 'stacked-text'],
-    'misc': ['graph', 'effect', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'fonts', 'chat-health', 'petiglyph', 'wave', 'calibrate', 'serve'],
+    'misc': ['graph', 'effect', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'to-drawio', 'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'fonts', 'chat-health', 'petiglyph', 'wave', 'calibrate', 'serve'],
     'media': ['image', 'video'],
 }
 
@@ -2075,7 +2084,7 @@ EXPECTED_SCHEMAS = {
     'dashboard':  '{"panels":[{"type":"gauge","data":{"label":"CPU","value":72,"max":100},"title":"CPU"},{"type":"sparkline","data":{"values":[1,3,5,2,8]},"title":"Load"}]}',
     'incplot':    'Raw JSON/JSONL/CSV/TSV auto plot. Supports prefer=bar|multibar|stackedbar|line|scatter|hist|table|kline via --prefer.',
     'graph':      '{"edges":[["A","B"],...], "directed":true, "node_style":"ROUND"}',
-    'diagram':    'glyph-arts diagram sequence --json "Alice->Bob: Hello" or {"kind":"flowchart","text":"A -> B"}',
+    'diagram':    'glyph-arts diagram sequence --json "Alice->Bob: Hello" or glyph-arts diagram drawio --json "A -> B"',
     'formula':    'Raw formula text or {"items":["E = mc^2", "\\\\int exp(-x^2) dx"]}; emits compact Unicode math',
     'formula-pretty': 'Raw formula text or {"items":["(a+b)/(c+d)", "Integral(exp(-x^2), x)"]}; emits SymPy multi-line math',
     'calibrate':  'glyph-arts chat calibrate --terminal --calibrate-glyph braille',
@@ -2098,6 +2107,7 @@ EXPECTED_SCHEMAS = {
     'record-replay': 'glyph-arts record-replay demo.cast --output demo.gif',
     'to-hyperframes': "glyph-arts to-hyperframes --json '[{\"label\":\"x\",\"x\":[1,2],\"y\":[3,4]}]' --frames 30 --duration 5 --output-dir ./hf",
     'to-ascii-motion': "glyph-arts to-ascii-motion --json '[{\"label\":\"x\",\"x\":[1,2],\"y\":[3,4]}]' --formats html,mp4,svg --output-dir ./out",
+    'to-drawio':   'glyph-arts to-drawio --json "Client -> API -> DB" --output diagram.drawio',
     'code':        'glyph-arts code --file foo.py --lang python',
     'status':      'glyph-arts status --kind ok --message "All tests green"',
     'splash':      'glyph-arts splash',
@@ -2282,9 +2292,34 @@ def _require_ascii_motion_npx():
         sys.exit(3)
 
 
+def _load_drawio_adapter():
+    try:
+        adapter = importlib.import_module("cli_charts.adapters.drawio")
+        client = importlib.import_module("cli_charts.mcp_clients.drawio")
+    except ImportError:
+        print("error: to-drawio requires 'pip install glyph-arts[drawio-mcp]'", file=sys.stderr)
+        sys.exit(2)
+    if getattr(client, "ClientSession", None) is None:
+        print("error: to-drawio requires 'pip install glyph-arts[drawio-mcp]'", file=sys.stderr)
+        sys.exit(2)
+    return adapter
+
+
+def _require_drawio_npx():
+    npx = shutil.which("npx") or shutil.which("npx.cmd") or "npx"
+    try:
+        result = subprocess.run([npx, "--version"], capture_output=True, text=True)
+    except FileNotFoundError:
+        print("error: to-drawio requires npx; install Node.js/npm", file=sys.stderr)
+        sys.exit(3)
+    if result.returncode != 0:
+        print("error: to-drawio requires npx; install Node.js/npm", file=sys.stderr)
+        sys.exit(3)
+
+
 def _render_ascii_motion_frames(chart_type, data, args, adapter, no_color=False):
     if chart_type not in CMDS or chart_type in {
-        'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion',
+        'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'to-drawio',
     'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'fonts', 'chat-health', 'petiglyph', 'wave',
     }:
         print('ERROR:schema: to-ascii-motion needs a renderable chart type argument', file=sys.stderr)
@@ -2377,6 +2412,8 @@ def main(argv=None):
         args,
         load_ascii_motion_adapter=_load_ascii_motion_adapter,
         require_ascii_motion_npx=_require_ascii_motion_npx,
+        load_drawio_adapter=_load_drawio_adapter,
+        require_drawio_npx=_require_drawio_npx,
         render_ascii_motion_frames=_render_ascii_motion_frames,
     )
     if motion_rc is not None:

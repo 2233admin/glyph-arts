@@ -154,10 +154,24 @@ def build_parser(
                    help='TYPE=calibrate measure current terminal columns')
     p.add_argument('--recommend', action='store_true',
                    help='TYPE=calibrate print preset recommendation rules')
-    p.add_argument('--diagram-kind', choices=['math', 'sequence', 'tree', 'table', 'frame', 'box', 'note', 'flowchart', 'graphdag', 'dag', 'graphplanar', 'planar'],
+    p.add_argument('--diagram-kind', choices=['math', 'sequence', 'tree', 'table', 'frame', 'box', 'note', 'flowchart', 'graphdag', 'dag', 'graphplanar', 'planar', 'drawio'],
                    default='', help='TYPE=diagram generator override')
     p.add_argument('--diagram-engine', choices=['auto', 'diagon', 'builtin'], default='auto',
                    help='TYPE=diagram backend. auto uses Diagon when installed, else builtin fallback.')
+    p.add_argument('--drawio-fragment', action='store_true',
+                   help='TYPE=diagram drawio: output mxCell elements only, for draw.io MCP display tools')
+    p.add_argument('--drawio-graph-model', action='store_true',
+                   help='TYPE=diagram drawio: output mxGraphModel only, for draw.io MCP create_new_diagram')
+    p.add_argument('--drawio-validate-only', action='store_true',
+                   help='TYPE=diagram drawio: validate input and print drawio: valid')
+    p.add_argument('--drawio-mcp-package', default='@next-ai-drawio/mcp-server@latest',
+                   help='TYPE=to-drawio MCP package to run through npx')
+    p.add_argument('--drawio-base-url', default='',
+                   help='TYPE=to-drawio DRAWIO_BASE_URL for self-hosted diagrams.net')
+    p.add_argument('--drawio-port', type=int, default=0,
+                   help='TYPE=to-drawio embedded preview port override')
+    p.add_argument('--drawio-hold', type=float, default=0,
+                   help='TYPE=to-drawio keep the MCP preview session alive for SEC after rendering')
     p.add_argument('--mermaid-theme', choices=[
         'zinc-light', 'zinc-dark', 'tokyo-night', 'tokyo-night-storm',
         'tokyo-night-light', 'catppuccin-mocha', 'catppuccin-latte', 'nord',

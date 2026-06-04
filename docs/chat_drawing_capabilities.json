@@ -130,6 +130,50 @@
         "requires_host": "none"
       }
     },
+    "drawio_xml": {
+      "chat": false,
+      "ansi": false,
+      "artifact": true,
+      "input_formats": [
+        "edge-list text",
+        "mxCell fragment",
+        "mxGraphModel",
+        "mxfile/.drawio"
+      ],
+      "outputs": [
+        ".drawio",
+        "mxGraphModel",
+        "mxCell fragment"
+      ],
+      "command": "glyph-arts diagram drawio --json <text> --output diagram.drawio",
+      "protocol": {
+        "targets": [
+          "artifact"
+        ],
+        "chat_safe": false,
+        "uses_ansi": false,
+        "unicode_tier": "ascii",
+        "fallback": "artifact",
+        "requires_host": "none"
+      }
+    },
+    "drawio_mcp_preview": {
+      "chat": false,
+      "ansi": false,
+      "artifact": true,
+      "command": "glyph-arts to-drawio --json <text> --output diagram.drawio",
+      "protocol": {
+        "targets": [
+          "host",
+          "artifact"
+        ],
+        "chat_safe": false,
+        "uses_ansi": false,
+        "unicode_tier": "ascii",
+        "fallback": "artifact",
+        "requires_host": "glyph-arts[drawio-mcp] + npx @next-ai-drawio/mcp-server"
+      }
+    },
     "note_box": {
       "chat": true,
       "ansi": false,

@@ -15,7 +15,7 @@ _MODULES = [
     "curve", "hires", "radar", "textplot", "turtle", "plotille", "uniplot", "banner", "art",
     "candlestick", "rich_live", "image", "video", "demo", "gallery",
     "splash", "status", "code", "animate", "record", "record_replay",
-    "to_hyperframes", "to_ascii_motion", "step", "wave", "calibrate", "serve",
+    "to_hyperframes", "to_ascii_motion", "to_drawio", "step", "wave", "calibrate", "serve",
 ]
 
 _BOOTSTRAPPED = False

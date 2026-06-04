@@ -838,6 +838,7 @@ all = [
     { name = "drawsvg" },
     { name = "lttb" },
     { name = "matplotlib" },
+    { name = "mcp" },
     { name = "mermaid-py" },
     { name = "pygments" },
     { name = "sympy" },
@@ -860,6 +861,9 @@ dev = [
     { name = "mypy" },
     { name = "pytest-cov" },
     { name = "ruff" },
+]
+drawio-mcp = [
+    { name = "mcp" },
 ]
 interactive = [
     { name = "textual" },
@@ -905,6 +909,8 @@ requires-dist = [
     { name = "matplotlib", marker = "extra == 'all'", specifier = ">=3.7" },
     { name = "matplotlib", marker = "extra == 'pixel'", specifier = ">=3.7" },
     { name = "mcp", marker = "extra == 'ai-motion'", specifier = ">=1.0,<2" },
+    { name = "mcp", marker = "extra == 'all'", specifier = ">=1.0,<2" },
+    { name = "mcp", marker = "extra == 'drawio-mcp'", specifier = ">=1.0,<2" },
     { name = "mermaid-py", marker = "extra == 'all'", specifier = ">=0.8.4" },
     { name = "mermaid-py", marker = "extra == 'markup'", specifier = ">=0.8.4" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.8" },
@@ -940,7 +946,7 @@ requires-dist = [
     { name = "uniplot", specifier = ">=0.5" },
     { name = "wcwidth", specifier = ">=0.7.0" },
 ]
-provides-extras = ["art", "braille", "code", "lttb", "pixel", "test", "tui", "interactive", "ai-motion", "dev", "textcharts", "all", "markup"]
+provides-extras = ["art", "braille", "code", "lttb", "pixel", "test", "tui", "interactive", "ai-motion", "drawio-mcp", "dev", "textcharts", "all", "markup"]
 
 [[package]]
 name = "h11"
