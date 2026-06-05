@@ -30,6 +30,25 @@ from cli_charts.charts._utils import (
     _series_color, _statusline_values, _style_to_bar_symbols, _style_to_gauge,
     _symbol_tier, _textcharts_options, load_duckdb,
 )
+from cli_charts.charts.aggregates.boxplot_comparison import boxplot_comparison
+from cli_charts.charts.aggregates.cdf_chart import cdf_chart
+from cli_charts.charts.aggregates.comparison import comparison
+from cli_charts.charts.aggregates.diverging import diverging
+from cli_charts.charts.aggregates.graph import graph
+from cli_charts.charts.aggregates.percentile import percentile
+from cli_charts.charts.aggregates.rank_table import rank_table
+from cli_charts.charts.aggregates.sparkline_table import sparkline_table
+from cli_charts.charts.aggregates.stacked_bar_text import stacked_bar_text
+from cli_charts.charts.aggregates.summary import summary
+from cli_charts.charts.algebra.calibrate import calibrate
+from cli_charts.charts.algebra.formula import formula
+from cli_charts.charts.algebra.formula_pretty import formula_pretty
+from cli_charts.charts.algebra.splash_command import splash_command
+from cli_charts.charts.algebra.status_command import status_command
+from cli_charts.charts.algebra.wave_command import wave_command
+from cli_charts.charts.composite.dashboard import dashboard
+from cli_charts.charts.composite.panel import panel
+from cli_charts.charts.composite.rich_live import rich_live
 from cli_charts.charts.series.bar import bar, hbar
 from cli_charts.charts.series.box import box
 from cli_charts.charts.series.curve import curve
@@ -202,287 +221,6 @@ def tree(d, title, w, h, theme, **kw):
     c.print(t)
 
 
-def panel(d, title, w, h, theme, **kw):
-    """rich Panel -- bordered text / callout box."""
-    from rich import box as richbox
-    from rich.console import Console
-    from rich.panel import Panel as RichPanel
-    no_color = kw.get('no_color', False)
-    c = Console(no_color=no_color)
-    box_style = getattr(richbox, d.get('box', 'ROUNDED'), richbox.ROUNDED)
-    p = RichPanel(d['content'],
-                  title=d.get('title', title or None),
-                  subtitle=d.get('subtitle'),
-                  box=box_style)
-    c.print(p)
-
-
-def graph(d, title, w, h, theme, **kw):
-    """PHART ASCII network graph."""
-    del title, w, h, theme
-    from cli_charts.render.graph_engine import render_graph
-
-    style = kw.get('graph_style') or (d.get('node_style') if isinstance(d, dict) else None) or 'round'
-    node_spacing = (d.get('node_spacing') if isinstance(d, dict) else None) or kw.get('graph_node_spacing') or 4
-    layer_spacing = (d.get('layer_spacing') if isinstance(d, dict) else None) or kw.get('graph_layer_spacing') or 2
-    rc = render_graph(
-        d,
-        output=kw.get('output') or None,
-        graph_format=kw.get('graph_format') or (d.get('format') if isinstance(d, dict) else 'auto'),
-        node_style=style,
-        node_spacing=node_spacing,
-        layer_spacing=layer_spacing,
-        charset=kw.get('graph_charset') or 'unicode',
-    )
-    if rc:
-        sys.exit(rc)
-
-
-# -- textcharts integration ---------------------------------------------------
-
-def comparison(d, title, w, h, theme, **kw):
-    """textcharts comparison bar chart -- side-by-side bars for A/B testing.
-
-    JSON: {"data":[{"label":"Python","baseline":85,"comparison":89.5}, ...]}
-    """
-    try:
-        from textcharts import ComparisonBar, ComparisonBarData
-        data = [
-            ComparisonBarData(
-                label=str(item['label']),
-                baseline_value=item.get('baseline', 0),
-                comparison_value=item.get('comparison', item.get('value', 0)),
-                baseline_name=str(item.get('baseline_name', 'Baseline')),
-                comparison_name=str(item.get('comparison_name', 'Comparison'))
-            )
-            for item in d.get('data', [])
-        ]
-        chart = ComparisonBar(data=data, title=title, options=_textcharts_options(kw))
-        print(chart.render())
-    except ImportError:
-        print("ERROR:dep: pip install textcharts", file=sys.stderr)
-        sys.exit(2)
-
-
-def diverging(d, title, w, h, theme, **kw):
-    """textcharts diverging bar chart -- positive/negative comparison.
-
-    JSON: {"data":[{"label":"Product A","pct_change":25},{"label":"Product B","pct_change":-15}]}
-    """
-    try:
-        from textcharts import DivergingBar, DivergingBarData
-        data = [
-            DivergingBarData(label=str(item['label']), pct_change=item.get('pct_change', item.get('value', 0)))
-            for item in d.get('data', [])
-        ]
-        chart = DivergingBar(data=data, title=title, options=_textcharts_options(kw))
-        print(chart.render())
-    except ImportError:
-        print("ERROR:dep: pip install textcharts", file=sys.stderr)
-        sys.exit(2)
-
-
-def summary(d, title, w, h, theme, **kw):
-    """textcharts summary box -- key statistics at a glance."""
-    try:
-        from textcharts import SummaryBox, SummaryStats
-        stats = SummaryStats()
-        for key, value in d.get('stats', {}).items():
-            setattr(stats, key, value)
-        chart = SummaryBox(stats=stats, subject=title, options=_textcharts_options(kw))
-        print(chart.render())
-    except ImportError:
-        print("ERROR:dep: pip install textcharts", file=sys.stderr)
-        sys.exit(2)
-
-
-def sparkline_table(d, title, w, h, theme, **kw):
-    """textcharts sparkline table -- multiple rows with inline mini charts.
-
-    JSON: {"columns":["Revenue"],"values":{"Jan":[100],"Feb":[120],"Mar":[110]}}
-    Note: Use 'sparkline' command for simpler sparkline charts.
-    """
-    try:
-        from textcharts import SparklineColumn, SparklineTable, SparklineTableData
-
-        columns_data = d.get('columns', ['Value'])
-        values = d.get('values', {})
-
-        # Build columns with values dict
-        columns = [SparklineColumn(name=str(col), values={}) for col in columns_data]
-
-        # Build rows (labels) and populate column values
-        rows = list(values.keys())
-
-        for col_idx, col_name in enumerate(columns_data):
-            for row_label in rows:
-                if col_name in values and row_label in values[col_name]:
-                    if col_idx < len(columns):
-                        columns[col_idx].values[row_label] = values[col_name][row_label]
-
-        data = SparklineTableData(rows=rows, columns=columns)
-        chart = SparklineTable(data=data, title=title, options=_textcharts_options(kw))
-        print(chart.render())
-    except ImportError:
-        print("ERROR:dep: pip install textcharts", file=sys.stderr)
-        sys.exit(2)
-
-
-def cdf_chart(d, title, w, h, theme, **kw):
-    """textcharts CDF chart -- cumulative distribution function.
-
-    JSON: {"series":[{"name":"A","values":[1,2,3,4,5]}]}
-    """
-    try:
-        from textcharts import CDFChart, CDFSeriesData
-
-        series = []
-        for s in d.get('series', [{'name': 'data', 'values': d.get('values', [])}]):
-            if isinstance(s, dict):
-                series.append(CDFSeriesData(name=str(s.get('name', 'data')), values=s.get('values', [])))
-            else:
-                series.append(CDFSeriesData(name='data', values=s))
-
-        if series:
-            chart = CDFChart(data=series, title=title, options=_textcharts_options(kw))
-            print(chart.render())
-        else:
-            print("(no data)", file=sys.stderr)
-    except ImportError:
-        print("ERROR:dep: pip install textcharts", file=sys.stderr)
-        sys.exit(2)
-
-
-def rank_table(d, title, w, h, theme, **kw):
-    """Sorted ranking table with Rich.
-
-    JSON: {"items":[{"label":"Python","value":89},{"label":"Rust","value":95}]}
-    or {"values":{"Python":89,"Rust":95}} (items auto-generated from values keys)
-    """
-    from rich.console import Console
-    from rich.table import Table
-
-    no_color = kw.get('no_color', False)
-    c = Console(no_color=no_color)
-    t = Table(title=title)
-
-    if d.get('items'):
-        # Format 1: items with label/value pairs
-        t.add_column("Rank", justify="center")
-        t.add_column("Item")
-        t.add_column("Value", justify="right")
-        sorted_items = sorted(d.get('items', []), key=lambda x: x.get('value', 0), reverse=True)
-        for idx, item in enumerate(sorted_items, 1):
-            t.add_row(str(idx), str(item.get('label', item)), f"{item.get('value', 0):.1f}")
-    else:
-        # Format 2: values dict {"Name": score}
-        values = d.get('values', {})
-        t.add_column("Rank", justify="center")
-        t.add_column("Item")
-        t.add_column("Score", justify="right")
-        sorted_items = sorted(values.items(), key=lambda x: x[1], reverse=True)
-        for idx, (name, score) in enumerate(sorted_items, 1):
-            t.add_row(str(idx), str(name), f"{score:.1f}")
-
-    c.print(t)
-
-
-def percentile(d, title, w, h, theme, **kw):
-    """textcharts percentile ladder -- show value distribution.
-
-    JSON: {"data":[{"name":"Response Time","p50":50,"p90":90,"p95":95,"p99":99}]}
-    or {"series":[{"name":"A","values":[...]}]} to auto-calculate.
-    """
-    try:
-        from textcharts import PercentileData, PercentileLadder
-
-        if 'data' in d:
-            # Direct percentile data
-            data = [PercentileData(
-                name=str(item['name']),
-                p50=item.get('p50', 0),
-                p90=item.get('p90', 0),
-                p95=item.get('p95', 0),
-                p99=item.get('p99', 0)
-            ) for item in d.get('data', [])]
-        elif 'series' in d:
-            # Auto-calculate from values
-            data = []
-            for s in d.get('series', []):
-                values = s.get('values', [])
-                if values:
-                    import numpy as np
-                    arr = np.array(values)
-                    data.append(PercentileData(
-                        name=str(s.get('name', 'data')),
-                        p50=np.percentile(arr, 50),
-                        p90=np.percentile(arr, 90),
-                        p95=np.percentile(arr, 95),
-                        p99=np.percentile(arr, 99)
-                    ))
-        else:
-            print("ERROR:schema: percentile requires 'data' or 'series'", file=sys.stderr)
-            sys.exit(1)
-            return
-
-        chart = PercentileLadder(data=data, title=title, options=_textcharts_options(kw))
-        print(chart.render())
-    except ImportError:
-        print("ERROR:dep: pip install textcharts", file=sys.stderr)
-        sys.exit(2)
-
-
-def boxplot_comparison(d, title, w, h, theme, **kw):
-    """textcharts box plot -- statistical distribution comparison.
-
-    JSON: {"series":[{"name":"A","values":[10,20,30,40,50]}]}
-    """
-    try:
-        from textcharts import BoxPlot, BoxPlotSeries
-
-        series = []
-        for s in d.get('series', []):
-            values = s.get('values', [])
-            if values:
-                series.append(BoxPlotSeries(name=str(s.get('name', 'data')), values=values))
-            else:
-                series.append(BoxPlotSeries(name=str(s.get('name', 'data')), values=[0]))
-
-        if series:
-            chart = BoxPlot(series=series, title=title, options=_textcharts_options(kw))
-            print(chart.render())
-        else:
-            print("(no data)", file=sys.stderr)
-    except ImportError:
-        print("ERROR:dep: pip install textcharts", file=sys.stderr)
-        sys.exit(2)
-
-
-def stacked_bar_text(d, title, w, h, theme, **kw):
-    """textcharts stacked bar chart -- composition over categories.
-
-    JSON: {"data":[{"label":"Project A","segments":[{"label":"Backend","value":30},{"label":"Frontend","value":20}]}]}
-    """
-    try:
-        from textcharts import StackedBar, StackedBarData, StackedBarSegment
-
-        data = []
-        for item in d.get('data', []):
-            segments = [
-                StackedBarSegment(phase_name=str(seg.get('label', 'Segment')), value=seg.get('value', 0))
-                for seg in item.get('segments', [])
-            ]
-            data.append(StackedBarData(label=str(item.get('label', '')), segments=segments))
-
-        if data:
-            chart = StackedBar(data=data, title=title, options=_textcharts_options(kw))
-            print(chart.render())
-        else:
-            print("(no data)", file=sys.stderr)
-    except ImportError:
-        print("ERROR:dep: pip install textcharts", file=sys.stderr)
-        sys.exit(2)
-
 def gauge(d, title, w, h, theme, **kw):
     """rich multi-metric progress bars (static gauge).
     Auto-colors: green <70%, yellow <90%, red >=90%.
@@ -557,130 +295,6 @@ def gauge(d, title, w, h, theme, **kw):
         bar = f'[{color}]{full * filled}{empty * (bar_w - filled)}[/{color}]'
         t.add_row(m.get('label', ''), bar, f'{val:.1f} / {mx:.0f}')
     c.print(t)
-
-
-def dashboard(d, title, w, h, theme, **kw):
-    """Delegates to cli_charts/dashboard.py via subprocess (Textual TUI or Rich static)."""
-    import subprocess
-    config = dict(d)
-    if title:
-        config['title'] = title
-    dash_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'dashboard.py')
-    cmd = [sys.executable, dash_script, '--json', json.dumps(config)]
-    if not sys.stdout.isatty():
-        cmd.append('--no-interactive')
-    result = subprocess.run(cmd)
-    sys.exit(result.returncode)
-
-
-def rich_live(d, title, w, h, theme, **kw):
-    """Compose multiple charts into a Rich Live/Layout panel grid.
-
-    Schema:
-        {"panels": [{"type":"bar","title":"Left","data":{...}}, ...],
-         "layout": "row" | "column",
-         "frames": 1}
-
-    frames=1: static single-frame snapshot via Console.print(layout) -- pipe/TTY safe.
-    frames>1: animated refresh via Rich Live (needs a TTY); falls back to static when piped.
-    Each panel's child chart renders via the same CMDS dispatcher, with stdout captured
-    and replayed inside a Rich Panel so ANSI colors from plotext/hires/etc. survive.
-    """
-    from io import StringIO
-
-    from rich import box as richbox
-    from rich.console import Console
-    from rich.layout import Layout
-    from rich.panel import Panel
-    from rich.text import Text
-
-    panels_spec = d.get('panels') or []
-    if not panels_spec:
-        print('ERROR:schema: rich_live requires non-empty "panels" list', file=sys.stderr)
-        sys.exit(1)
-
-    orientation = d.get('layout', 'row')
-    if orientation not in ('row', 'column'):
-        print(f'ERROR:schema: layout must be "row" or "column", got {orientation!r}', file=sys.stderr)
-        sys.exit(1)
-
-    frames = max(1, int(d.get('frames', 1)))
-    no_color = kw.get('no_color', False)
-    panel_failures = []
-
-    def _render_panel_content(panel_spec):
-        """Dispatch sub-chart and capture its stdout as a Rich-renderable Text."""
-        name = panel_spec.get('title') or panel_spec.get('name') or panel_spec.get('id') or panel_spec.get('type')
-        ptype = panel_spec.get('type')
-        if ptype not in CMDS:
-            panel_failures.append((name, -1))
-            return Text(f'[unknown panel type: {ptype!r}]', style='red')
-        if ptype in ('dashboard', 'rich_live'):
-            panel_failures.append((name, -1))
-            return Text(f'[cannot nest {ptype!r} inside rich_live]', style='red')
-        pdata = panel_spec.get('data', {})
-        ptitle = panel_spec.get('title', '')
-        pw = panel_spec.get('width', max(20, w // max(1, len(panels_spec)) if orientation == 'row' else w))
-        ph = panel_spec.get('height', max(8, h // max(1, len(panels_spec)) if orientation == 'column' else h))
-        buf = StringIO()
-        saved_stdout = sys.stdout
-        sys.stdout = buf
-        try:
-            try:
-                CMDS[ptype](pdata, ptitle, pw, ph, theme, no_color=no_color)
-            except (SystemExit, KeyboardInterrupt):
-                raise
-            except Exception as e:
-                panel_failures.append((name, -1))
-                return Text(f'[panel render failed: {type(e).__name__}: {e}]', style='red')
-        finally:
-            sys.stdout = saved_stdout
-        captured = buf.getvalue().rstrip('\n')
-        return Text.from_ansi(captured) if captured else Text('(empty)', style='dim')
-
-    def _build_layout():
-        lay = Layout()
-        sub_layouts = []
-        for idx, spec in enumerate(panels_spec):
-            child = Layout(name=f'p{idx}')
-            child.update(Panel(
-                _render_panel_content(spec),
-                title=spec.get('title') or None,
-                box=richbox.ROUNDED,
-            ))
-            sub_layouts.append(child)
-        if orientation == 'row':
-            lay.split_row(*sub_layouts)
-        else:
-            lay.split_column(*sub_layouts)
-        return lay
-
-    console = Console(no_color=no_color, width=w if w else None)
-    layout = _build_layout()
-
-    if frames == 1 or not sys.stdout.isatty():
-        if title:
-            console.rule(title)
-        console.print(layout)
-        if panel_failures:
-            print(f'ERROR:render: {len(panel_failures)} panel(s) failed: {panel_failures}',
-                  file=sys.stderr)
-            sys.exit(4)
-        return
-
-    import time
-
-    from rich.live import Live
-    refresh = float(d.get('refresh_per_second', 4))
-    frame_delay = 1.0 / max(1.0, refresh)
-    with Live(layout, refresh_per_second=refresh, console=console, transient=False):
-        for _ in range(frames):
-            layout = _build_layout()
-            time.sleep(frame_delay)
-    if panel_failures:
-        print(f'ERROR:render: {len(panel_failures)} panel(s) failed: {panel_failures}',
-              file=sys.stderr)
-        sys.exit(4)
 
 
 def confusion(d, title, w, h, theme, **kw):
@@ -1107,16 +721,6 @@ def code_command(d, title, w, h, theme, **kw):
     raise RuntimeError("code is dispatched by main()")
 
 
-def status_command(d, title, w, h, theme, **kw):
-    """Placeholder registry entry; dispatched specially by main()."""
-    raise RuntimeError("status is dispatched by main()")
-
-
-def splash_command(d, title, w, h, theme, **kw):
-    """Placeholder registry entry; dispatched specially by main()."""
-    raise RuntimeError("splash is dispatched by main()")
-
-
 def demo_command(d, title, w, h, theme, **kw):
     """Placeholder registry entry; dispatched specially by main()."""
     raise RuntimeError("demo is dispatched by main()")
@@ -1157,52 +761,9 @@ def chat_health_command(d, title, w, h, theme, **kw):
     raise RuntimeError("chat-health is dispatched by main()")
 
 
-def wave_command(d, title, w, h, theme, **kw):
-    """Placeholder registry entry; dispatched specially by main()."""
-    raise RuntimeError("wave is dispatched by main()")
-
-
 def serve_command(d, title, w, h, theme, **kw):
     """Placeholder registry entry; dispatched specially by main()."""
     raise RuntimeError("serve is dispatched by main()")
-
-
-def formula(d, title, w, h, theme, **kw):
-    """Formula source -> compact Unicode math text."""
-    from cli_charts.markup import render_formula_panel
-
-    spec = d if isinstance(d, (dict, list, str)) else str(d)
-    if title and isinstance(spec, dict) and not spec.get("title"):
-        spec = {**spec, "title": title}
-    elif title and not isinstance(spec, dict):
-        spec = {"title": title, "items": spec if isinstance(spec, list) else [spec]}
-    print(render_formula_panel(spec), end="")
-
-
-def formula_pretty(d, title, w, h, theme, **kw):
-    """Formula source -> SymPy terminal pretty-printer."""
-    from cli_charts.markup import render_formula_pretty
-
-    spec = d if isinstance(d, (dict, list, str)) else str(d)
-    if title and isinstance(spec, dict) and not spec.get("title"):
-        spec = {**spec, "title": title}
-    elif title and not isinstance(spec, dict):
-        spec = {"title": title, "items": spec if isinstance(spec, list) else [spec]}
-    print(render_formula_pretty(spec), end="")
-
-
-def calibrate(d, title, w, h, theme, **kw):
-    """Print chat/terminal width calibration rulers."""
-    from cli_charts.markup import render_chat_calibration
-
-    spec = d if isinstance(d, dict) else {}
-    spec.setdefault("from", kw.get("calibrate_from", 96))
-    spec.setdefault("to", kw.get("calibrate_to", 160))
-    spec.setdefault("step", kw.get("calibrate_step", 8))
-    spec.setdefault("glyph", kw.get("calibrate_glyph", "all"))
-    spec.setdefault("terminal", kw.get("terminal", False))
-    spec.setdefault("recommend", kw.get("recommend", False))
-    print(render_chat_calibration(spec), end="")
 
 
 CMDS = {
