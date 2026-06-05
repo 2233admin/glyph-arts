@@ -21,7 +21,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
 
 from cli_charts.cmd.media_args import add_media_arguments
 from cli_charts.cmd.media_dispatch import dispatch_media
@@ -2188,100 +2187,6 @@ def _render_ascii_motion_frames(chart_type, data, args, adapter, no_color=False)
     return [adapter.text_to_cells(text)]
 
 
-# -- main --------------------------------------------------------------------
-
-def _serve_error(message: str, *, returncode: int = 2, duration_ms: float = 0.0) -> dict:
-    return {
-        "ok": False,
-        "returncode": returncode,
-        "stdout": "",
-        "stderr": f"ERROR:serve: {message}\n",
-        "duration_ms": round(duration_ms, 3),
-    }
-
-
-def _coerce_serve_request(line: str) -> tuple[list[str], str] | dict:
-    try:
-        payload = json.loads(line)
-    except json.JSONDecodeError as exc:
-        return _serve_error(f"invalid JSON: {exc}")
-    if not isinstance(payload, dict):
-        return _serve_error("request must be a JSON object")
-
-    argv = payload.get("argv")
-    if not isinstance(argv, list) or not all(isinstance(item, str) for item in argv):
-        return _serve_error("request.argv must be a list of strings")
-    if argv and argv[0] == "serve":
-        return _serve_error("nested serve requests are not supported")
-
-    stdin_text = payload.get("stdin", "")
-    if stdin_text is None:
-        stdin_text = ""
-    if not isinstance(stdin_text, str):
-        return _serve_error("request.stdin must be a string when provided")
-    return argv, stdin_text
-
-
-def _run_serve_request(argv: list[str], stdin_text: str) -> dict:
-    stdout = io.StringIO()
-    stderr = io.StringIO()
-    old_stdin = sys.stdin
-    old_no_splash = os.environ.get("GLYPH_ARTS_NO_SPLASH")
-    start = time.perf_counter()
-    returncode = 0
-    try:
-        sys.stdin = io.StringIO(stdin_text)
-        os.environ["GLYPH_ARTS_NO_SPLASH"] = "1"
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            try:
-                main(argv)
-            except SystemExit as exc:
-                if exc.code is None:
-                    returncode = 0
-                elif isinstance(exc.code, int):
-                    returncode = exc.code
-                else:
-                    print(exc.code, file=sys.stderr)
-                    returncode = 1
-            except Exception:
-                import traceback
-
-                traceback.print_exc(file=sys.stderr)
-                returncode = 4
-    finally:
-        sys.stdin = old_stdin
-        if old_no_splash is None:
-            os.environ.pop("GLYPH_ARTS_NO_SPLASH", None)
-        else:
-            os.environ["GLYPH_ARTS_NO_SPLASH"] = old_no_splash
-
-    duration_ms = (time.perf_counter() - start) * 1000
-    return {
-        "ok": returncode == 0,
-        "returncode": returncode,
-        "stdout": stdout.getvalue(),
-        "stderr": stderr.getvalue(),
-        "duration_ms": round(duration_ms, 3),
-    }
-
-
-def run_stdio_server(input_stream=None, output_stream=None) -> int:
-    input_stream = input_stream or sys.stdin
-    output_stream = output_stream or sys.stdout
-    for line in input_stream:
-        line = line.strip()
-        if not line:
-            continue
-        request = _coerce_serve_request(line)
-        if isinstance(request, dict):
-            response = request
-        else:
-            argv, stdin_text = request
-            response = _run_serve_request(argv, stdin_text)
-        print(json.dumps(response, ensure_ascii=False), file=output_stream, flush=True)
-    return 0
-
-
 def main(argv=None):
     raw_argv = list(sys.argv[1:] if argv is None else argv)
     raw_argv = _rewrite_chat_argv(raw_argv)
@@ -2591,7 +2496,9 @@ Examples:
         if not args.stdio:
             print('ERROR:schema: serve currently requires --stdio', file=sys.stderr)
             sys.exit(1)
-        sys.exit(run_stdio_server())
+        from cli_charts.serve_stdio import run_stdio_server
+
+        sys.exit(run_stdio_server(main))
 
     if args.font_tier is None:
         args.font_tier = detect_font_tier()
