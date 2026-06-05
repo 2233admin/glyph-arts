@@ -9,7 +9,6 @@ Animation (--animate):
   Supported types: line, scatter, sparkline
   Flags: --refresh FPS (default 10), --window N (default 50), --duration SEC
 """
-import argparse
 import contextlib
 import datetime
 import importlib
@@ -22,8 +21,13 @@ import subprocess
 import sys
 import tempfile
 
-from cli_charts.cmd.media_args import add_media_arguments
+from cli_charts.cmd.animate_stream import ANIMATE_TYPES
+from cli_charts.cmd.direct_commands import dispatch_direct_command
 from cli_charts.cmd.media_dispatch import dispatch_media
+from cli_charts.cmd.motion_commands import dispatch_motion_command
+from cli_charts.cmd.parser import build_parser
+from cli_charts.cmd.text_input_commands import dispatch_text_input_command
+from cli_charts.cmd.tool_commands import dispatch_tool_command
 from cli_charts.font_tier import detect_font_tier
 from cli_charts.osc8 import link as _osc8_link
 from cli_charts.registry import DEFAULT_STYLE, STYLE_ROUTES, resolve_engine
@@ -31,16 +35,8 @@ from cli_charts.registry import STYLES as _STYLES
 from cli_charts.symbols import BLOCK, BRAILLE_ALL, get_symbol
 from cli_charts.themes import get_palette as _get_palette
 
-try:
-    from importlib.metadata import version as _pkg_version
-    _VERSION = _pkg_version("glyph-arts")
-except Exception:
-    try:
-        from pathlib import Path as _Path
-        _VERSION = (_Path(__file__).parent.parent / "VERSION").read_text().strip()
-    except Exception:
-        _VERSION = "unknown"
-
+# Re-exported by cli_charts.chart for compatibility with older imports.
+_ANIMATE_TYPES = ANIMATE_TYPES
 
 # -- helpers -----------------------------------------------------------------
 
@@ -1904,6 +1900,11 @@ def wave_command(d, title, w, h, theme, **kw):
     raise RuntimeError("wave is dispatched by main()")
 
 
+def serve_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("serve is dispatched by main()")
+
+
 def formula(d, title, w, h, theme, **kw):
     """Formula source -> compact Unicode math text."""
     from cli_charts.markup import render_formula_panel
@@ -2015,6 +2016,7 @@ CMDS = {
     'fonts':       fonts_command,
     'chat-health': chat_health_command,
     'wave':        wave_command,
+    'serve':       serve_command,
 }
 
 # Single source of truth for chart-type docs. Order is intentional.
@@ -2032,7 +2034,7 @@ CHART_TYPES_BY_ENGINE: dict[str, list[str]] = {
     'plotille': ['plotille'],
     'uniplot': ['uniplot'],
     'textcharts': ['comparison', 'diverging', 'summary', 'sparkline-table', 'cdf', 'rank', 'percentile', 'boxplot', 'stacked-text'],
-    'misc': ['graph', 'effect', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'fonts', 'chat-health', 'wave', 'calibrate'],
+    'misc': ['graph', 'effect', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'fonts', 'chat-health', 'wave', 'calibrate', 'serve'],
     'media': ['image', 'video'],
 }
 
@@ -2109,6 +2111,137 @@ _NO_SIZE_THEME = {'table', 'tree', 'panel', 'graph', 'sparkline', 'gauge', 'bann
 
 PIXEL_SUPPORTED = frozenset({'bar', 'line', 'scatter'})
 INTERACTIVE_SUPPORTED = frozenset({'line'})
+_GLYPH_VISUAL_STYLES = {
+    'auto',
+    'ascii',
+    'unicode',
+    'braille',
+    'block',
+    'shade',
+    'bar',
+    'half-circle',
+    'full-circle',
+}
+_DEPENDENCY_CORE = [
+    'plotext',
+    'rich',
+    'uniplot',
+    'pyfiglet',
+    'sparklines',
+    'duckdb',
+    'pandas',
+    'networkx',
+    'phart',
+]
+_DEPENDENCY_MEDIA = (
+    ('chafa', 'image/video high-fidelity render'),
+    ('ffmpeg', 'video frame extract'),
+    ('diagon', 'math/sequence/tree/flowchart diagrams'),
+)
+_DEPENDENCY_OPTIONAL = (
+    ('PIL', 'image text fallback', 'Pillow'),
+    ('drawille', 'curve chart', 'glyph-arts[braille]'),
+    ('lttb', 'LTTB sampling', 'glyph-arts[lttb]'),
+    ('textual', 'dashboard TUI', 'glyph-arts[tui]'),
+)
+
+
+def _build_cli_epilog():
+    epilog_lines = [f'Chart types ({CHART_TYPE_COUNT}):']
+    for engine, types in CHART_TYPES_BY_ENGINE.items():
+        epilog_lines.append(f'  {engine:9}: {" ".join(types)}')
+    epilog_lines.append("""
+Examples:
+  python chart.py kline --json '{"dates":["07/04/2026"],"open":[100],"high":[102],"low":[99],"close":[101]}'
+  python chart.py scatter --json '[{"label":"A","x":[1,2,3],"y":[4,2,5]}]'
+  python chart.py hist --json '{"values":[1,2,2,3,3,3,4,4,5],"bins":5}'
+  python chart.py heatmap --json '{"matrix":[[1,2],[3,4]],"xlabels":["A","B"],"ylabels":["X","Y"]}'
+  python chart.py spectrum --json '{"freq":[99.0,99.3,99.6],"power":[-93,-42,-93],"center":99.3,"bandwidth":0.2}'
+  python chart.py waterfall --json '{"matrix":[[0,3,8,3,0],[0,2,9,4,0]],"xlabels":["99.0","99.6"],"ylabels":["t-1","now"]}'
+  python chart.py diagram sequence --json 'Alice->Bob: Hello'
+  python chart.py chat mermaid --json 'graph LR\nA[Start] --> B[Done]'
+  python chart.py chat effects
+  python chart.py effect signal-panel
+  python chart.py chat image --file photo.jpg --width 80 --height 30
+  python chart.py chat sequence --json 'Alice->Bob: Hello'
+  python chart.py chat sdr spectrum --json '{"freq":[99.0,99.3,99.6],"power":[-93,-42,-93]}'
+  python chart.py box --json '{"data":[[1,2,3,4,5],[2,3,4,5,6]],"labels":["A","B"]}'
+  python chart.py sparkline --json '{"values":[1,3,5,2,8,4,6]}'
+  python chart.py indicator --json '{"value":23.4,"label":"Total Return %"}'
+  python chart.py confusion --json '{"actual":[0,1,2,0,1,2],"predicted":[0,2,2,0,0,1],"labels":["Cat","Dog","Bird"]}'
+  python chart.py gauge --json '[{"label":"CPU","value":72,"max":100},{"label":"RAM","value":14,"max":32}]'
+  python chart.py banner --json '{"text":"PROFIT","font":"big","color":"green"}'
+  python chart.py uniplot --json '[{"label":"A","x":[1,2,3,4],"y":[2,4,3,6]},{"label":"B","y":[1,3,2,5]}]'
+  python chart.py tree --json '{"label":"root","children":[{"label":"A"},{"label":"B","children":[{"label":"C"}]}]}'
+  python chart.py panel --json '{"content":"Hello world","title":"Info","box":"ROUNDED"}'
+  python chart.py multibar --json '{"labels":["Q1","Q2"],"series":[{"label":"Rev","values":[10,12]},{"label":"Cost","values":[8,9]}]}'
+  python chart.py event --json '{"data":[1,3,5,8,13]}'
+  python chart.py line --duckdb "SELECT trade_date, close FROM stock_daily LIMIT 60" --db /path/to/data.duckdb
+  cat data.json | python chart.py line
+""")
+    return '\n'.join(epilog_lines)
+
+
+def _print_dependency_status(include_optional=False):
+    print('[core]')
+    for pkg in _DEPENDENCY_CORE:
+        try:
+            __import__(pkg)
+            status = 'OK'
+        except ImportError:
+            status = 'MISSING'
+        print(f'  {pkg:<13} {status}')
+    print('[media]')
+    for tool, purpose in _DEPENDENCY_MEDIA:
+        status = 'OK' if shutil.which(tool) else 'MISSING'
+        print(f'  {tool:<13} {status}  ({purpose})')
+    if include_optional:
+        print('[optional]')
+        for pkg, purpose, install in _DEPENDENCY_OPTIONAL:
+            try:
+                __import__(pkg)
+                status = 'OK'
+                hint = ''
+            except ImportError:
+                status = 'MISSING'
+                hint = f'  -> pip install {install}'
+            print(f'  {pkg:<13} {status}  ({purpose}){hint}')
+
+
+def _print_style_list():
+    print('Available styles per chart type:\n')
+    for ctype in sorted(STYLE_ROUTES):
+        engines = STYLE_ROUTES[ctype]
+        parts = [f'{s} ({eng})' for s, eng in engines.items()]
+        print(f'  {ctype:<12} {", ".join(parts)}')
+    print(f'\nDefault style: {DEFAULT_STYLE}')
+    print('Override: --style <name> or GLYPH_ARTS_STYLE=<name>')
+
+
+def _handle_pre_parse_flags(raw_argv):
+    if '--check-deps' in raw_argv:
+        _print_dependency_status(include_optional='--all' in raw_argv)
+        return True
+    if '--list-styles' in raw_argv:
+        _print_style_list()
+        return True
+    return False
+
+
+def _apply_font_and_style_defaults(args):
+    if args.font_tier is None:
+        args.font_tier = detect_font_tier()
+    if args.chat_profile != 'auto':
+        from cli_charts.chat_health import chat_profile_tier
+
+        args.font_tier = chat_profile_tier(args.chat_profile, args.font_tier)
+        if args.chat_profile == 'ascii':
+            args.no_color = True
+
+    if args.style is None:
+        env_style = os.environ.get('GLYPH_ARTS_STYLE', '').strip().lower()
+        if env_style and env_style in _STYLES:
+            args.style = env_style
 
 
 def _load_ascii_motion_adapter():
@@ -2127,7 +2260,13 @@ def _load_ascii_motion_adapter():
 def _require_ascii_motion_npx():
     npx = shutil.which("npx") or shutil.which("npx.cmd") or "npx"
     try:
-        result = subprocess.run([npx, "ascii-motion-mcp", "--version"], capture_output=True, text=True)
+        result = subprocess.run(
+            [npx, "ascii-motion-mcp", "--version"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
     except FileNotFoundError:
         print("error: ascii-motion-mcp not found; install via 'npm i -g ascii-motion-mcp'", file=sys.stderr)
         sys.exit(3)
@@ -2163,731 +2302,81 @@ def _render_ascii_motion_frames(chart_type, data, args, adapter, no_color=False)
     return [adapter.text_to_cells(text)]
 
 
-# -- main --------------------------------------------------------------------
+def _build_arg_parser():
+    return build_parser(
+        commands=CMDS,
+        media_types=_MEDIA_TYPES,
+        marker_symbols=_MARKER_SYMBOLS,
+        registry_styles=_STYLES,
+        glyph_visual_styles=_GLYPH_VISUAL_STYLES,
+        epilog=_build_cli_epilog(),
+    )
+
 
 def main(argv=None):
     raw_argv = list(sys.argv[1:] if argv is None else argv)
     raw_argv = _rewrite_chat_argv(raw_argv)
     raw_argv = _rewrite_diagram_argv(raw_argv)
-    epilog_lines = [f'Chart types ({CHART_TYPE_COUNT}):']
-    for engine, types in CHART_TYPES_BY_ENGINE.items():
-        epilog_lines.append(f'  {engine:9}: {" ".join(types)}')
-    epilog_lines.append("""
-Examples:
-  python chart.py kline --json '{"dates":["07/04/2026"],"open":[100],"high":[102],"low":[99],"close":[101]}'
-  python chart.py scatter --json '[{"label":"A","x":[1,2,3],"y":[4,2,5]}]'
-  python chart.py hist --json '{"values":[1,2,2,3,3,3,4,4,5],"bins":5}'
-  python chart.py heatmap --json '{"matrix":[[1,2],[3,4]],"xlabels":["A","B"],"ylabels":["X","Y"]}'
-  python chart.py spectrum --json '{"freq":[99.0,99.3,99.6],"power":[-93,-42,-93],"center":99.3,"bandwidth":0.2}'
-  python chart.py waterfall --json '{"matrix":[[0,3,8,3,0],[0,2,9,4,0]],"xlabels":["99.0","99.6"],"ylabels":["t-1","now"]}'
-  python chart.py diagram sequence --json 'Alice->Bob: Hello'
-  python chart.py chat mermaid --json 'graph LR\nA[Start] --> B[Done]'
-  python chart.py chat effects
-  python chart.py effect signal-panel
-  python chart.py chat image --file photo.jpg --width 80 --height 30
-  python chart.py chat sequence --json 'Alice->Bob: Hello'
-  python chart.py chat sdr spectrum --json '{"freq":[99.0,99.3,99.6],"power":[-93,-42,-93]}'
-  python chart.py box --json '{"data":[[1,2,3,4,5],[2,3,4,5,6]],"labels":["A","B"]}'
-  python chart.py sparkline --json '{"values":[1,3,5,2,8,4,6]}'
-  python chart.py indicator --json '{"value":23.4,"label":"Total Return %"}'
-  python chart.py confusion --json '{"actual":[0,1,2,0,1,2],"predicted":[0,2,2,0,0,1],"labels":["Cat","Dog","Bird"]}'
-  python chart.py gauge --json '[{"label":"CPU","value":72,"max":100},{"label":"RAM","value":14,"max":32}]'
-  python chart.py banner --json '{"text":"PROFIT","font":"big","color":"green"}'
-  python chart.py uniplot --json '[{"label":"A","x":[1,2,3,4],"y":[2,4,3,6]},{"label":"B","y":[1,3,2,5]}]'
-  python chart.py tree --json '{"label":"root","children":[{"label":"A"},{"label":"B","children":[{"label":"C"}]}]}'
-  python chart.py panel --json '{"content":"Hello world","title":"Info","box":"ROUNDED"}'
-  python chart.py multibar --json '{"labels":["Q1","Q2"],"series":[{"label":"Rev","values":[10,12]},{"label":"Cost","values":[8,9]}]}'
-  python chart.py event --json '{"data":[1,3,5,8,13]}'
-  python chart.py line --duckdb "SELECT trade_date, close FROM stock_daily LIMIT 60" --db /path/to/data.duckdb
-  cat data.json | python chart.py line
-""")
-    epilog = '\n'.join(epilog_lines)
-    p = argparse.ArgumentParser(
-        description='glyph-arts -- terminal-visible charts and chat drawing',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=epilog)
-    p.add_argument('type', choices=list(CMDS) + sorted(_MEDIA_TYPES), metavar='TYPE',
-                   help='Chart type, or use `chat TYPE ...` for chat-safe drawing: ' + ' | '.join(CMDS) +
-                        ' | image | video (media via Pillow/chafa/ffmpeg)')
-    p.add_argument('art_text', nargs='*',
-                   help='Text for TYPE=art (example: glyph-arts art SHIP IT)')
-    p.add_argument('--json',        dest='data', help='JSON data string')
-    p.add_argument('--file',        metavar='PATH',
-                   help='Read JSON from a file path')
-    p.add_argument('--duckdb',      metavar='SQL',
-                   help='SQL query against a DuckDB database')
-    p.add_argument('--db',          default=None,
-                   help='DuckDB file path (required with --duckdb)')
-    p.add_argument('--title',       default='')
-    p.add_argument('--width',       type=int,
-                   default=shutil.get_terminal_size((70, 20)).columns,
-                   help='Chart width in terminal columns (ignored for table/tree/panel/graph/sparkline)')
-    p.add_argument('--height',      type=int, default=20,
-                   help='Chart height in terminal rows (ignored for table/tree/panel/graph/sparkline)')
-    p.add_argument('--theme',       default='pro',
-                   help='plotext theme: pro dark clear matrix retro elegant + brand palettes: claude linear tesla vercel (ignored for rich/graph/sparkline)')
-    p.add_argument('--font-tier',   choices=['ascii', 'unicode', 'unicode-extended', 'nerd'],
-                   default=None, help='Terminal font capability tier (default: auto-detect)')
-    p.add_argument('--chat-profile', choices=['auto', 'ascii', 'safe', 'rich', 'max'],
-                   default='auto', help='Chat glyph profile: auto, ascii, safe, rich, or max')
-    p.add_argument('--font',        default='slant',
-                   help='TYPE=art figlet font (default: slant). Use --list-fonts to see all.')
-    p.add_argument('--decor',       default=None,
-                   help='TYPE=art optional decoration (barcode/snake/dna/wave + 200+ from art lib). Use --list-decors to see all.')
-    p.add_argument('--frame',       choices=['single', 'double', 'rounded', 'ascii', 'heavy', 'none'],
-                   default=None, help='TYPE=art optional Rich frame')
-    p.add_argument('--gradient',    choices=['sunset', 'viridis', 'ocean', 'rainbow', 'none'],
-                   default=None, help='TYPE=art optional text gradient')
-    p.add_argument('--justify',     choices=['left', 'center', 'right'],
-                   default=None, help='TYPE=art figlet text alignment')
-    p.add_argument('--anim',        action='store_true',
-                   help='TYPE=art animation mode (requires art library; pip install glyph-arts[art])')
-    p.add_argument('--list-fonts',  action='store_true',
-                   help='TYPE=art: list all available figlet fonts')
-    p.add_argument('--list-decors', action='store_true',
-                   help='TYPE=art: list all available decorations')
-    p.add_argument('--engine',      choices=['ascii', 'pixel', 'interactive'], default='ascii',
-                   help='Render backend. ascii (default) = plotext/rich/drawille text art. '
-                        'pixel = matplotlib + chafa true-color pixel chart (requires '
-                        '`pip install glyph-arts[pixel]` + chafa system binary). '
-                        'Phase A pixel support: bar/line/scatter only. '
-                        'interactive = Textual keyboard-first TUI for line charts '
-                        '(requires `pip install glyph-arts[interactive]`).')
-    add_media_arguments(p)
-    p.add_argument('--art', choices=['low', 'default', 'high'], default='default',
-                   help='Visual fidelity tier (only with --engine pixel). low=block(compat). default=vhalf(btop-style). high=sextant(max resolution).')
-    p.add_argument('--xlabel',      default='', help='X-axis label (plotext charts)')
-    p.add_argument('--ylabel',      default='', help='Y-axis label (plotext charts)')
-    p.add_argument('--xlim',        nargs=2, type=float, metavar=('MIN', 'MAX'),
-                   help='X-axis limits')
-    p.add_argument('--ylim',        nargs=2, type=float, metavar=('MIN', 'MAX'),
-                   help='Y-axis limits')
-    p.add_argument('--xscale',      choices=['linear', 'log'], default='linear')
-    p.add_argument('--yscale',      choices=['linear', 'log'], default='linear')
-    p.add_argument('--orientation', choices=['vertical', 'horizontal'],
-                   default='vertical', help='Bar orientation (bar/multibar/stackedbar)')
-    p.add_argument('--output',      default='',
-                   help='Save chart to file (.png with pixel engine; .txt/.ansi/.html with ascii engine; .md for table)')
-    p.add_argument('--format',      default=None,
-                   help="Output format (reserved for future use)")
-    p.add_argument('--output-dir',  default='',
-                   help='TYPE=to-hyperframes/to-ascii-motion output directory')
-    p.add_argument('--out-dir',     dest='output_dir',
-                   help='Alias for --output-dir')
-    p.add_argument('--formats',     default='html',
-                   help='TYPE=to-ascii-motion comma-separated exports (html,mp4,gif,react,svg)')
-    p.add_argument('--polish',      choices=['ascii-motion'], default='',
-                   help='Route rendered chart through ASCII Motion polish')
-    p.add_argument('--polish-style', default='retro',
-                   help='ASCII Motion polish style (terminal, retro, matrix, minimalist, detailed, colorful)')
-    p.add_argument('--cmd',         default='',
-                   help='TYPE=record command to run inside asciinema')
-    p.add_argument('--no-color',    action='store_true',
-                   help='Disable ANSI colors (respects NO_COLOR env var)')
-    p.add_argument('--marker',      choices=list(_MARKER_SYMBOLS), default=None,
-                   help='TYPE=scatter marker symbol set')
-    p.add_argument('--symbols',     default=None, metavar='SET',
-                   help='TYPE=bar symbol set (block, progress, braille, arrows); '
-                        'image symbols (ascii, shade, block, half) or chafa --symbols value; '
-                        'video chafa --symbols value')
-    p.add_argument('--candle-style', choices=['default', 'geom'], default='default',
-                   help='TYPE=kline candle glyph style')
-    _glyph_visual_styles = {'auto', 'ascii', 'unicode', 'braille', 'block', 'shade', 'bar', 'half-circle', 'full-circle'}
-    p.add_argument('--gauge-style', choices=['bar', 'half-circle', 'full-circle', 'braille'],
-                   default='bar', help='TYPE=gauge glyph style')
-    p.add_argument('--style',       choices=sorted(set(_STYLES) | _glyph_visual_styles),
-                   default=None, help='Rendering style. Supports global style routing plus legacy glyph styles.')
-    p.add_argument('--list-styles', action='store_true',
-                   help='Show available styles for each chart type and exit')
-    p.add_argument('--prefer',      choices=['sparkline', 'bar', 'multibar', 'stackedbar', 'line', 'scatter', 'hist', 'table', 'kline', 'candlestick'], default='',
-                   help='TYPE=auto/incplot chart preference override')
-    p.add_argument('--calibrate-from', dest='calibrate_from', type=int, default=96,
-                   help='TYPE=calibrate starting ruler width')
-    p.add_argument('--calibrate-to', dest='calibrate_to', type=int, default=160,
-                   help='TYPE=calibrate ending ruler width')
-    p.add_argument('--calibrate-step', dest='calibrate_step', type=int, default=8,
-                   help='TYPE=calibrate ruler width step')
-    p.add_argument('--calibrate-glyph', choices=['all', 'ascii', 'digits', 'braille', 'solid', 'mixed'], default='all',
-                   help='TYPE=calibrate glyph family to print')
-    p.add_argument('--terminal', action='store_true',
-                   help='TYPE=calibrate measure current terminal columns')
-    p.add_argument('--recommend', action='store_true',
-                   help='TYPE=calibrate print preset recommendation rules')
-    p.add_argument('--diagram-kind', choices=['math', 'sequence', 'tree', 'table', 'frame', 'box', 'note', 'flowchart', 'graphdag', 'dag', 'graphplanar', 'planar'],
-                   default='', help='TYPE=diagram generator override')
-    p.add_argument('--diagram-engine', choices=['auto', 'diagon', 'builtin'], default='auto',
-                   help='TYPE=diagram backend. auto uses Diagon when installed, else builtin fallback.')
-    p.add_argument('--mermaid-theme', choices=[
-        'zinc-light', 'zinc-dark', 'tokyo-night', 'tokyo-night-storm',
-        'tokyo-night-light', 'catppuccin-mocha', 'catppuccin-latte', 'nord',
-        'nord-light', 'dracula', 'github-light', 'github-dark',
-        'solarized-light', 'solarized-dark', 'one-dark',
-    ], default='zinc-dark', help='TYPE=mermaid beautiful-mermaid-compatible theme name')
-    p.add_argument('--mermaid-ascii', action='store_true',
-                   help='TYPE=mermaid use ASCII connectors instead of Unicode')
-    p.add_argument('--mermaid-padding-x', type=int, default=5,
-                   help='TYPE=mermaid horizontal spacing between nodes')
-    p.add_argument('--mermaid-padding-y', type=int, default=1,
-                   help='TYPE=mermaid vertical spacing between nodes')
-    p.add_argument('--mermaid-box-padding', type=int, default=1,
-                   help='TYPE=mermaid node inner padding')
-    p.add_argument('--graph-format', choices=['auto', 'json', 'edges', 'dot', 'graphml'], default='auto',
-                   help='TYPE=graph input format override')
-    p.add_argument('--graph-style', choices=['minimal', 'square', 'round', 'diamond'], default='round',
-                   help='TYPE=graph PHART node style')
-    p.add_argument('--graph-charset', choices=['unicode', 'ascii'], default='unicode',
-                   help='TYPE=graph PHART character set')
-    p.add_argument('--graph-node-spacing', type=int, default=4,
-                   help='TYPE=graph horizontal node spacing')
-    p.add_argument('--graph-layer-spacing', type=int, default=2,
-                   help='TYPE=graph vertical layer spacing')
-    p.add_argument('--effect-kind', choices=['gallery', 'pipeline', 'metrics', 'system-status', 'system-map', 'signal-panel', 'timeline', 'matrix', 'comparison', 'swimlane', 'kanban', 'quadrant', 'mindmap'],
-                   default='', help='TYPE=effect preset override')
-    p.add_argument('--fps',         type=int, default=12, metavar='N',
-                   help='Video playback frames/sec for type=video (default: 12)')
-    p.add_argument('--version',     action='version', version=f'glyph-arts {_VERSION}')
-    p.add_argument('--check-deps',  action='store_true',
-                   help='Print dependency availability table and exit')
-    p.add_argument('--all',         action='store_true',
-                   help='With --check-deps: also show optional deps (braille/lttb/tui)')
-    p.add_argument('--sample',      type=int, default=0, metavar='N',
-                   help='Downsample any list longer than N in the input data')
-    p.add_argument('--animate',    action='store_true',
-                   help='Read stdin line-by-line and re-render chart after each value')
-    p.add_argument('--refresh',    type=int, default=10, metavar='FPS',
-                   help='Animation refresh rate in frames/sec (default: 10)')
-    p.add_argument('--window',     type=int, default=50,  metavar='N',
-                   help='Keep last N data points in view (0=unlimited, default: 50)')
-    p.add_argument('--duration',   type=float, default=0, metavar='SEC',
-                   help='Auto-stop after SEC seconds (0=until EOF/Ctrl-C)')
-    p.add_argument('--interval',   type=float, default=0.2, metavar='SEC',
-                   help='TYPE=live update interval in seconds (default: 0.2)')
-    p.add_argument('--frames',     type=int, default=30, metavar='N',
-                   help='TYPE=animate frame count (default: 30)')
-    p.add_argument('--spinner',    default='',
-                   help='TYPE=animate/status Rich spinner preset (dots, dots2, line, pong, ...)')
-    p.add_argument('--rich-progress', action='store_true',
-                   help='TYPE=gauge render with rich.progress Progress')
-    p.add_argument('--lang',       default='',
-                   help='TYPE=code syntax language (python, javascript, ...)')
-    p.add_argument('--kind',       default='info',
-                   help='TYPE=status kind: ok, warn, error, info, loading')
-    p.add_argument('--message',    default='',
-                   help='TYPE=status message text')
-    p.add_argument('--link-data',  default='',
-                   help='OSC 8 hyperlink URL for line/scatter data labels')
-    p.add_argument('--link-title', default='',
-                   help='OSC 8 hyperlink URL for the chart title')
-    p.add_argument('--statusline', action='store_true',
-                   help='Single-line ANSI-safe output for Claude Code statusLine.command')
-    p.add_argument('--no-splash',  action='store_true',
-                   help='Skip the first-run mascot splash')
-    p.add_argument('--speed', choices=['fast', 'normal', 'slow'], default='normal',
-                   help='TYPE=demo speed: fast=10s, normal=30s, slow=60s')
-    p.add_argument('--no-clear', action='store_true',
-                   help='TYPE=demo do not clear the terminal between sections')
-    p.add_argument('--demo', action='store_true',
-                   help='TYPE=dashboard use built-in dashboard demo')
-    p.add_argument('--no-interactive', action='store_true',
-                   help='TYPE=dashboard render static Rich dashboard instead of Textual TUI')
-    p.add_argument('--chart', default='',
-                   help='TYPE=gallery pre-select chart type')
-    p.add_argument(
-        '--target',
-        choices=['all', 'chat', 'media', 'fonts', 'diagrams'],
-        default='all',
-        help='TYPE=install-backends install target',
-    )
-    p.add_argument(
-        '--manager',
-        choices=[
-            'auto', 'download', 'scoop', 'choco', 'winget', 'brew', 'apt-get',
-            'dnf', 'pacman', 'snap', 'x-cmd',
-        ],
-        default='auto',
-        help='TYPE=install-backends package manager override',
-    )
-    p.add_argument('--run', action='store_true',
-                   help='TYPE=install-backends execute the generated install commands')
-    p.add_argument('--yes', action='store_true',
-                   help='TYPE=install-backends confirm execution when used with --run')
-    p.add_argument('--fix-chat', action='store_true',
-                   help='TYPE=doctor print chat glyph/font remediation plan')
-    p.add_argument('--font-dir', default='',
-                   help='TYPE=fonts download/status directory (default: ~/.glyph-arts/fonts)')
-    p.add_argument('--dry-run', action='store_true',
-                   help='TYPE=wave print planned chart/wsh commands without running them')
-    p.add_argument('--wave-format', choices=['html', 'txt', 'ansi'], default='html',
-                   help='TYPE=wave render export format for wave render')
-    p.add_argument('--wave-stdout', action='store_true',
-                   help='TYPE=wave render also print the generated preview file')
-    if '--check-deps' in sys.argv:
-        _CORE = ['plotext', 'rich', 'uniplot', 'pyfiglet',
-                 'sparklines', 'duckdb', 'pandas', 'networkx', 'phart']
-        _OPT = [
-            ('PIL',      'image text fallback', 'Pillow'),
-            ('drawille', 'curve chart',   'glyph-arts[braille]'),
-            ('lttb',     'LTTB sampling', 'glyph-arts[lttb]'),
-            ('textual',  'dashboard TUI', 'glyph-arts[tui]'),
-        ]
-        print('[core]')
-        for pkg in _CORE:
-            try:
-                __import__(pkg)
-                status = 'OK'
-            except ImportError:
-                status = 'MISSING'
-            print(f'  {pkg:<13} {status}')
-        print('[media]')
-        for tool, purpose in (('chafa', 'image/video high-fidelity render'),
-                              ('ffmpeg', 'video frame extract'),
-                              ('diagon', 'math/sequence/tree/flowchart diagrams')):
-            status = 'OK' if shutil.which(tool) else 'MISSING'
-            print(f'  {tool:<13} {status}  ({purpose})')
-        if '--all' in sys.argv:
-            print('[optional]')
-            for pkg, purpose, install in _OPT:
-                try:
-                    __import__(pkg)
-                    status = 'OK'
-                    hint = ''
-                except ImportError:
-                    status = 'MISSING'
-                    hint = f'  -> pip install {install}'
-                print(f'  {pkg:<13} {status}  ({purpose}){hint}')
-        sys.exit(0)
-
-    if '--list-styles' in raw_argv:
-        print('Available styles per chart type:\n')
-        for ctype in sorted(STYLE_ROUTES):
-            engines = STYLE_ROUTES[ctype]
-            parts = [f'{s} ({eng})' for s, eng in engines.items()]
-            print(f'  {ctype:<12} {", ".join(parts)}')
-        print(f'\nDefault style: {DEFAULT_STYLE}')
-        print('Override: --style <name> or GLYPH_ARTS_STYLE=<name>')
+    p = _build_arg_parser()
+    if _handle_pre_parse_flags(raw_argv):
         sys.exit(0)
 
     args = p.parse_args(raw_argv)
-    if args.font_tier is None:
-        args.font_tier = detect_font_tier()
-    if args.chat_profile != 'auto':
-        from cli_charts.chat_health import chat_profile_tier
+    if args.type == 'serve':
+        if not args.stdio:
+            print('ERROR:schema: serve currently requires --stdio', file=sys.stderr)
+            sys.exit(1)
+        from cli_charts.serve_stdio import run_stdio_server
 
-        args.font_tier = chat_profile_tier(args.chat_profile, args.font_tier)
-        if args.chat_profile == 'ascii':
-            args.no_color = True
+        sys.exit(run_stdio_server(main))
 
-    if args.style is None:
-        env_style = os.environ.get('GLYPH_ARTS_STYLE', '').strip().lower()
-        if env_style and env_style in _STYLES:
-            args.style = env_style
+    _apply_font_and_style_defaults(args)
 
-    if args.type == 'doctor':
-        from cli_charts.installers import render_doctor
-        print(render_doctor(fix_chat=args.fix_chat), end='')
-        sys.exit(0)
-
-    if args.type == 'install-backends':
-        from cli_charts.installers import render_install_plan, run_install_plan
-        manager = '' if args.manager == 'auto' else args.manager
-        if args.run:
-            sys.exit(run_install_plan(args.target, manager, yes=args.yes))
-        print(render_install_plan(args.target, manager), end='')
-        sys.exit(0)
-
-    if args.type == 'fonts':
-        from cli_charts.font_downloads import run_fonts_command
-        sys.exit(run_fonts_command(args))
-
-    if args.type == 'chat-health':
-        from cli_charts.chat_health import run_chat_health_command
-        sys.exit(run_chat_health_command(args))
-
-    if args.type == 'wave':
-        from cli_charts.adapters.waveterm import run_wave_command
-        sys.exit(run_wave_command(args))
-
-    if args.type == 'demo':
-        from cli_charts.demo_engine import run_demo
-        sys.exit(run_demo(speed=args.speed, clear=not args.no_clear))
-
-    if args.type == 'gallery':
-        from cli_charts.gallery_engine import run_gallery
-        sys.exit(run_gallery(output=args.output or None,
-                             chart=args.chart or None,
-                             theme=args.theme if '--theme' in raw_argv else None))
-
-    if args.type == 'splash':
-        from cli_charts.splash import main as splash_main
-        sys.exit(splash_main(['--no-splash'] if args.no_splash else []))
+    tool_rc = dispatch_tool_command(args, raw_argv)
+    if tool_rc is not None:
+        sys.exit(tool_rc)
 
     from cli_charts.splash import maybe_play_first_run
     maybe_play_first_run(no_splash=args.no_splash)
 
-    if args.type == 'live':
-        from cli_charts.live_engine import run_live
-        source = args.art_text[0] if args.art_text else 'random'
-        no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
-        sys.exit(run_live(
-            source,
-            window=args.window,
-            interval=args.interval,
-            duration=args.duration,
-            title=args.title,
-            width=args.width,
-            height=args.height,
-            theme=args.theme,
-            no_color=no_color,
-        ))
-
-    if args.type == 'code':
-        if not args.file:
-            print('ERROR:schema: code needs --file PATH', file=sys.stderr)
-            sys.exit(1)
-        if not args.lang:
-            print('ERROR:schema: code needs --lang LANG', file=sys.stderr)
-            sys.exit(1)
-        from cli_charts.render.code_engine import render_code
-        no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
-        code_theme = 'monokai' if args.theme == 'pro' else args.theme
-        rc = render_code(args.file, args.lang, theme=code_theme, no_color=no_color)
-        sys.exit(rc)
-
-    if args.type == 'status':
-        from cli_charts.render.status_engine import render_status
-        no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
-        rc = render_status(
-            args.kind,
-            args.message or args.title or args.kind,
-            spinner=args.spinner or 'dots',
-            no_color=no_color,
-        )
-        sys.exit(rc)
-
-    if args.type == 'dashboard' and args.demo:
-        dash_script = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'dashboard.py')
-        cmd = [sys.executable, dash_script, '--demo']
-        if args.no_interactive:
-            cmd.append('--no-interactive')
-        result = subprocess.run(cmd)
-        sys.exit(result.returncode)
+    direct_rc = dispatch_direct_command(args, calibrate_func=calibrate)
+    if direct_rc is not None:
+        sys.exit(direct_rc)
 
     # Media types (image/video) bypass JSON loading -- they take a filesystem path.
     if args.type in _MEDIA_TYPES:
         sys.exit(dispatch_media(args))
         return
 
-    if args.type == 'art':
-        from cli_charts.render.art_engine import list_decors, list_fonts, render_art
-        no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
-        if args.list_fonts:
-            list_fonts()
-            sys.exit(0)
-        if args.list_decors:
-            list_decors()
-            sys.exit(0)
-        rc = render_art(
-            ' '.join(args.art_text),
-            args.font,
-            args.decor,
-            args.frame,
-            args.gradient,
-            args.theme,
-            args.width,
-            args.height,
-            no_color,
-            args.output,
-            args.justify,
-            args.anim,
-        )
-        sys.exit(rc)
+    text_rc = dispatch_text_input_command(
+        args,
+        commands=CMDS,
+        diagram_func=diagram,
+        mermaid_func=mermaid,
+        effect_func=effect,
+    )
+    if text_rc is not None:
+        sys.exit(text_rc)
 
-    if args.type == 'calibrate':
-        calibrate(
-            {},
-            args.title,
-            args.width,
-            args.height,
-            args.theme,
-            calibrate_from=args.calibrate_from,
-            calibrate_to=args.calibrate_to,
-            calibrate_step=args.calibrate_step,
-            calibrate_glyph=args.calibrate_glyph,
-            terminal=args.terminal,
-            recommend=args.recommend,
-        )
-        sys.exit(0)
-
-    if args.type in {'incplot', 'textplot', 'turtle', 'formula', 'formula-pretty', 'math', 'math-pretty'}:
-        if args.file:
-            with open(args.file, encoding='utf-8') as _f:
-                raw = _f.read().strip()
-        elif args.data is not None:
-            raw = args.data
-        elif args.art_text:
-            raw = ' '.join(args.art_text)
-        else:
-            raw = sys.stdin.read().strip()
-        if not raw:
-            print(f'ERROR:schema: {args.type} needs --json TEXT, --file PATH, stdin, or trailing text',
-                  file=sys.stderr)
-            sys.exit(1)
-        data = raw
-        if args.type != 'incplot':
-            try:
-                data = json.loads(raw)
-            except json.JSONDecodeError:
-                data = raw
-        no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
-        render_kw = dict(
-            xlabel=args.xlabel,
-            ylabel=args.ylabel,
-            xlim=args.xlim,
-            ylim=args.ylim,
-            xscale=args.xscale,
-            yscale=args.yscale,
-            orientation=args.orientation,
-            output='',
-            no_color=no_color,
-            prefer=args.prefer,
-        )
-        if args.output:
-            from cli_charts.render.export_engine import export_to_path
-
-            buf = io.StringIO()
-            with contextlib.redirect_stdout(buf):
-                CMDS[args.type](data, args.title, args.width, args.height, args.theme, **render_kw)
-            export_to_path(buf.getvalue(), args.output, no_color)
-        else:
-            CMDS[args.type](data, args.title, args.width, args.height, args.theme, **render_kw)
-        sys.exit(0)
-
-    if args.type == 'diagram':
-        kind = args.diagram_kind or (args.art_text[0] if args.art_text else '')
-        inline_text = ' '.join(args.art_text[1:]) if args.art_text and kind == args.art_text[0] else ''
-        if args.file:
-            with open(args.file, encoding='utf-8') as _f:
-                raw = _f.read().strip()
-        elif args.data is not None:
-            raw = args.data
-        elif inline_text:
-            raw = inline_text
-        else:
-            raw = sys.stdin.read().strip()
-        if not raw:
-            print('ERROR:schema: diagram needs --json TEXT, --file PATH, stdin, or trailing text',
-                  file=sys.stderr)
-            sys.exit(1)
-        data = raw
-        try:
-            parsed = json.loads(raw)
-        except json.JSONDecodeError:
-            parsed = None
-        if isinstance(parsed, dict):
-            data = parsed
-            kind = kind or parsed.get('kind') or parsed.get('type') or ''
-        if not kind:
-            print('ERROR:schema: diagram needs a kind: math, sequence, tree, table, frame, note, flowchart, graphdag, graphplanar',
-                  file=sys.stderr)
-            sys.exit(1)
-        rc = diagram(
-            data,
-            args.title,
-            args.width,
-            args.height,
-            args.theme,
-            output=args.output,
-            diagram_kind=kind,
-            diagram_engine=args.diagram_engine,
-            statusline=args.statusline,
-        )
-        sys.exit(rc or 0)
-
-    if args.type == 'mermaid':
-        if args.file:
-            with open(args.file, encoding='utf-8') as _f:
-                raw = _f.read().strip()
-        elif args.data is not None:
-            raw = args.data
-        elif args.art_text:
-            raw = ' '.join(args.art_text)
-        else:
-            raw = sys.stdin.read().strip()
-        if not raw:
-            print('ERROR:schema: mermaid needs --json TEXT, --file PATH, stdin, or trailing text',
-                  file=sys.stderr)
-            sys.exit(1)
-        rc = mermaid(
-            raw,
-            args.title,
-            args.width,
-            args.height,
-            args.theme,
-            mermaid_theme=args.mermaid_theme,
-            mermaid_ascii=args.mermaid_ascii,
-            mermaid_padding_x=args.mermaid_padding_x,
-            mermaid_padding_y=args.mermaid_padding_y,
-            mermaid_box_padding=args.mermaid_box_padding,
-        )
-        sys.exit(rc or 0)
-
-    if args.type == 'effect':
-        kind = args.effect_kind or (args.art_text[0] if args.art_text else '')
-        inline_text = ' '.join(args.art_text[1:]) if args.art_text and kind == args.art_text[0] else ''
-        raw = ''
-        if args.file:
-            with open(args.file, encoding='utf-8') as _f:
-                raw = _f.read().strip()
-        elif args.data is not None:
-            raw = args.data
-        elif inline_text:
-            raw = inline_text
-        data = {}
-        if raw:
-            try:
-                parsed = json.loads(raw)
-            except json.JSONDecodeError:
-                parsed = {'text': raw}
-            if isinstance(parsed, dict):
-                data = parsed
-            else:
-                data = {'values': parsed}
-        rc = effect(
-            data,
-            args.title,
-            args.width,
-            args.height,
-            args.theme,
-            output=args.output,
-            effect_kind=kind or data.get('kind') or data.get('effect') or 'gallery',
-            statusline=args.statusline,
-        )
-        sys.exit(rc or 0)
-
-    if args.type == 'animate':
-        if not args.art_text:
-            print('ERROR:schema: animate needs a chart type '
-                  '(line, bar, scatter, sparkline)', file=sys.stderr)
-            sys.exit(1)
-        chart_type = args.art_text[0]
-        no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
-        if args.file:
-            with open(args.file) as _f:
-                raw = _f.read().strip()
-        elif args.data:
-            raw = args.data
-        else:
-            raw = sys.stdin.read().strip()
-        if not raw:
-            print('ERROR:schema: Provide --json, --file, or pipe JSON to stdin',
-                  file=sys.stderr)
-            sys.exit(1)
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            print(f'ERROR:json: {exc}', file=sys.stderr)
-            sys.exit(1)
-        from cli_charts.render.animate_engine import render_animate
-        rc = render_animate(
-            chart_type,
-            data,
-            args.duration,
-            args.frames,
-            title=args.title,
-            width=args.width,
-            height=args.height,
-            theme=args.theme,
-            xlabel=args.xlabel,
-            ylabel=args.ylabel,
-            xlim=args.xlim,
-            ylim=args.ylim,
-            xscale=args.xscale,
-            yscale=args.yscale,
-            orientation=args.orientation,
-            no_color=no_color,
-            spinner=args.spinner,
-        )
-        sys.exit(rc)
-
-    if args.type == 'record':
-        if not args.art_text:
-            print('ERROR:schema: record needs an output .cast path', file=sys.stderr)
-            sys.exit(1)
-        from cli_charts.render.record_engine import record
-        rc = record(args.art_text[0], args.cmd, args.duration)
-        sys.exit(rc)
-
-    if args.type == 'record-replay':
-        if not args.art_text:
-            print('ERROR:schema: record-replay needs an input .cast path', file=sys.stderr)
-            sys.exit(1)
-        from cli_charts.render.record_engine import record_replay
-        rc = record_replay(args.art_text[0], args.output)
-        sys.exit(rc)
-
-    if args.type == 'to-hyperframes':
-        if not args.data:
-            print('ERROR:schema: to-hyperframes needs --json SERIES_JSON', file=sys.stderr)
-            sys.exit(1)
-        if not args.output_dir:
-            print('ERROR:schema: to-hyperframes needs --output-dir DIR', file=sys.stderr)
-            sys.exit(1)
-        from cli_charts.adapters.hyperframes import to_hyperframes
-        no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
-        rc = to_hyperframes(
-            args.data,
-            args.frames,
-            args.duration,
-            args.output_dir,
-            width=args.width,
-            height=args.height,
-            title=args.title,
-            theme=args.theme,
-            no_color=no_color,
-        )
-        sys.exit(rc)
-
-    if args.type == 'to-ascii-motion':
-        if not args.data and not args.file:
-            print('ERROR:schema: to-ascii-motion needs --json SERIES_JSON or --file PATH', file=sys.stderr)
-            sys.exit(1)
-        if not args.output_dir:
-            print('ERROR:schema: to-ascii-motion needs --output-dir DIR', file=sys.stderr)
-            sys.exit(1)
-        adapter = _load_ascii_motion_adapter()
-        _require_ascii_motion_npx()
-        if args.file:
-            with open(args.file) as _f:
-                raw = _f.read().strip()
-        else:
-            raw = args.data
-        try:
-            data = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            print(f'ERROR:json: {exc}', file=sys.stderr)
-            sys.exit(1)
-        frames = _render_ascii_motion_frames(
-            args.art_text[0] if args.art_text else 'line',
-            data,
-            args,
-            adapter,
-            no_color=args.no_color or bool(os.environ.get('NO_COLOR')),
-        )
-        formats = [fmt.strip().lower() for fmt in args.formats.split(',') if fmt.strip()]
-        project_dir = tempfile.mkdtemp(prefix='glyph-arts-ascii-motion-')
-        import asyncio
-
-        asyncio.run(adapter.to_ascii_motion(project_dir, frames, formats, args.output_dir, int(max(args.duration, 0.1) * 1000 / max(args.frames, 1))))
-        return
+    motion_rc = dispatch_motion_command(
+        args,
+        load_ascii_motion_adapter=_load_ascii_motion_adapter,
+        require_ascii_motion_npx=_require_ascii_motion_npx,
+        render_ascii_motion_frames=_render_ascii_motion_frames,
+    )
+    if motion_rc is not None:
+        sys.exit(motion_rc)
 
     if args.animate:
+        from cli_charts.cmd.animate_stream import animate_stdin
+
         no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
         kw = dict(xlabel=args.xlabel, ylabel=args.ylabel, xlim=args.xlim,
                   ylim=args.ylim, xscale=args.xscale, yscale=args.yscale,
                   orientation=args.orientation, output=args.output,
                   no_color=no_color, visual_style=args.style)
-        _animate_stdin(args.type, args.title, args.width, args.height,
-                       args.theme, args.refresh, args.window, args.duration, kw)
+        animate_stdin(args.type, args.title, args.width, args.height,
+                      args.theme, args.refresh, args.window, args.duration, kw)
         return
 
     # Warn when size/theme options are silently ignored
@@ -2910,7 +2399,7 @@ Examples:
     try:
         if args.type == 'auto':
             if args.file:
-                with open(args.file) as _f:
+                with open(args.file, encoding='utf-8') as _f:
                     raw = _f.read().strip()
             elif args.data:
                 raw = args.data
@@ -2933,7 +2422,7 @@ Examples:
             data = load_duckdb(args.duckdb, args.db, args.type)
         else:
             if args.file:
-                with open(args.file) as _f:
+                with open(args.file, encoding='utf-8') as _f:
                     raw = _f.read().strip()
             elif args.data:
                 raw = args.data
@@ -2978,7 +2467,7 @@ Examples:
             candle_style=args.candle_style if args.type == 'kline' else 'default',
             gauge_style=(
                 args.style
-                if args.type == 'gauge' and args.style in _glyph_visual_styles
+                if args.type == 'gauge' and args.style in _GLYPH_VISUAL_STYLES
                 else args.gauge_style if args.type == 'gauge' else 'bar'
             ),
             graph_format=args.graph_format,
@@ -3069,7 +2558,7 @@ Examples:
                     'type': args.type,
                     'title': args.title,
                 })
-                with open('.chart_history.jsonl', 'a') as _lf:
+                with open('.chart_history.jsonl', 'a', encoding='utf-8') as _lf:
                     _lf.write(entry + '\n')
             except Exception:
                 pass
@@ -3085,82 +2574,6 @@ Examples:
         last = traceback.format_exc().strip().splitlines()[-1]
         print(f'ERROR:render: {last}', file=sys.stderr)
         sys.exit(4)
-
-
-# ---------------------------------------------------------------------------
-# Animation helpers
-# ---------------------------------------------------------------------------
-
-_ANIMATE_TYPES = {'line', 'scatter', 'sparkline'}
-
-
-def _animate_stdin(chart_type, title, w, h, theme, refresh, window, duration, kw):
-    """Stream values from stdin and re-render chart after each point.
-
-    Input format: one numeric value per line (whitespace-separated fields are
-    accepted; only the last field is used as the Y value).
-    """
-    import collections
-    import time
-
-    import plotext as plt
-    from rich.console import Console
-    from rich.live import Live
-    from rich.text import Text
-
-    if chart_type not in _ANIMATE_TYPES:
-        print(f'ERROR:schema: --animate supports: {", ".join(sorted(_ANIMATE_TYPES))}',
-              file=sys.stderr)
-        sys.exit(1)
-
-    buf = collections.deque(maxlen=window if window > 0 else None)
-    t_start = time.monotonic()
-    console = Console()
-
-    def make_frame():
-        ys = list(buf)
-        xs = list(range(len(ys)))
-        label = (title + ' ' if title else '') + f'[n={len(ys)}]'
-        if chart_type == 'sparkline':
-            try:
-                from sparklines import sparklines as _sparklines
-                lines = _sparklines(ys)
-                return '\n'.join(lines) + f'\n{label}'
-            except ImportError:
-                return label + '\n' + ' '.join(f'{v:.1f}' for v in ys[-20:])
-        plt.clf()
-        _plt_fn = {'line': 'plot', 'scatter': 'scatter'}.get(chart_type, chart_type)
-        getattr(plt, _plt_fn)(xs, ys)
-        plt.title(label)
-        plt.plotsize(w - 2, h)
-        _ap = _get_palette(theme)
-        if _ap:
-            if _ap.get('plt_base'):
-                plt.theme(_ap['plt_base'])
-            plt.canvas_color(_ap['canvas'])
-            plt.axes_color(_ap['axes'])
-            plt.ticks_color(_ap['ticks'])
-        else:
-            plt.theme(theme)
-        return plt.build()
-
-    try:
-        with Live(console=console, refresh_per_second=refresh, screen=False) as live:
-            for raw_line in sys.stdin:
-                raw_line = raw_line.strip()
-                if not raw_line:
-                    continue
-                try:
-                    val = float(raw_line.split()[-1])
-                except ValueError:
-                    continue
-                buf.append(val)
-                if len(buf) >= 2:
-                    live.update(Text.from_ansi(make_frame()))
-                if duration > 0 and time.monotonic() - t_start >= duration:
-                    break
-    except KeyboardInterrupt:
-        pass  # clean exit on Ctrl-C
 
 
 if __name__ == '__main__':

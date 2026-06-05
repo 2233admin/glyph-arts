@@ -12,12 +12,23 @@ for _stream in (_sys.stdout, _sys.stderr):
             pass
 del _sys
 
-try:
-    from importlib.metadata import version as _pkg_version
-    __version__ = _pkg_version("glyph-arts")
-except Exception:
+def _load_version() -> str:
     try:
         from pathlib import Path
-        __version__ = (Path(__file__).parent.parent / "VERSION").read_text().strip()
+
+        return (Path(__file__).parent.parent / "VERSION").read_text(encoding="utf-8").strip()
     except Exception:
-        __version__ = "unknown"
+        try:
+            from importlib.metadata import version as _pkg_version
+
+            return _pkg_version("glyph-arts")
+        except Exception:
+            return "unknown"
+
+
+def __getattr__(name: str):
+    if name == "__version__":
+        version = _load_version()
+        globals()["__version__"] = version
+        return version
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

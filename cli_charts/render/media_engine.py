@@ -1180,7 +1180,13 @@ def render_video_export(
             if max_frames and max_frames > 0:
                 ff_cmd += ["-frames:v", str(max_frames)]
             ff_cmd.append(os.path.join(tmp, "frame_%06d.png"))
-            result = subprocess.run(ff_cmd, capture_output=True, text=True)
+            result = subprocess.run(
+                ff_cmd,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
             if result.returncode != 0:
                 lines = (result.stderr or "").strip().splitlines()
                 print(f"ERROR:render: {lines[-1] if lines else 'ffmpeg decode failed'}", file=sys.stderr)
@@ -1259,7 +1265,13 @@ def render_video_export(
              "-i", os.path.join(enc_dir, "r_%06d.png")]
             + enc_args + tail_args + [output]
         )
-        result = subprocess.run(enc_cmd, capture_output=True, text=True)
+        result = subprocess.run(
+            enc_cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
         if result.returncode != 0:
             lines = (result.stderr or "").strip().splitlines()
             print(f"ERROR:render: {lines[-1] if lines else 'ffmpeg encode failed'}", file=sys.stderr)
@@ -1329,7 +1341,13 @@ def render_video(
         if duration and duration > 0:
             ff += ["-t", str(duration)]
         ff.append(os.path.join(tmp, "f_%05d.png"))
-        result = subprocess.run(ff, capture_output=True, text=True)
+        result = subprocess.run(
+            ff,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
         if result.returncode != 0:
             lines = (result.stderr or "").strip().splitlines()
             msg = lines[-1] if lines else "ffmpeg exited non-zero"
@@ -1367,7 +1385,13 @@ def render_video(
                 if is_tty:
                     sys.stdout.write("\x1b[H")
                     sys.stdout.flush()
-                result = subprocess.run(chafa_cmd + [frame], capture_output=True, text=True)
+                result = subprocess.run(
+                    chafa_cmd + [frame],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                )
                 if result.returncode != 0:
                     lines = (result.stderr or "").strip().splitlines()
                     msg = lines[-1] if lines else "chafa exited non-zero"

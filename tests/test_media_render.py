@@ -73,7 +73,7 @@ def test_render_image_uses_chat_safe_chafa_command(monkeypatch, capsys):
         captured['filter_style'] = filter_style
         yield path
 
-    def fake_run(cmd, capture_output, text):
+    def fake_run(cmd, capture_output, text, **kwargs):
         captured['cmd'] = cmd
         return subprocess.CompletedProcess(cmd, 0, stdout='pixels\n', stderr='')
 
