@@ -33,7 +33,10 @@ def bootstrap() -> None:
     if _BOOTSTRAPPED:
         return
     for module in _MODULES:
-        import_module(f"{__name__}.{module}")
+        if module.startswith("cli_charts."):
+            import_module(module)
+        else:
+            import_module(f"{__name__}.{module}")
     _BOOTSTRAPPED = True
 
 
