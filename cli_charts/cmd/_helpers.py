@@ -2620,7 +2620,7 @@ Examples:
 
     if args.type in {'incplot', 'textplot', 'turtle', 'formula', 'formula-pretty', 'math', 'math-pretty'}:
         if args.file:
-            with open(args.file, encoding='utf-8') as _f:
+            with open(args.file, encoding='utf-8-sig') as _f:
                 raw = _f.read().strip()
         elif args.data is not None:
             raw = args.data
@@ -2666,7 +2666,7 @@ Examples:
         kind = args.diagram_kind or (args.art_text[0] if args.art_text else '')
         inline_text = ' '.join(args.art_text[1:]) if args.art_text and kind == args.art_text[0] else ''
         if args.file:
-            with open(args.file, encoding='utf-8') as _f:
+            with open(args.file, encoding='utf-8-sig') as _f:
                 raw = _f.read().strip()
         elif args.data is not None:
             raw = args.data
@@ -2705,7 +2705,7 @@ Examples:
 
     if args.type == 'mermaid':
         if args.file:
-            with open(args.file, encoding='utf-8') as _f:
+            with open(args.file, encoding='utf-8-sig') as _f:
                 raw = _f.read().strip()
         elif args.data is not None:
             raw = args.data
@@ -2736,7 +2736,7 @@ Examples:
         inline_text = ' '.join(args.art_text[1:]) if args.art_text and kind == args.art_text[0] else ''
         raw = ''
         if args.file:
-            with open(args.file, encoding='utf-8') as _f:
+            with open(args.file, encoding='utf-8-sig') as _f:
                 raw = _f.read().strip()
         elif args.data is not None:
             raw = args.data
@@ -2772,7 +2772,7 @@ Examples:
         chart_type = args.art_text[0]
         no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
         if args.file:
-            with open(args.file) as _f:
+            with open(args.file, encoding='utf-8-sig') as _f:
                 raw = _f.read().strip()
         elif args.data:
             raw = args.data
@@ -2857,7 +2857,7 @@ Examples:
         adapter = _load_ascii_motion_adapter()
         _require_ascii_motion_npx()
         if args.file:
-            with open(args.file) as _f:
+            with open(args.file, encoding='utf-8-sig') as _f:
                 raw = _f.read().strip()
         else:
             raw = args.data
@@ -2910,7 +2910,7 @@ Examples:
     try:
         if args.type == 'auto':
             if args.file:
-                with open(args.file) as _f:
+                with open(args.file, encoding='utf-8-sig') as _f:
                     raw = _f.read().strip()
             elif args.data:
                 raw = args.data
@@ -2933,7 +2933,7 @@ Examples:
             data = load_duckdb(args.duckdb, args.db, args.type)
         else:
             if args.file:
-                with open(args.file) as _f:
+                with open(args.file, encoding='utf-8-sig') as _f:
                     raw = _f.read().strip()
             elif args.data:
                 raw = args.data

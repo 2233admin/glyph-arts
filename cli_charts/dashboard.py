@@ -318,7 +318,7 @@ Examples:
     if args.demo:
         config = DEMO_CONFIG
     elif args.file:
-        with open(args.file) as f:
+        with open(args.file, encoding='utf-8-sig') as f:
             config = json.load(f)
     elif args.data:
         try:
