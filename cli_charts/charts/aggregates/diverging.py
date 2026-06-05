@@ -1,7 +1,10 @@
 """diverging chart -- extracted from cli_charts.cmd._helpers (Phase 3a)."""
 
 from cli_charts.charts._utils import _textcharts_options
+from cli_charts.registry import register
 
+
+@register("diverging")
 
 def diverging(d, title, w, h, theme, **kw):
     """textcharts diverging bar chart -- positive/negative comparison.

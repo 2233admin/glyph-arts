@@ -1,5 +1,8 @@
 """graph chart -- extracted from cli_charts.cmd._helpers (Phase 3a)."""
 
+from cli_charts.registry import register
+
+@register("graph")
 
 def graph(d, title, w, h, theme, **kw):
     """PHART ASCII network graph."""

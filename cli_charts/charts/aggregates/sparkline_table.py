@@ -1,7 +1,10 @@
 """sparkline_table chart -- extracted from cli_charts.cmd._helpers (Phase 3a)."""
 
 from cli_charts.charts._utils import _textcharts_options
+from cli_charts.registry import register
 
+
+@register("sparkline_table")
 
 def sparkline_table(d, title, w, h, theme, **kw):
     """textcharts sparkline table -- multiple rows with inline mini charts.

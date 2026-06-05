@@ -1,5 +1,8 @@
 """rank_table chart -- extracted from cli_charts.cmd._helpers (Phase 3a)."""
 
+from cli_charts.registry import register
+
+@register("rank_table")
 
 def rank_table(d, title, w, h, theme, **kw):
     """Sorted ranking table with Rich.

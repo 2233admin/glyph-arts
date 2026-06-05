@@ -1,7 +1,10 @@
 """summary chart -- extracted from cli_charts.cmd._helpers (Phase 3a)."""
 
 from cli_charts.charts._utils import _textcharts_options
+from cli_charts.registry import register
 
+
+@register("summary")
 
 def summary(d, title, w, h, theme, **kw):
     """textcharts summary box -- key statistics at a glance."""

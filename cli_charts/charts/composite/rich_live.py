@@ -1,5 +1,8 @@
 """rich_live chart -- extracted from cli_charts.cmd._helpers (Phase 3a)."""
 
+from cli_charts.registry import register
+
+@register("rich_live")
 
 def rich_live(d, title, w, h, theme, **kw):
     """Compose multiple charts into a Rich Live/Layout panel grid.

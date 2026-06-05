@@ -1,5 +1,8 @@
 """dashboard chart -- extracted from cli_charts.cmd._helpers (Phase 3a)."""
 
+from cli_charts.registry import register
+
+@register("dashboard")
 
 def dashboard(d, title, w, h, theme, **kw):
     """Delegates to cli_charts/dashboard.py via subprocess (Textual TUI or Rich static)."""

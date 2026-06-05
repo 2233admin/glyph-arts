@@ -1,5 +1,8 @@
 """formula_pretty chart -- extracted from cli_charts.cmd._helpers (Phase 3a)."""
 
+from cli_charts.registry import register
+
+@register("formula_pretty")
 
 def formula_pretty(d, title, w, h, theme, **kw):
     """Formula source -> SymPy terminal pretty-printer."""

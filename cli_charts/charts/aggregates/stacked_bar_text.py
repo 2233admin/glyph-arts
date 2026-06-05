@@ -1,7 +1,10 @@
 """stacked_bar_text chart -- extracted from cli_charts.cmd._helpers (Phase 3a)."""
 
 from cli_charts.charts._utils import _textcharts_options
+from cli_charts.registry import register
 
+
+@register("stacked_bar_text")
 
 def stacked_bar_text(d, title, w, h, theme, **kw):
     """textcharts stacked bar chart -- composition over categories.

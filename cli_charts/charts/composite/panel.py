@@ -1,5 +1,8 @@
 """panel chart -- extracted from cli_charts.cmd._helpers (Phase 3a)."""
 
+from cli_charts.registry import register
+
+@register("panel")
 
 def panel(d, title, w, h, theme, **kw):
     """rich Panel -- bordered text / callout box."""
