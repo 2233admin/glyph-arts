@@ -164,8 +164,8 @@
       "command": "glyph-arts to-drawio --json <text> --output diagram.drawio",
       "protocol": {
         "targets": [
-          "host",
-          "artifact"
+          "artifact",
+          "host"
         ],
         "chat_safe": false,
         "uses_ansi": false,

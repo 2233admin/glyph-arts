@@ -1,6 +1,6 @@
 ---
 name: glyph-arts
-description: glyph-arts -- terminal-visible chart toolkit. All chart types directly in the CLI -- no files, no GUI. incplot-style auto plotting (JSON/JSONL/CSV/TSV inference), plotext (kline/candlestick/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion/plotext overlays), SDR spectrum/waterfall, Diagon-style diagram (math/sequence/tree/table/frame/flowchart/GraphDAG/GraphPlanar), Mermaid/beautiful-mermaid-style diagrams, rich (table/tree/panel/gauge/pie/dashboard/rich_live), drawille/textplots Braille (curve/hires/radar/textplot/turtle), plotille (composable braille Figure), uniplot scientific line, media image via Pillow chat-safe ASCII or chafa truecolor, terminal host profiles for Windows Terminal/Preview/Canary and Warp, WaveTerm adapter via `wave doctor/view/render`, video via ffmpeg+chafa, backend doctor/install helpers for chafa/ffmpeg/Graphviz/Diagon/Nerd Fonts/Symbols Nerd Font/terminal probes, ASCII network graph, chat effect presets, sparkline, pyfiglet banner, composable art text, cursor-home animate for line/bar/scatter/sparkline, asciinema record/replay export via record and record-replay. LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
+description: glyph-arts -- Chat Arts / chat drawing toolkit. Turns chat requests into visuals for the conversation first, with CLI, terminal, artifact, media, and host-preview paths when needed. incplot-style auto plotting (JSON/JSONL/CSV/TSV inference), plotext (kline/candlestick/line/scatter/step/bar/multibar/stackedbar/hist/heatmap/box/indicator/event/confusion/plotext overlays), SDR spectrum/waterfall, Diagram Renderer paths for Diagon-style diagrams (math/sequence/tree/table/frame/flowchart/GraphDAG/GraphPlanar), Mermaid/beautiful-mermaid-style diagrams, Draw.io Export, rich (table/tree/panel/gauge/pie/dashboard/rich_live), drawille/textplots Braille (curve/hires/radar/textplot/turtle), plotille (composable braille Figure), uniplot scientific line, media image via Pillow chat-safe ASCII or chafa truecolor, terminal host profiles for Windows Terminal/Preview/Canary and Warp, WaveTerm adapter via `wave doctor/view/render`, video via ffmpeg+chafa, backend doctor/install helpers for chafa/ffmpeg/Graphviz/Diagon/Nerd Fonts/Symbols Nerd Font/terminal probes, ASCII network graph, chat effect presets, sparkline, pyfiglet banner, composable art text, cursor-home animate for line/bar/scatter/sparkline, asciinema record/replay export via record and record-replay. LTTB-aware downsampling via --sample. Textual TUI dashboard via scripts/dashboard.py.
 version: 3.0.1
 ---
 
@@ -8,9 +8,11 @@ version: 3.0.1
 
 ## Vision
 
-When AI lives in the terminal, visualization must live there too.
-No browser. No generated files. No context switch.
-glyph-arts gives the AI a native sense of sight inside the terminal.
+When AI answers in chat, useful visuals should be able to live there too.
+Chat output comes first. Terminal rendering, files, and host previews are exits
+for cases where the drawing needs more room, persistence, or human review.
+glyph-arts gives the AI a native visual language without forcing every drawing
+through a GUI.
 
 ## Invocation
 

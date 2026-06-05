@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "glyph-arts"
 dynamic = ["version"]
-description = "Chat drawing and terminal-visible chart toolkit -- 74 chart types (incl. incplot-style auto plots, Mermaid/beautiful-mermaid-style diagrams, draw.io XML/MCP preview, chat effect presets, Diagon-style diagrams, SDR spectrum/waterfall, chat-safe image rendering, WaveTerm adapter, Graphviz/Diagon/chafa/font backend doctor/install helpers, and video via chafa+ffmpeg) + live animation rendered directly in the CLI."
+description = "Chat Arts toolkit for conversation-first visuals -- 74 chart types (incl. incplot-style auto plots, Mermaid/beautiful-mermaid-style diagrams, draw.io XML/MCP preview, chat effect presets, Diagon-style diagrams, SDR spectrum/waterfall, chat-safe image rendering, terminal rendering, WaveTerm adapter, Graphviz/Diagon/chafa/font backend doctor/install helpers, and video via chafa+ffmpeg) + live animation rendered directly in the CLI."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
