@@ -30,6 +30,22 @@ from cli_charts.charts._utils import (
     _series_color, _statusline_values, _style_to_bar_symbols, _style_to_gauge,
     _symbol_tier, _textcharts_options, load_duckdb,
 )
+from cli_charts.charts.series.bar import bar, hbar
+from cli_charts.charts.series.box import box
+from cli_charts.charts.series.curve import curve
+from cli_charts.charts.series.event import event
+from cli_charts.charts.series.heatmap import heatmap
+from cli_charts.charts.series.hist import hist
+from cli_charts.charts.series.indicator import indicator
+from cli_charts.charts.series.kline import kline
+from cli_charts.charts.series.line import line
+from cli_charts.charts.series.multibar import multibar
+from cli_charts.charts.series.scatter import scatter
+from cli_charts.charts.series.sparkline import sparkline
+from cli_charts.charts.series.spectrum import spectrum
+from cli_charts.charts.series.stackedbar import stackedbar
+from cli_charts.charts.series.step import step
+from cli_charts.charts.series.waterfall import waterfall
 from cli_charts.cmd.animate_stream import ANIMATE_TYPES
 from cli_charts.cmd.direct_commands import dispatch_direct_command
 from cli_charts.cmd.media_dispatch import dispatch_media
@@ -56,79 +72,6 @@ _MARKER_SYMBOLS = {
     'star': 'star',
     'square': 'square',
 }
-
-def kline(d, title, w, h, theme, **kw):
-    """plotext candlestick K-line. Accepts DD/MM/YYYY or YYYY-MM-DD dates."""
-    candle_style = kw.get('candle_style')
-    if candle_style and candle_style != 'default':
-        tier = _symbol_tier(kw)
-        up = get_symbol('triangle_up', tier=tier)
-        down = get_symbol('triangle_down', tier=tier)
-        for date, open_, close in zip(d['dates'], d['open'], d['close'], strict=False):
-            marker = up if close >= open_ else down
-            print(f"{date} {marker} {open_} -> {close}")
-        return
-    import plotext as plt
-    plt.clear_figure()
-    plt.candlestick(_normalize_kline_dates(d['dates']), {
-        'Open': d['open'], 'High': d['high'],
-        'Low': d['low'],   'Close': d['close'],
-    })
-    _plt_finalize(plt, title, w, h, theme, kw)
-
-
-def line(d, title, w, h, theme, **kw):
-    """plotext multi-series line chart."""
-    import plotext as plt
-    plt.clear_figure()
-    series = d if isinstance(d, list) else [d]
-    for i, s in enumerate(series):
-        x = s.get('x', list(range(len(s['y']))))
-        label = s.get('label', '')
-        if kw.get('link_data'):
-            label = _osc8_link(label or f'S{i}', kw['link_data'])
-        plt.plot(x, s['y'], label=label,
-                 marker=s.get('marker'), color=_series_color(theme, i, s.get('color')))
-    _plt_finalize(plt, title, w, h, theme, kw)
-
-
-def scatter(d, title, w, h, theme, **kw):
-    """plotext scatter plot. Same schema as line."""
-    import plotext as plt
-    plt.clear_figure()
-    series = d if isinstance(d, list) else [d]
-    marker_name = kw.get('marker')
-    marker = get_symbol(_MARKER_SYMBOLS[marker_name], tier=_symbol_tier(kw)) if marker_name else None
-    for i, s in enumerate(series):
-        x = s.get('x', list(range(len(s['y']))))
-        label = s.get('label', '')
-        if kw.get('link_data'):
-            label = _osc8_link(label or f'S{i}', kw['link_data'])
-        plt.scatter(x, s['y'], label=label,
-                    marker=marker or s.get('marker'), color=_series_color(theme, i, s.get('color')))
-    _plt_finalize(plt, title, w, h, theme, kw)
-
-
-def step(d, title, w, h, theme, **kw):
-    """plotext staircase step chart -- x-point duplication creates stairs.
-    Same schema as line. Use for discrete state changes (e.g. bid price, stock level).
-    """
-    import plotext as plt
-    series = d if isinstance(d, list) else [d]
-    for s in series:
-        x = s.get('x', list(range(len(s['y']))))
-        y = s['y']
-        sx, sy = [], []
-        for i in range(len(x)):
-            sx.append(x[i])
-            sy.append(y[i])
-            if i + 1 < len(x):
-                sx.append(x[i + 1])
-                sy.append(y[i])
-        plt.plot(sx, sy, label=s.get('label', ''),
-                 marker=s.get('marker'), color=s.get('color'))
-    _plt_finalize(plt, title, w, h, theme, kw)
-
 
 def bar(d, title, w, h, theme, **kw):
     """plotext vertical/horizontal bar chart."""
@@ -209,134 +152,6 @@ def pie(d, title, w, h, theme, **kw):
         bar = f'[{color}]{"█" * filled}[/{color}]{"░" * (bar_w - filled)}'
         tbl.add_row(str(label), f'{pct:.1f}%', bar, str(val))
     Console().print(tbl)
-
-
-def multibar(d, title, w, h, theme, **kw):
-    """plotext grouped multi-series bar chart."""
-    import plotext as plt
-    xlabels = d['labels']
-    values = [s['values'] for s in d['series']]
-    slabels = [s.get('label', f'S{i}') for i, s in enumerate(d['series'])]
-    plt.multiple_bar(xlabels, values, labels=slabels,
-                     orientation=kw.get('orientation', 'vertical'))
-    _plt_finalize(plt, title, w, h, theme, kw)
-
-
-def stackedbar(d, title, w, h, theme, **kw):
-    """plotext stacked bar chart."""
-    import plotext as plt
-    xlabels = d['labels']
-    values = [s['values'] for s in d['series']]
-    slabels = [s.get('label', f'S{i}') for i, s in enumerate(d['series'])]
-    plt.stacked_bar(xlabels, values, labels=slabels,
-                    orientation=kw.get('orientation', 'vertical'))
-    _plt_finalize(plt, title, w, h, theme, kw)
-
-
-def hist(d, title, w, h, theme, **kw):
-    """plotext histogram -- single or multi-series."""
-    import plotext as plt
-    series = d if isinstance(d, list) else [d]
-    for s in series:
-        plt.hist(s['values'], bins=s.get('bins', 20),
-                 label=s.get('label', ''), color=s.get('color'))
-    _plt_finalize(plt, title, w, h, theme, kw)
-
-
-def heatmap(d, title, w, h, theme, **kw):
-    """plotext heatmap / correlation matrix.
-    plotext.heatmap() requires a pandas DataFrame.
-    """
-    import pandas as pd
-    import plotext as plt
-    df = pd.DataFrame(
-        d['matrix'],
-        columns=d.get('xlabels'),
-        index=d.get('ylabels'),
-    )
-    plt.heatmap(df)
-    _plt_finalize(plt, title, w, h, theme, kw)
-
-
-def spectrum(d, title, w, h, theme, **kw):
-    """SDR-style RF spectrum with center/band/peak overlays."""
-    if kw.get('statusline'):
-        _render_statusline('spectrum', d, title)
-        return
-    from cli_charts.render.sdr_engine import render_spectrum
-
-    print(render_spectrum(d, title=title, width=w, height=h), end="")
-
-
-def waterfall(d, title, w, h, theme, **kw):
-    """SDR-style waterfall intensity map."""
-    if kw.get('statusline'):
-        _render_statusline('waterfall', d, title)
-        return
-    from cli_charts.render.sdr_engine import render_waterfall
-
-    print(render_waterfall(d, title=title, width=w, height=h), end="")
-
-
-def box(d, title, w, h, theme, **kw):
-    """plotext box plot (median/quartile/whisker).
-    x-labels passed as first positional arg; data matrix as second.
-    """
-    import plotext as plt
-    if 'quintuples' in d:
-        # Pre-computed quantiles: list of 5-element lists
-        plt.box(d.get('labels', []), d['quintuples'], quintuples=True)
-    else:
-        xlabels = d.get('labels', list(range(len(d['data']))))
-        plt.box(xlabels, d['data'])
-    _plt_finalize(plt, title, w, h, theme, kw)
-
-
-def indicator(d, title, w, h, theme, **kw):
-    """plotext big-number KPI display."""
-    if kw.get('statusline'):
-        _render_statusline('indicator', d, title)
-        return
-    import plotext as plt
-    plt.indicator(d['value'], d.get('label', title or ''))
-    _plt_finalize(plt, None, w, h, theme, kw)  # title already baked into label
-
-
-def event(d, title, w, h, theme, **kw):
-    """plotext event / timeline plot.
-    Orientation comes from --orientation CLI flag (kw) not JSON data.
-    """
-    import plotext as plt
-    plt.event_plot(d['data'],
-                   orientation=kw.get('orientation', 'vertical'))
-    _plt_finalize(plt, title, w, h, theme, kw)
-
-
-def sparkline(d, title, w, h, theme, **kw):
-    """sparklines unicode block chart -- single line.
-
-    Uses textgraph.spark() for enhanced sparklines with multiple styles.
-    Falls back to sparklines library if textgraph is unavailable.
-    """
-    if kw.get('statusline'):
-        _render_statusline('sparkline', d, title)
-        return
-    if title:
-        print(title)
-    values = d['values']
-
-    # Try textgraph.spark() first (better sparklines)
-    try:
-        from textgraph import spark as textgraph_spark
-        print(textgraph_spark(values))
-        return
-    except ImportError:
-        pass
-
-    # Fallback to sparklines library
-    import sparklines as sl
-    for ln in sl.sparklines(values):
-        print(ln)
 
 
 def table(d, title, w, h, theme, **kw):
@@ -667,43 +482,6 @@ def stacked_bar_text(d, title, w, h, theme, **kw):
     except ImportError:
         print("ERROR:dep: pip install textcharts", file=sys.stderr)
         sys.exit(2)
-
-def curve(d, title, w, h, theme, **kw):
-    """drawille braille pixel canvas -- connected high-res curves.
-    Points are auto-scaled to fit --width x --height.
-    Uses Bresenham's line between consecutive points for smooth output.
-    """
-    import drawille
-    points = d['points']
-    if not points:
-        print('(no points)', file=sys.stderr)
-        return
-    xs = [p[0] for p in points]
-    ys = [p[1] for p in points]
-    min_x, max_x = min(xs), max(xs)
-    min_y, max_y = min(ys), max(ys)
-    # drawille: 2 pixels wide x 4 pixels tall per terminal cell
-    canvas_w = max(1, w * 2 - 1)
-    canvas_h = max(1, h * 4 - 1)
-
-    def scale(v, lo, hi, size):
-        return size // 2 if hi == lo else round((v - lo) / (hi - lo) * size)
-
-    if title:
-        print(title)
-    c = drawille.Canvas()
-    if len(points) == 1:
-        c.set(scale(points[0][0], min_x, max_x, canvas_w),
-              canvas_h - scale(points[0][1], min_y, max_y, canvas_h))
-    else:
-        for i in range(len(points) - 1):
-            x1 = scale(points[i][0],     min_x, max_x, canvas_w)
-            y1 = canvas_h - scale(points[i][1],     min_y, max_y, canvas_h)
-            x2 = scale(points[i + 1][0], min_x, max_x, canvas_w)
-            y2 = canvas_h - scale(points[i + 1][1], min_y, max_y, canvas_h)
-            _canvas_line(c, x1, y1, x2, y2)
-    print(c.frame())
-
 
 def gauge(d, title, w, h, theme, **kw):
     """rich multi-metric progress bars (static gauge).

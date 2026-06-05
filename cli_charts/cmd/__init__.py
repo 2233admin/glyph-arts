@@ -9,13 +9,20 @@ registry population is now explicit via :func:`bootstrap`.
 from importlib import import_module
 
 _MODULES = [
-    "auto", "live", "incplot", "line", "bar", "kline", "scatter", "multibar", "stackedbar", "hist",
-    "heatmap", "spectrum", "waterfall", "box", "indicator", "event", "confusion", "plotext", "sparkline",
-    "pie", "table", "tree", "panel", "gauge", "dashboard", "graph", "diagram", "formula", "mermaid", "effect",
-    "curve", "hires", "radar", "textplot", "turtle", "plotille", "uniplot", "banner", "art",
-    "candlestick", "rich_live", "image", "video", "demo", "gallery",
+    "auto", "live", "incplot",
+    "cli_charts.charts.series.line", "cli_charts.charts.series.bar",
+    "cli_charts.charts.series.kline", "cli_charts.charts.series.scatter",
+    "cli_charts.charts.series.multibar", "cli_charts.charts.series.stackedbar",
+    "cli_charts.charts.series.hist", "cli_charts.charts.series.heatmap",
+    "cli_charts.charts.series.spectrum", "cli_charts.charts.series.waterfall",
+    "cli_charts.charts.series.box", "cli_charts.charts.series.indicator",
+    "cli_charts.charts.series.event", "confusion", "plotext",
+    "cli_charts.charts.series.sparkline", "pie", "table", "tree", "panel", "gauge",
+    "dashboard", "graph", "diagram", "formula", "mermaid", "effect",
+    "cli_charts.charts.series.curve", "hires", "radar", "textplot", "turtle", "plotille",
+    "uniplot", "banner", "art", "candlestick", "rich_live", "image", "video", "demo", "gallery",
     "splash", "status", "code", "animate", "record", "record_replay",
-    "to_hyperframes", "to_ascii_motion", "step", "wave", "calibrate", "serve",
+    "to_hyperframes", "to_ascii_motion", "cli_charts.charts.series.step", "wave", "calibrate", "serve",
 ]
 
 _BOOTSTRAPPED = False
