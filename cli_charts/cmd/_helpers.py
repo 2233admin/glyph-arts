@@ -2133,6 +2133,137 @@ _NO_SIZE_THEME = {'table', 'tree', 'panel', 'graph', 'sparkline', 'gauge', 'bann
 
 PIXEL_SUPPORTED = frozenset({'bar', 'line', 'scatter'})
 INTERACTIVE_SUPPORTED = frozenset({'line'})
+_GLYPH_VISUAL_STYLES = {
+    'auto',
+    'ascii',
+    'unicode',
+    'braille',
+    'block',
+    'shade',
+    'bar',
+    'half-circle',
+    'full-circle',
+}
+_DEPENDENCY_CORE = [
+    'plotext',
+    'rich',
+    'uniplot',
+    'pyfiglet',
+    'sparklines',
+    'duckdb',
+    'pandas',
+    'networkx',
+    'phart',
+]
+_DEPENDENCY_MEDIA = (
+    ('chafa', 'image/video high-fidelity render'),
+    ('ffmpeg', 'video frame extract'),
+    ('diagon', 'math/sequence/tree/flowchart diagrams'),
+)
+_DEPENDENCY_OPTIONAL = (
+    ('PIL', 'image text fallback', 'Pillow'),
+    ('drawille', 'curve chart', 'glyph-arts[braille]'),
+    ('lttb', 'LTTB sampling', 'glyph-arts[lttb]'),
+    ('textual', 'dashboard TUI', 'glyph-arts[tui]'),
+)
+
+
+def _build_cli_epilog():
+    epilog_lines = [f'Chart types ({CHART_TYPE_COUNT}):']
+    for engine, types in CHART_TYPES_BY_ENGINE.items():
+        epilog_lines.append(f'  {engine:9}: {" ".join(types)}')
+    epilog_lines.append("""
+Examples:
+  python chart.py kline --json '{"dates":["07/04/2026"],"open":[100],"high":[102],"low":[99],"close":[101]}'
+  python chart.py scatter --json '[{"label":"A","x":[1,2,3],"y":[4,2,5]}]'
+  python chart.py hist --json '{"values":[1,2,2,3,3,3,4,4,5],"bins":5}'
+  python chart.py heatmap --json '{"matrix":[[1,2],[3,4]],"xlabels":["A","B"],"ylabels":["X","Y"]}'
+  python chart.py spectrum --json '{"freq":[99.0,99.3,99.6],"power":[-93,-42,-93],"center":99.3,"bandwidth":0.2}'
+  python chart.py waterfall --json '{"matrix":[[0,3,8,3,0],[0,2,9,4,0]],"xlabels":["99.0","99.6"],"ylabels":["t-1","now"]}'
+  python chart.py diagram sequence --json 'Alice->Bob: Hello'
+  python chart.py chat mermaid --json 'graph LR\nA[Start] --> B[Done]'
+  python chart.py chat effects
+  python chart.py effect signal-panel
+  python chart.py chat image --file photo.jpg --width 80 --height 30
+  python chart.py chat sequence --json 'Alice->Bob: Hello'
+  python chart.py chat sdr spectrum --json '{"freq":[99.0,99.3,99.6],"power":[-93,-42,-93]}'
+  python chart.py box --json '{"data":[[1,2,3,4,5],[2,3,4,5,6]],"labels":["A","B"]}'
+  python chart.py sparkline --json '{"values":[1,3,5,2,8,4,6]}'
+  python chart.py indicator --json '{"value":23.4,"label":"Total Return %"}'
+  python chart.py confusion --json '{"actual":[0,1,2,0,1,2],"predicted":[0,2,2,0,0,1],"labels":["Cat","Dog","Bird"]}'
+  python chart.py gauge --json '[{"label":"CPU","value":72,"max":100},{"label":"RAM","value":14,"max":32}]'
+  python chart.py banner --json '{"text":"PROFIT","font":"big","color":"green"}'
+  python chart.py uniplot --json '[{"label":"A","x":[1,2,3,4],"y":[2,4,3,6]},{"label":"B","y":[1,3,2,5]}]'
+  python chart.py tree --json '{"label":"root","children":[{"label":"A"},{"label":"B","children":[{"label":"C"}]}]}'
+  python chart.py panel --json '{"content":"Hello world","title":"Info","box":"ROUNDED"}'
+  python chart.py multibar --json '{"labels":["Q1","Q2"],"series":[{"label":"Rev","values":[10,12]},{"label":"Cost","values":[8,9]}]}'
+  python chart.py event --json '{"data":[1,3,5,8,13]}'
+  python chart.py line --duckdb "SELECT trade_date, close FROM stock_daily LIMIT 60" --db /path/to/data.duckdb
+  cat data.json | python chart.py line
+""")
+    return '\n'.join(epilog_lines)
+
+
+def _print_dependency_status(include_optional=False):
+    print('[core]')
+    for pkg in _DEPENDENCY_CORE:
+        try:
+            __import__(pkg)
+            status = 'OK'
+        except ImportError:
+            status = 'MISSING'
+        print(f'  {pkg:<13} {status}')
+    print('[media]')
+    for tool, purpose in _DEPENDENCY_MEDIA:
+        status = 'OK' if shutil.which(tool) else 'MISSING'
+        print(f'  {tool:<13} {status}  ({purpose})')
+    if include_optional:
+        print('[optional]')
+        for pkg, purpose, install in _DEPENDENCY_OPTIONAL:
+            try:
+                __import__(pkg)
+                status = 'OK'
+                hint = ''
+            except ImportError:
+                status = 'MISSING'
+                hint = f'  -> pip install {install}'
+            print(f'  {pkg:<13} {status}  ({purpose}){hint}')
+
+
+def _print_style_list():
+    print('Available styles per chart type:\n')
+    for ctype in sorted(STYLE_ROUTES):
+        engines = STYLE_ROUTES[ctype]
+        parts = [f'{s} ({eng})' for s, eng in engines.items()]
+        print(f'  {ctype:<12} {", ".join(parts)}')
+    print(f'\nDefault style: {DEFAULT_STYLE}')
+    print('Override: --style <name> or GLYPH_ARTS_STYLE=<name>')
+
+
+def _handle_pre_parse_flags(raw_argv):
+    if '--check-deps' in raw_argv:
+        _print_dependency_status(include_optional='--all' in raw_argv)
+        return True
+    if '--list-styles' in raw_argv:
+        _print_style_list()
+        return True
+    return False
+
+
+def _apply_font_and_style_defaults(args):
+    if args.font_tier is None:
+        args.font_tier = detect_font_tier()
+    if args.chat_profile != 'auto':
+        from cli_charts.chat_health import chat_profile_tier
+
+        args.font_tier = chat_profile_tier(args.chat_profile, args.font_tier)
+        if args.chat_profile == 'ascii':
+            args.no_color = True
+
+    if args.style is None:
+        env_style = os.environ.get('GLYPH_ARTS_STYLE', '').strip().lower()
+        if env_style and env_style in _STYLES:
+            args.style = env_style
 
 
 def _load_ascii_motion_adapter():
@@ -2191,39 +2322,7 @@ def main(argv=None):
     raw_argv = list(sys.argv[1:] if argv is None else argv)
     raw_argv = _rewrite_chat_argv(raw_argv)
     raw_argv = _rewrite_diagram_argv(raw_argv)
-    epilog_lines = [f'Chart types ({CHART_TYPE_COUNT}):']
-    for engine, types in CHART_TYPES_BY_ENGINE.items():
-        epilog_lines.append(f'  {engine:9}: {" ".join(types)}')
-    epilog_lines.append("""
-Examples:
-  python chart.py kline --json '{"dates":["07/04/2026"],"open":[100],"high":[102],"low":[99],"close":[101]}'
-  python chart.py scatter --json '[{"label":"A","x":[1,2,3],"y":[4,2,5]}]'
-  python chart.py hist --json '{"values":[1,2,2,3,3,3,4,4,5],"bins":5}'
-  python chart.py heatmap --json '{"matrix":[[1,2],[3,4]],"xlabels":["A","B"],"ylabels":["X","Y"]}'
-  python chart.py spectrum --json '{"freq":[99.0,99.3,99.6],"power":[-93,-42,-93],"center":99.3,"bandwidth":0.2}'
-  python chart.py waterfall --json '{"matrix":[[0,3,8,3,0],[0,2,9,4,0]],"xlabels":["99.0","99.6"],"ylabels":["t-1","now"]}'
-  python chart.py diagram sequence --json 'Alice->Bob: Hello'
-  python chart.py chat mermaid --json 'graph LR\nA[Start] --> B[Done]'
-  python chart.py chat effects
-  python chart.py effect signal-panel
-  python chart.py chat image --file photo.jpg --width 80 --height 30
-  python chart.py chat sequence --json 'Alice->Bob: Hello'
-  python chart.py chat sdr spectrum --json '{"freq":[99.0,99.3,99.6],"power":[-93,-42,-93]}'
-  python chart.py box --json '{"data":[[1,2,3,4,5],[2,3,4,5,6]],"labels":["A","B"]}'
-  python chart.py sparkline --json '{"values":[1,3,5,2,8,4,6]}'
-  python chart.py indicator --json '{"value":23.4,"label":"Total Return %"}'
-  python chart.py confusion --json '{"actual":[0,1,2,0,1,2],"predicted":[0,2,2,0,0,1],"labels":["Cat","Dog","Bird"]}'
-  python chart.py gauge --json '[{"label":"CPU","value":72,"max":100},{"label":"RAM","value":14,"max":32}]'
-  python chart.py banner --json '{"text":"PROFIT","font":"big","color":"green"}'
-  python chart.py uniplot --json '[{"label":"A","x":[1,2,3,4],"y":[2,4,3,6]},{"label":"B","y":[1,3,2,5]}]'
-  python chart.py tree --json '{"label":"root","children":[{"label":"A"},{"label":"B","children":[{"label":"C"}]}]}'
-  python chart.py panel --json '{"content":"Hello world","title":"Info","box":"ROUNDED"}'
-  python chart.py multibar --json '{"labels":["Q1","Q2"],"series":[{"label":"Rev","values":[10,12]},{"label":"Cost","values":[8,9]}]}'
-  python chart.py event --json '{"data":[1,3,5,8,13]}'
-  python chart.py line --duckdb "SELECT trade_date, close FROM stock_daily LIMIT 60" --db /path/to/data.duckdb
-  cat data.json | python chart.py line
-""")
-    epilog = '\n'.join(epilog_lines)
+    epilog = _build_cli_epilog()
     p = argparse.ArgumentParser(
         description='glyph-arts -- terminal-visible charts and chat drawing',
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -2314,10 +2413,9 @@ Examples:
                         'video chafa --symbols value')
     p.add_argument('--candle-style', choices=['default', 'geom'], default='default',
                    help='TYPE=kline candle glyph style')
-    _glyph_visual_styles = {'auto', 'ascii', 'unicode', 'braille', 'block', 'shade', 'bar', 'half-circle', 'full-circle'}
     p.add_argument('--gauge-style', choices=['bar', 'half-circle', 'full-circle', 'braille'],
                    default='bar', help='TYPE=gauge glyph style')
-    p.add_argument('--style',       choices=sorted(set(_STYLES) | _glyph_visual_styles),
+    p.add_argument('--style',       choices=sorted(set(_STYLES) | _GLYPH_VISUAL_STYLES),
                    default=None, help='Rendering style. Supports global style routing plus legacy glyph styles.')
     p.add_argument('--list-styles', action='store_true',
                    help='Show available styles for each chart type and exit')
@@ -2445,50 +2543,7 @@ Examples:
                    help='TYPE=wave render also print the generated preview file')
     p.add_argument('--stdio', action='store_true',
                    help='TYPE=serve read newline-delimited JSON requests from stdin')
-    if '--check-deps' in raw_argv:
-        _CORE = ['plotext', 'rich', 'uniplot', 'pyfiglet',
-                 'sparklines', 'duckdb', 'pandas', 'networkx', 'phart']
-        _OPT = [
-            ('PIL',      'image text fallback', 'Pillow'),
-            ('drawille', 'curve chart',   'glyph-arts[braille]'),
-            ('lttb',     'LTTB sampling', 'glyph-arts[lttb]'),
-            ('textual',  'dashboard TUI', 'glyph-arts[tui]'),
-        ]
-        print('[core]')
-        for pkg in _CORE:
-            try:
-                __import__(pkg)
-                status = 'OK'
-            except ImportError:
-                status = 'MISSING'
-            print(f'  {pkg:<13} {status}')
-        print('[media]')
-        for tool, purpose in (('chafa', 'image/video high-fidelity render'),
-                              ('ffmpeg', 'video frame extract'),
-                              ('diagon', 'math/sequence/tree/flowchart diagrams')):
-            status = 'OK' if shutil.which(tool) else 'MISSING'
-            print(f'  {tool:<13} {status}  ({purpose})')
-        if '--all' in raw_argv:
-            print('[optional]')
-            for pkg, purpose, install in _OPT:
-                try:
-                    __import__(pkg)
-                    status = 'OK'
-                    hint = ''
-                except ImportError:
-                    status = 'MISSING'
-                    hint = f'  -> pip install {install}'
-                print(f'  {pkg:<13} {status}  ({purpose}){hint}')
-        sys.exit(0)
-
-    if '--list-styles' in raw_argv:
-        print('Available styles per chart type:\n')
-        for ctype in sorted(STYLE_ROUTES):
-            engines = STYLE_ROUTES[ctype]
-            parts = [f'{s} ({eng})' for s, eng in engines.items()]
-            print(f'  {ctype:<12} {", ".join(parts)}')
-        print(f'\nDefault style: {DEFAULT_STYLE}')
-        print('Override: --style <name> or GLYPH_ARTS_STYLE=<name>')
+    if _handle_pre_parse_flags(raw_argv):
         sys.exit(0)
 
     args = p.parse_args(raw_argv)
@@ -2500,19 +2555,7 @@ Examples:
 
         sys.exit(run_stdio_server(main))
 
-    if args.font_tier is None:
-        args.font_tier = detect_font_tier()
-    if args.chat_profile != 'auto':
-        from cli_charts.chat_health import chat_profile_tier
-
-        args.font_tier = chat_profile_tier(args.chat_profile, args.font_tier)
-        if args.chat_profile == 'ascii':
-            args.no_color = True
-
-    if args.style is None:
-        env_style = os.environ.get('GLYPH_ARTS_STYLE', '').strip().lower()
-        if env_style and env_style in _STYLES:
-            args.style = env_style
+    _apply_font_and_style_defaults(args)
 
     if args.type == 'doctor':
         from cli_charts.installers import render_doctor
@@ -3010,7 +3053,7 @@ Examples:
             candle_style=args.candle_style if args.type == 'kline' else 'default',
             gauge_style=(
                 args.style
-                if args.type == 'gauge' and args.style in _glyph_visual_styles
+                if args.type == 'gauge' and args.style in _GLYPH_VISUAL_STYLES
                 else args.gauge_style if args.type == 'gauge' else 'bar'
             ),
             graph_format=args.graph_format,

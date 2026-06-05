@@ -63,6 +63,12 @@ class TestCLIStyleParam:
         assert "line" in out
         assert "smooth" in out
 
+    def test_check_deps_exits_zero_without_type(self):
+        rc, out, err = _run(["--check-deps"])
+        assert rc == 0
+        assert "[core]" in out
+        assert "[media]" in out
+
     def test_style_science_renders_uniplot(self):
         rc, out, err = _run([
             "line", "--style", "science", "--json",
