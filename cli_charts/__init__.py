@@ -1,10 +1,10 @@
 """glyph-arts: terminal-visible chart toolkit for Claude Code."""
 import sys as _sys
 
-# Normalize stdout/stderr to UTF-8 on Windows legacy consoles (cp1252).
-# Rich + plotext emit braille / box-drawing chars that crash on cp1252.
-# `errors='replace'` is a safety valve so an exotic glyph never aborts a render.
-for _stream in (_sys.stdout, _sys.stderr):
+# Normalize stdio to UTF-8 on Windows legacy consoles (cp1252/cp936).
+# Rich + plotext emit braille / box-drawing chars, and PowerShell pipes UTF-8
+# payloads that should not be decoded through the active ANSI code page.
+for _stream in (_sys.stdin, _sys.stdout, _sys.stderr):
     if hasattr(_stream, 'reconfigure') and getattr(_stream, 'encoding', '').lower() != 'utf-8':
         try:
             _stream.reconfigure(encoding='utf-8', errors='replace')

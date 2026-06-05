@@ -95,7 +95,7 @@ def run_stdio_server(
     input_stream = input_stream or sys.stdin
     output_stream = output_stream or sys.stdout
     for line in input_stream:
-        line = line.strip()
+        line = line.strip().lstrip("\ufeff")
         if not line:
             continue
         request = _coerce_request(line)

@@ -53,6 +53,23 @@ def test_serve_stdio_passes_request_stdin() -> None:
     assert responses[0]["stdout"].strip()
 
 
+def test_serve_stdio_accepts_utf8_bom_prefix() -> None:
+    payload = "\ufeff" + json.dumps({"argv": ["auto", "--no-color"], "stdin": "[1,2,3]"}) + "\n"
+    result = subprocess.run(
+        [sys.executable, "-m", "cli_charts.chart", "serve", "--stdio"],
+        input=payload,
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=10,
+    )
+    response = json.loads(result.stdout)
+
+    assert response["ok"] is True
+    assert response["stdout"].strip()
+
+
 def test_serve_stdio_reports_invalid_requests() -> None:
     result = subprocess.run(
         [sys.executable, "-m", "cli_charts.chart", "serve", "--stdio"],
