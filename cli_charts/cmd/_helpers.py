@@ -2260,7 +2260,13 @@ def _load_ascii_motion_adapter():
 def _require_ascii_motion_npx():
     npx = shutil.which("npx") or shutil.which("npx.cmd") or "npx"
     try:
-        result = subprocess.run([npx, "ascii-motion-mcp", "--version"], capture_output=True, text=True)
+        result = subprocess.run(
+            [npx, "ascii-motion-mcp", "--version"],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
     except FileNotFoundError:
         print("error: ascii-motion-mcp not found; install via 'npm i -g ascii-motion-mcp'", file=sys.stderr)
         sys.exit(3)
@@ -2393,7 +2399,7 @@ def main(argv=None):
     try:
         if args.type == 'auto':
             if args.file:
-                with open(args.file) as _f:
+                with open(args.file, encoding='utf-8') as _f:
                     raw = _f.read().strip()
             elif args.data:
                 raw = args.data
@@ -2416,7 +2422,7 @@ def main(argv=None):
             data = load_duckdb(args.duckdb, args.db, args.type)
         else:
             if args.file:
-                with open(args.file) as _f:
+                with open(args.file, encoding='utf-8') as _f:
                     raw = _f.read().strip()
             elif args.data:
                 raw = args.data
@@ -2552,7 +2558,7 @@ def main(argv=None):
                     'type': args.type,
                     'title': args.title,
                 })
-                with open('.chart_history.jsonl', 'a') as _lf:
+                with open('.chart_history.jsonl', 'a', encoding='utf-8') as _lf:
                     _lf.write(entry + '\n')
             except Exception:
                 pass

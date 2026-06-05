@@ -28,7 +28,7 @@ coverage.xml
 .coverage
 .coverage.*
 _temp/
-export_test_outputs/phase7a/
+export_test_outputs/
 
 # Editor / OS
 .env

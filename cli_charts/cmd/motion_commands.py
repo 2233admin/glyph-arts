@@ -21,7 +21,7 @@ def dispatch_motion_command(
         chart_type = args.art_text[0]
         no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
         if args.file:
-            with open(args.file) as file_obj:
+            with open(args.file, encoding='utf-8') as file_obj:
                 raw = file_obj.read().strip()
         elif args.data:
             raw = args.data
@@ -106,7 +106,7 @@ def dispatch_motion_command(
         adapter = load_ascii_motion_adapter()
         require_ascii_motion_npx()
         if args.file:
-            with open(args.file) as file_obj:
+            with open(args.file, encoding='utf-8') as file_obj:
                 raw = file_obj.read().strip()
         else:
             raw = args.data

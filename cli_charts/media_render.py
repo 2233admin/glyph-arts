@@ -130,7 +130,13 @@ def render_image(path: str, w: int, h: int, symbols: str = 'braille',
 
     cmd = build_chafa_image_cmd(w, h, symbols, no_color)
     with _prepared_image_path(path, fit, filter_style) as render_path:
-        result = subprocess.run(cmd + [render_path], capture_output=True, text=True)
+        result = subprocess.run(
+            cmd + [render_path],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
     if result.returncode != 0:
         lines = (result.stderr or '').strip().splitlines()
         msg = lines[-1] if lines else 'chafa exited non-zero'
@@ -168,6 +174,8 @@ def _subject_crop_path(path: str, fit: str, tmp: str) -> str:
         ],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     return out if result.returncode == 0 and os.path.exists(out) else path
 
@@ -260,6 +268,8 @@ def _probe_image_size(path: str, ffprobe: str) -> tuple[int, int] | None:
         ],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
     )
     if result.returncode != 0:
         return None
