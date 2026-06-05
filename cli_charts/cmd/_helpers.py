@@ -2414,7 +2414,7 @@ def main(argv=None):
     try:
         if args.type == 'auto':
             if args.file:
-                with open(args.file, encoding='utf-8') as _f:
+                with open(args.file, encoding='utf-8-sig') as _f:
                     raw = _f.read().strip()
             elif args.data:
                 raw = args.data
@@ -2437,7 +2437,7 @@ def main(argv=None):
             data = load_duckdb(args.duckdb, args.db, args.type)
         else:
             if args.file:
-                with open(args.file, encoding='utf-8') as _f:
+                with open(args.file, encoding='utf-8-sig') as _f:
                     raw = _f.read().strip()
             elif args.data:
                 raw = args.data
