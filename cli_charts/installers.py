@@ -41,7 +41,7 @@ SYMBOLS_FONT_MARKERS = (
     "NerdFontsSymbolsOnly",
 )
 
-VALID_TARGETS = {"all", "chat", "media", "fonts", "diagrams"}
+VALID_TARGETS = {"all", "chat", "media", "fonts", "diagrams", "petiglyph"}
 
 
 def platform_key() -> str:
@@ -86,6 +86,15 @@ def detect_chafa() -> BackendStatus:
 
 def detect_ffmpeg() -> BackendStatus:
     return _tool_status("ffmpeg", "video/GIF frame extractor")
+
+
+def detect_petiglyph() -> BackendStatus:
+    binary = os.environ.get("GLYPH_ARTS_PETIGLYPH") or shutil.which("petiglyph") or shutil.which("petiglyph.exe")
+    return BackendStatus(
+        "petiglyph",
+        bool(binary),
+        binary or "missing (optional custom font glyph backend; pip install petiglyph)",
+    )
 
 
 def detect_graphviz() -> BackendStatus:
@@ -157,6 +166,7 @@ def backend_statuses() -> list[BackendStatus]:
         detect_graphviz(),
         detect_diagon(),
         detect_ffmpeg(),
+        detect_petiglyph(),
         detect_nerd_font(),
         detect_symbols_font(),
         detect_downloaded_fonts(),
@@ -173,6 +183,8 @@ def build_install_plan(target: str = "all", manager: str = "") -> list[InstallSt
     steps: list[InstallStep] = []
     if target in {"all", "media"}:
         steps.extend(_media_steps(key, manager))
+    if target in {"all", "petiglyph"}:
+        steps.extend(_petiglyph_steps(key, manager))
     if target == "chat":
         steps.extend(_chat_media_steps(key, manager))
     if target in {"all", "chat", "diagrams"}:
@@ -267,6 +279,15 @@ def _media_steps(key: str, manager: str) -> list[InstallStep]:
         if manager == "pacman":
             return [InstallStep("media", ["sudo", "pacman", "-S", "--needed", "chafa", "ffmpeg"])]
     return []
+
+
+def _petiglyph_steps(key: str, manager: str) -> list[InstallStep]:
+    del key, manager
+    return [InstallStep(
+        "petiglyph",
+        [sys.executable, "-m", "pip", "install", "petiglyph"],
+        "Optional Petiglyph CLI backend. Upstream also supports npm install -g petiglyph.",
+    )]
 
 
 def _platform_key_for_manager(manager: str) -> str:

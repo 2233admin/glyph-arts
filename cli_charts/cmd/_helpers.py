@@ -1895,6 +1895,11 @@ def chat_health_command(d, title, w, h, theme, **kw):
     raise RuntimeError("chat-health is dispatched by main()")
 
 
+def petiglyph_command(d, title, w, h, theme, **kw):
+    """Placeholder registry entry; dispatched specially by main()."""
+    raise RuntimeError("petiglyph is dispatched by main()")
+
+
 def wave_command(d, title, w, h, theme, **kw):
     """Placeholder registry entry; dispatched specially by main()."""
     raise RuntimeError("wave is dispatched by main()")
@@ -2015,6 +2020,7 @@ CMDS = {
     'install-backends': install_backends_command,
     'fonts':       fonts_command,
     'chat-health': chat_health_command,
+    'petiglyph':   petiglyph_command,
     'wave':        wave_command,
     'serve':       serve_command,
 }
@@ -2034,7 +2040,7 @@ CHART_TYPES_BY_ENGINE: dict[str, list[str]] = {
     'plotille': ['plotille'],
     'uniplot': ['uniplot'],
     'textcharts': ['comparison', 'diverging', 'summary', 'sparkline-table', 'cdf', 'rank', 'percentile', 'boxplot', 'stacked-text'],
-    'misc': ['graph', 'effect', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'fonts', 'chat-health', 'wave', 'calibrate', 'serve'],
+    'misc': ['graph', 'effect', 'sparkline', 'banner', 'art', 'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion', 'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'fonts', 'chat-health', 'petiglyph', 'wave', 'calibrate', 'serve'],
     'media': ['image', 'video'],
 }
 
@@ -2103,6 +2109,7 @@ EXPECTED_SCHEMAS = {
     'install-backends': 'glyph-arts install-backends --target all [--run --yes]',
     'fonts':       'glyph-arts fonts install core',
     'chat-health': 'glyph-arts chat probe',
+    'petiglyph':   'glyph-arts petiglyph doctor | list projects | use-project PROJECT build | preview PROJECT --chat',
     'wave':        'glyph-arts wave render bar --json \'{"labels":["A"],"values":[3]}\'',
 }
 
@@ -2278,7 +2285,7 @@ def _require_ascii_motion_npx():
 def _render_ascii_motion_frames(chart_type, data, args, adapter, no_color=False):
     if chart_type not in CMDS or chart_type in {
         'animate', 'record', 'record-replay', 'to-hyperframes', 'to-ascii-motion',
-    'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'fonts', 'chat-health', 'wave',
+    'code', 'status', 'splash', 'demo', 'gallery', 'auto', 'live', 'doctor', 'install-backends', 'fonts', 'chat-health', 'petiglyph', 'wave',
     }:
         print('ERROR:schema: to-ascii-motion needs a renderable chart type argument', file=sys.stderr)
         sys.exit(1)
@@ -2313,10 +2320,18 @@ def _build_arg_parser():
     )
 
 
+def _rewrite_petiglyph_argv(argv):
+    """Let `glyph-arts petiglyph ... --json` mean JSON output."""
+    if not argv or argv[0] != 'petiglyph':
+        return argv
+    return ['--petiglyph-json-output' if item == '--json' else item for item in argv]
+
+
 def main(argv=None):
     raw_argv = list(sys.argv[1:] if argv is None else argv)
     raw_argv = _rewrite_chat_argv(raw_argv)
     raw_argv = _rewrite_diagram_argv(raw_argv)
+    raw_argv = _rewrite_petiglyph_argv(raw_argv)
     p = _build_arg_parser()
     if _handle_pre_parse_flags(raw_argv):
         sys.exit(0)
