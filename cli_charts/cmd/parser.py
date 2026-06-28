@@ -186,6 +186,37 @@ def build_parser(
                    default='', help='TYPE=effect preset override')
     p.add_argument('--fps',         type=int, default=12, metavar='N',
                    help='Video playback frames/sec for type=video (default: 12)')
+    p.add_argument('--input', dest='petiglyph_input', action='append', nargs='+',
+                   default=[],
+                   help='TYPE=petiglyph source file(s) for create glyph/grid/animation')
+    p.add_argument('--rows', type=int, default=None,
+                   help='TYPE=petiglyph grid row count')
+    p.add_argument('--cols', type=int, default=None,
+                   help='TYPE=petiglyph grid column count')
+    p.add_argument('--bleed', choices=['off', 'weak', 'strong'], default='',
+                   help='TYPE=petiglyph grid bleed setting')
+    p.add_argument('--threshold', type=float, default=None,
+                   help='TYPE=petiglyph threshold value')
+    p.add_argument('--clear-threshold', action='store_true',
+                   help='TYPE=petiglyph clear a configured threshold')
+    p.add_argument('--force-remap', action='store_true',
+                   help='TYPE=petiglyph build with fresh codepoint remapping')
+    p.add_argument('--build', action='store_true',
+                   help='TYPE=petiglyph build after create/configure when upstream supports it')
+    p.add_argument('--install', action='store_true',
+                   help='TYPE=petiglyph install font after create/configure when upstream supports it')
+    p.add_argument('--glyph', default='',
+                   help='TYPE=petiglyph preview/show-sample glyph filter')
+    p.add_argument('--animation', default='',
+                   help='TYPE=petiglyph preview/show-sample animation filter')
+    p.add_argument('--preview-limit', type=int, default=6,
+                   help='TYPE=petiglyph maximum preview PNGs to render in --chat mode')
+    p.add_argument('--petiglyph-backend', choices=['auto', 'cli', 'native'], default='auto',
+                   help='TYPE=petiglyph backend selector')
+    p.add_argument('--petiglyph-arg', action='append', default=[],
+                   help='TYPE=petiglyph raw upstream CLI argument(s); repeat as needed')
+    p.add_argument('--petiglyph-json-output', action='store_true',
+                   help=argparse.SUPPRESS)
     p.add_argument('--version',     action=_LazyVersionAction, help='Show glyph-arts version and exit')
     p.add_argument('--check-deps',  action='store_true',
                    help='Print dependency availability table and exit')
@@ -235,7 +266,7 @@ def build_parser(
                    help='TYPE=gallery pre-select chart type')
     p.add_argument(
         '--target',
-        choices=['all', 'chat', 'media', 'fonts', 'diagrams'],
+        choices=['all', 'chat', 'media', 'fonts', 'diagrams', 'petiglyph'],
         default='all',
         help='TYPE=install-backends install target',
     )
