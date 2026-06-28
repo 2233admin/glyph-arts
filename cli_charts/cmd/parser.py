@@ -154,10 +154,24 @@ def build_parser(
                    help='TYPE=calibrate measure current terminal columns')
     p.add_argument('--recommend', action='store_true',
                    help='TYPE=calibrate print preset recommendation rules')
-    p.add_argument('--diagram-kind', choices=['math', 'sequence', 'tree', 'table', 'frame', 'box', 'note', 'flowchart', 'graphdag', 'dag', 'graphplanar', 'planar'],
+    p.add_argument('--diagram-kind', choices=['math', 'sequence', 'tree', 'table', 'frame', 'box', 'note', 'flowchart', 'graphdag', 'dag', 'graphplanar', 'planar', 'drawio'],
                    default='', help='TYPE=diagram generator override')
     p.add_argument('--diagram-engine', choices=['auto', 'diagon', 'builtin'], default='auto',
                    help='TYPE=diagram backend. auto uses Diagon when installed, else builtin fallback.')
+    p.add_argument('--drawio-fragment', action='store_true',
+                   help='TYPE=diagram drawio: output mxCell elements only, for draw.io MCP display tools')
+    p.add_argument('--drawio-graph-model', action='store_true',
+                   help='TYPE=diagram drawio: output mxGraphModel only, for draw.io MCP create_new_diagram')
+    p.add_argument('--drawio-validate-only', action='store_true',
+                   help='TYPE=diagram drawio: validate input and print drawio: valid')
+    p.add_argument('--drawio-mcp-package', default='@next-ai-drawio/mcp-server@latest',
+                   help='TYPE=to-drawio MCP package to run through npx')
+    p.add_argument('--drawio-base-url', default='',
+                   help='TYPE=to-drawio DRAWIO_BASE_URL for self-hosted diagrams.net')
+    p.add_argument('--drawio-port', type=int, default=0,
+                   help='TYPE=to-drawio embedded preview port override')
+    p.add_argument('--drawio-hold', type=float, default=0,
+                   help='TYPE=to-drawio keep the MCP preview session alive for SEC after rendering')
     p.add_argument('--mermaid-theme', choices=[
         'zinc-light', 'zinc-dark', 'tokyo-night', 'tokyo-night-storm',
         'tokyo-night-light', 'catppuccin-mocha', 'catppuccin-latte', 'nord',
@@ -186,6 +200,37 @@ def build_parser(
                    default='', help='TYPE=effect preset override')
     p.add_argument('--fps',         type=int, default=12, metavar='N',
                    help='Video playback frames/sec for type=video (default: 12)')
+    p.add_argument('--input', dest='petiglyph_input', action='append', nargs='+',
+                   default=[],
+                   help='TYPE=petiglyph source file(s) for create glyph/grid/animation')
+    p.add_argument('--rows', type=int, default=None,
+                   help='TYPE=petiglyph grid row count')
+    p.add_argument('--cols', type=int, default=None,
+                   help='TYPE=petiglyph grid column count')
+    p.add_argument('--bleed', choices=['off', 'weak', 'strong'], default='',
+                   help='TYPE=petiglyph grid bleed setting')
+    p.add_argument('--threshold', type=float, default=None,
+                   help='TYPE=petiglyph threshold value')
+    p.add_argument('--clear-threshold', action='store_true',
+                   help='TYPE=petiglyph clear a configured threshold')
+    p.add_argument('--force-remap', action='store_true',
+                   help='TYPE=petiglyph build with fresh codepoint remapping')
+    p.add_argument('--build', action='store_true',
+                   help='TYPE=petiglyph build after create/configure when upstream supports it')
+    p.add_argument('--install', action='store_true',
+                   help='TYPE=petiglyph install font after create/configure when upstream supports it')
+    p.add_argument('--glyph', default='',
+                   help='TYPE=petiglyph preview/show-sample glyph filter')
+    p.add_argument('--animation', default='',
+                   help='TYPE=petiglyph preview/show-sample animation filter')
+    p.add_argument('--preview-limit', type=int, default=6,
+                   help='TYPE=petiglyph maximum preview PNGs to render in --chat mode')
+    p.add_argument('--petiglyph-backend', choices=['auto', 'cli', 'native'], default='auto',
+                   help='TYPE=petiglyph backend selector')
+    p.add_argument('--petiglyph-arg', action='append', default=[],
+                   help='TYPE=petiglyph raw upstream CLI argument(s); repeat as needed')
+    p.add_argument('--petiglyph-json-output', action='store_true',
+                   help=argparse.SUPPRESS)
     p.add_argument('--version',     action=_LazyVersionAction, help='Show glyph-arts version and exit')
     p.add_argument('--check-deps',  action='store_true',
                    help='Print dependency availability table and exit')
@@ -235,7 +280,7 @@ def build_parser(
                    help='TYPE=gallery pre-select chart type')
     p.add_argument(
         '--target',
-        choices=['all', 'chat', 'media', 'fonts', 'diagrams'],
+        choices=['all', 'chat', 'media', 'fonts', 'diagrams', 'petiglyph'],
         default='all',
         help='TYPE=install-backends install target',
     )

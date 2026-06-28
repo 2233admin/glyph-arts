@@ -27,6 +27,11 @@ def dispatch_tool_command(args, raw_argv):
 
         return run_chat_health_command(args)
 
+    if args.type == 'petiglyph':
+        from cli_charts.petiglyph_support import run_petiglyph_command
+
+        return run_petiglyph_command(args, raw_argv)
+
     if args.type == 'wave':
         from cli_charts.adapters.waveterm import run_wave_command
 

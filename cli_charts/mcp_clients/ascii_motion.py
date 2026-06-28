@@ -1,13 +1,20 @@
+import importlib
 import os
 from pathlib import Path
+from typing import Any
+
+ClientSession: Any = None
+StdioServerParameters: Any = None
+stdio_client: Any = None
 
 try:
-    from mcp import ClientSession, StdioServerParameters
-    from mcp.client.stdio import stdio_client
+    _mcp = importlib.import_module("mcp")
+    _stdio = importlib.import_module("mcp.client.stdio")
+    ClientSession = _mcp.ClientSession
+    StdioServerParameters = _mcp.StdioServerParameters
+    stdio_client = _stdio.stdio_client
 except ImportError:
-    ClientSession = None
-    StdioServerParameters = None
-    stdio_client = None
+    pass
 
 
 CHUNK_SIZE = 10_000

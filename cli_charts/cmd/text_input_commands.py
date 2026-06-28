@@ -11,7 +11,7 @@ INLINE_TEXT_TYPES = {'incplot', 'textplot', 'turtle', 'formula', 'formula-pretty
 
 def _read_text_input(args, *, inline_text=''):
     if args.file:
-        with open(args.file, encoding='utf-8') as file_obj:
+        with open(args.file, encoding='utf-8-sig') as file_obj:
             return file_obj.read().strip()
     if args.data is not None:
         return args.data
@@ -76,7 +76,7 @@ def dispatch_text_input_command(args, *, commands, diagram_func, mermaid_func, e
             data = parsed
             kind = kind or parsed.get('kind') or parsed.get('type') or ''
         if not kind:
-            print('ERROR:schema: diagram needs a kind: math, sequence, tree, table, frame, note, flowchart, graphdag, graphplanar',
+            print('ERROR:schema: diagram needs a kind: math, sequence, tree, table, frame, note, flowchart, graphdag, graphplanar, drawio',
                   file=sys.stderr)
             return 1
         return diagram_func(
@@ -88,6 +88,9 @@ def dispatch_text_input_command(args, *, commands, diagram_func, mermaid_func, e
             output=args.output,
             diagram_kind=kind,
             diagram_engine=args.diagram_engine,
+            drawio_fragment=args.drawio_fragment,
+            drawio_graph_model=args.drawio_graph_model,
+            drawio_validate_only=args.drawio_validate_only,
             statusline=args.statusline,
         ) or 0
 

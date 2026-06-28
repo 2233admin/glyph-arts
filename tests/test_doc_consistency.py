@@ -81,6 +81,7 @@ def test_chat_drawing_capability_manifest_is_agent_readable():
     from cli_charts.render_target import validate_protocol
 
     manifest = json.loads((ROOT / 'docs' / 'chat_drawing_capabilities.json').read_text(encoding='utf-8'))
+    target_order = {'chat': 0, 'terminal': 1, 'artifact': 2, 'host': 3}
     assert manifest['default_entry'] == 'glyph-arts chat'
     assert (ROOT / manifest['skill_package'] / 'SKILL.md').exists()
     assert (ROOT / manifest['verification_script']).exists()
@@ -90,6 +91,10 @@ def test_chat_drawing_capability_manifest_is_agent_readable():
         protocol = capability.get('protocol')
         assert isinstance(protocol, dict), f"{name} missing protocol block"
         validate_protocol(protocol, name=name)
+        targets = protocol['targets']
+        assert targets == sorted(targets, key=target_order.__getitem__), (
+            f"{name} protocol targets must be ordered chat -> terminal -> artifact -> host"
+        )
         if capability.get('chat') is True:
             assert protocol['targets'][0] == 'chat'
             assert protocol['chat_safe'] is True
