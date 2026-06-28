@@ -42,7 +42,7 @@ _GENERATOR_ALIAS = {
     for alias in generator.aliases
     if alias not in {"box", "note"}
 }
-_BUILTIN_EXTENSION_KEYS = {"box", "note"}
+_BUILTIN_EXTENSION_KEYS = {"box", "note", "drawio"}
 
 DIAGON_GENERATORS = {
     generator.key: generator.diagon_name
@@ -78,7 +78,7 @@ def normalize_diagram_kind(kind: str) -> str:
     key = (kind or "").strip().lower().replace("-", "").replace("_", "")
     key = _GENERATOR_ALIAS.get(key, key)
     if key not in _GENERATOR_BY_KEY and key not in _BUILTIN_EXTENSION_KEYS:
-        supported = ", ".join(sorted(set(DIAGON_GENERATORS) | set(_GENERATOR_ALIAS)))
+        supported = ", ".join(sorted(set(DIAGON_GENERATORS) | set(_GENERATOR_ALIAS) | _BUILTIN_EXTENSION_KEYS))
         raise ValueError(f"unknown diagram kind: {kind!r}; supported: {supported}")
     return key
 
@@ -103,12 +103,30 @@ def render_diagram(
     width: int = 70,
     output: str | None = None,
     engine: str = "auto",
+    drawio_fragment: bool = False,
+    drawio_graph_model: bool = False,
+    drawio_validate_only: bool = False,
 ) -> int:
     key = normalize_diagram_kind(kind)
     source = text.replace("\\n", "\n").rstrip("\n")
     if not source:
         print("ERROR:schema: diagram input must not be empty", file=sys.stderr)
         return 1
+
+    if key == "drawio":
+        from cli_charts.render.drawio import DrawioValidationError, render_drawio
+
+        try:
+            return render_drawio(
+                source,
+                output=output,
+                fragment=drawio_fragment,
+                graph_model=drawio_graph_model,
+                validate_only=drawio_validate_only,
+            )
+        except DrawioValidationError as exc:
+            print(f"ERROR:drawio: {exc}", file=sys.stderr)
+            return 4
 
     result = None
     if engine in {"auto", "diagon"}:

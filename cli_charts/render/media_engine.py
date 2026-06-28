@@ -24,6 +24,7 @@ _TEXT_SYMBOL_SETS = {
     "blocks",
 }
 _HALF_SYMBOL_SETS = {"half", "vhalf", "upper-half", "upper_half", "color", "ansi"}
+_STRIPE_PRONE_VIDEO_SYMBOL_SETS = _HALF_SYMBOL_SETS | {"block", "blocks"}
 
 _ASCII_RAMP = " .:-=+*#%@"
 _SHADE_RAMP = " .:-=+*#%@"
@@ -38,6 +39,7 @@ _IMAGE_STYLES = {
     "dot-cross",
     "halftone",
     "particles",
+    "stipple",
     "retro-art",
     "terminal",
 }
@@ -46,6 +48,13 @@ _DITHER_MODES = {"none", "floyd-steinberg", "bayer", "atkinson"}
 _BACKGROUND_MODES = {"dark", "light", "transparent"}
 _CHAFA_FORMATS = {"auto", "symbols", "sixels", "sixel", "kitty", "iterm"}
 _CHAFA_COLOR_MODES = {"auto", "none", "2", "16", "240", "256", "full"}
+_VIDEO_MODE_DEFAULT_CHAFA_COLORS = {
+    1: "none",
+    2: "16",
+    3: "240",
+    4: "256",
+    5: "full",
+}
 _RATIO_PRESETS = {
     "original": None,
     "16:9": (16, 9),
@@ -58,6 +67,7 @@ _CLASSIC_RAMP = "$@B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/\\|()1{}[]?-_+~<>i!lI;
 _DOT_CROSS_RAMP = "█▓#X*x+:· "
 _HALFTONE_RAMP = "@O0o·. "
 _RETRO_RAMP = "█▓▒░#%=+:. "
+_STIPPLE_RAMP = " ·"
 _PARTICLE_CHARS = ["•", "·", "‧", "*", "∙", "+"]
 _BRAILLE_DOTS = ((0x01, 0x08), (0x02, 0x10), (0x04, 0x20), (0x40, 0x80))
 _NAMED_COLORS = {
@@ -480,6 +490,7 @@ def _build_ascii_image(
         "halftone": len(_HALFTONE_RAMP),
         "block": 5,
         "particles": len(_PARTICLE_CHARS),
+        "stipple": len(_STIPPLE_RAMP),
     }.get(style, 10)
     brightness = _apply_dither_grid(brightness, dither, ramp_levels, dither_strength)
 
@@ -495,6 +506,8 @@ def _build_ascii_image(
         chars = _chars_from_ramp(brightness, _HALFTONE_RAMP)
     elif style == "particles":
         chars = _particles_chars(brightness)
+    elif style == "stipple":
+        chars = _chars_from_ramp(brightness, _STIPPLE_RAMP)
     else:
         chars = _chars_from_ramp(brightness, _CLASSIC_RAMP)
 
@@ -517,6 +530,47 @@ def _ansi_text(art: AsciiImage) -> str:
         parts.append("\x1b[0m")
         lines.append("".join(parts).rstrip())
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _render_video_frame_pillow(
+    frame_path: str,
+    w: int,
+    h: int,
+    *,
+    image_style: str,
+    color_mode: str,
+    background: str,
+    custom_color: str | None,
+    dither: str,
+    dither_strength: float,
+    invert: bool,
+    trim: bool,
+    no_color: bool,
+    video_mode: int,
+) -> str:
+    Image, _ = _load_pillow()
+    if Image is None:
+        raise RuntimeError("Pillow not installed -- pip install Pillow")
+    with Image.open(frame_path) as im:
+        image = im.convert("RGB")
+    if trim:
+        image, _, _ = _prepare_image_layers(image, "auto", True)
+    cols, rows = _fit_style_size(image, w, h, image_style)
+    effective_no_color = no_color or video_mode == 1
+    effective_color_mode = "grayscale" if effective_no_color else color_mode
+    art = _build_ascii_image(
+        image,
+        cols,
+        rows,
+        style=image_style,
+        color_mode=effective_color_mode,
+        background=background,
+        custom_color=custom_color,
+        dither=dither,
+        dither_strength=dither_strength,
+        invert=invert,
+    )
+    return _ascii_text(art, rstrip=False) if effective_no_color else _ansi_text(art)
 
 
 def _html_escape(text: str) -> str:
@@ -792,6 +846,48 @@ def _normalize_chafa_colors(value: str) -> str:
     if normalized not in _CHAFA_COLOR_MODES:
         raise ValueError(f"unknown chafa colors: {value!r}")
     return normalized
+
+
+def _resolve_video_mode_defaults(video_mode: int, *, pixel_mode: bool = False) -> dict[str, str | bool]:
+    """Resolve ASCILINE-like defaults for video quality mode settings."""
+    resolved: dict[str, str | bool] = {
+        "chafa_colors": _VIDEO_MODE_DEFAULT_CHAFA_COLORS.get(video_mode, "auto"),
+        "force_no_color": video_mode == 1,
+        "symbols": "vhalf" if pixel_mode else "braille",
+        "export_color_mode": "original",
+    }
+    if video_mode == 1:
+        resolved["symbols"] = "ascii"
+        resolved["export_color_mode"] = "grayscale"
+    return resolved
+
+
+def _is_stripe_prone_video_symbols(symbols: str) -> bool:
+    normalized = (symbols or "").strip().lower().replace("_", "-")
+    tokens = normalized.replace(",", " ").replace("+", " ").split()
+    return any(token in _STRIPE_PRONE_VIDEO_SYMBOL_SETS for token in tokens)
+
+
+def _is_ascii_video_symbols(symbols: str) -> bool:
+    normalized = (symbols or "").strip().lower()
+    tokens = normalized.replace(",", " ").replace("+", " ").split()
+    return "ascii" in tokens
+
+
+def _resolve_video_chafa_format(
+    chafa_format: str,
+    symbols: str,
+    *,
+    pixel_mode: bool = False,
+    chat: bool = False,
+) -> str:
+    requested = _normalize_chafa_format(chafa_format)
+    if requested != "symbols" or chat:
+        return requested
+    if not pixel_mode and not _is_stripe_prone_video_symbols(symbols):
+        return requested
+    graphics_format = _detect_chafa_format("auto", chat=chat)
+    return graphics_format if graphics_format != "symbols" else requested
 
 
 def _detect_chafa_format(value: str = "auto", *, chat: bool = False, output: str | None = None) -> str:
@@ -1118,6 +1214,8 @@ def render_video_export(
     invert: bool = False,
     trim: bool = False,
     font_size: int = 14,
+    video_mode: int = 1,
+    pixel_mode: bool = False,
 ) -> int:
     """Export a video or animated GIF as an animated ASCII art file.
 
@@ -1147,7 +1245,11 @@ def render_video_export(
         )
         return 1
 
-    no_color = color_mode == "grayscale"
+    mode_profile = _resolve_video_mode_defaults(video_mode, pixel_mode=pixel_mode)
+    effective_color_mode = (
+        str(mode_profile["export_color_mode"]) if isinstance(mode_profile["export_color_mode"], str) else color_mode
+    )
+    no_color = effective_color_mode == "grayscale"
 
     with tempfile.TemporaryDirectory(prefix="glyph_vanim_") as tmp:
         # ── 1. Decode source into individual PNG frames ──────────────────────
@@ -1212,7 +1314,7 @@ def render_video_export(
             art = _build_ascii_image(
                 image, cols, rows,
                 style=image_style,
-                color_mode=color_mode,
+                color_mode=effective_color_mode,
                 background=background,
                 custom_color=custom_color,
                 dither=dither,
@@ -1301,10 +1403,12 @@ def render_video(
     invert: bool = False,
     trim: bool = False,
     font_size: int = 14,
-    chafa_format: str = "symbols",
+    chafa_format: str = "auto",
     chafa_colors: str = "auto",
     chafa_symbols: str | None = None,
     chafa_args: list[str] | None = None,
+    video_mode: int = 1,
+    pixel_mode: bool = False,
 ) -> int:
     """Play a video in the terminal, or export to an animated file.
 
@@ -1327,9 +1431,21 @@ def render_video(
             invert=invert,
             trim=trim,
             font_size=font_size,
+            video_mode=video_mode,
+            pixel_mode=pixel_mode,
         )
-    """Play a video in the terminal: ffmpeg extracts frames, chafa renders each."""
-    if not shutil.which("chafa"):
+    """Play a video in the terminal: ffmpeg extracts frames, then renders each."""
+    use_pillow_live = (
+        image_style != "classic"
+        or dither != "none"
+        or invert
+        or trim
+        or color_mode not in {"original", "grayscale"}
+    )
+    if use_pillow_live and _load_pillow()[0] is None:
+        print("ERROR:dep: Pillow not installed -- pip install Pillow", file=sys.stderr)
+        return 2
+    if not use_pillow_live and not shutil.which("chafa"):
         print("ERROR:dep: chafa not found", file=sys.stderr)
         return 2
     if not shutil.which("ffmpeg"):
@@ -1361,15 +1477,79 @@ def render_video(
 
         delay = 1.0 / fps if fps > 0 else 1.0 / 12
         is_tty = sys.stdout.isatty()
+        if use_pillow_live:
+            if is_tty:
+                sys.stdout.write("\x1b[?25l")
+                sys.stdout.flush()
+            try:
+                for frame in frames:
+                    t0 = time.time()
+                    if is_tty:
+                        sys.stdout.write("\x1b[H")
+                        sys.stdout.flush()
+                    try:
+                        rendered = _render_video_frame_pillow(
+                            frame,
+                            w,
+                            h,
+                            image_style=image_style,
+                            color_mode=color_mode,
+                            background=background,
+                            custom_color=custom_color,
+                            dither=dither,
+                            dither_strength=dither_strength,
+                            invert=invert,
+                            trim=trim,
+                            no_color=no_color,
+                            video_mode=video_mode,
+                        )
+                    except (OSError, RuntimeError, ValueError) as exc:
+                        print(f"ERROR:render: {exc}", file=sys.stderr)
+                        return 4
+                    sys.stdout.write(rendered)
+                    sys.stdout.flush()
+                    elapsed = time.time() - t0
+                    if elapsed < delay:
+                        time.sleep(delay - elapsed)
+            except KeyboardInterrupt:
+                pass
+            finally:
+                if is_tty:
+                    sys.stdout.write("\x1b[?25h")
+                    sys.stdout.flush()
+            return 0
+
         try:
+            mode_profile = _resolve_video_mode_defaults(video_mode, pixel_mode=pixel_mode)
+            symbols_effective = chafa_symbols or symbols or str(mode_profile["symbols"])
+            colors_effective = chafa_colors
+            if colors_effective == "auto":
+                resolved_colors = str(mode_profile["chafa_colors"])
+                if resolved_colors != "auto":
+                    colors_effective = resolved_colors
+            if no_color or bool(mode_profile["force_no_color"]):
+                colors_effective = "none"
+            chafa_format_effective = _resolve_video_chafa_format(
+                chafa_format,
+                symbols_effective,
+                pixel_mode=pixel_mode,
+                chat=chat,
+            )
+            chafa_args_effective = list(chafa_args or [])
+            if (
+                chafa_format_effective == "symbols"
+                and _is_ascii_video_symbols(symbols_effective)
+                and not any(arg == "--fg-only" or arg.startswith("--bg=") for arg in chafa_args_effective)
+            ):
+                chafa_args_effective.append("--fg-only")
             chafa_cmd = _build_chafa_cmd(
                 w,
                 h,
-                symbols=chafa_symbols or symbols,
-                no_color=no_color,
-                chafa_format=chafa_format,
-                chafa_colors=chafa_colors,
-                chafa_args=chafa_args,
+                symbols=symbols_effective,
+                no_color=no_color or bool(mode_profile["force_no_color"]),
+                chafa_format=chafa_format_effective,
+                chafa_colors=colors_effective,
+                chafa_args=chafa_args_effective,
                 chat=chat,
             )
         except ValueError as exc:
