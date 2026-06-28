@@ -9,6 +9,7 @@ IMAGE_STYLES = [
     "dot-cross",
     "halftone",
     "particles",
+    "stipple",
     "retro-art",
     "terminal",
 ]
@@ -20,6 +21,7 @@ RATIOS = ["original", "16:9", "4:3", "1:1", "3:4", "9:16"]
 DITHER_MODES = ["none", "floyd-steinberg", "bayer", "atkinson"]
 CHAFA_FORMATS = ["auto", "symbols", "sixels", "sixel", "kitty", "iterm"]
 CHAFA_COLOR_MODES = ["auto", "none", "2", "16", "240", "256", "full"]
+VIDEO_MODES = [1, 2, 3, 4, 5]
 
 
 def add_media_arguments(parser):
@@ -108,6 +110,48 @@ def add_media_arguments(parser):
         type=float,
         default=0.8,
         help="TYPE=image dithering strength 0..1",
+    )
+    parser.add_argument(
+        "--video-playlist",
+        metavar="FILE",
+        default=None,
+        help=(
+            "TYPE=video: load playlist JSON (per-item fields: `video`, `mode`, `pixel`, `path`). "
+            "Supported extensions: .mp4, .mkv, .avi, .mov, .webm"
+        ),
+    )
+    parser.add_argument(
+        "--video-folder",
+        metavar="DIR",
+        default=None,
+        help=(
+            "TYPE=video: play all files in folder in filesystem order (same as ASCILINE). "
+            "Supported extensions: .mp4, .mkv, .avi, .mov, .webm"
+        ),
+    )
+    parser.add_argument(
+        "--video-mode",
+        type=int,
+        choices=VIDEO_MODES,
+        default=1,
+        help=(
+            "TYPE=video quality mode. "
+            "1=B&W, 2=512c, 3=32Kc, 4=262Kc, 5=16M. "
+            "1 is text-only by design."
+        ),
+    )
+    parser.add_argument(
+        "--video-pixel",
+        action="store_true",
+        help=(
+            "TYPE=video: pixel-style output (requires --video-mode 2-5). "
+            "Uses terminal graphics such as sixel/kitty when available to avoid block-glyph striping."
+        ),
+    )
+    parser.add_argument(
+        "--video-loop",
+        action="store_true",
+        help="TYPE=video: loop folder/playlist continuously",
     )
     parser.add_argument(
         "--font-size",

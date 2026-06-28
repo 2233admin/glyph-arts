@@ -1,11 +1,12 @@
 # glyph-arts
 
-> When AI lives in the terminal, visualization must live there too.
+> Chat Arts for agents: visuals that belong in the conversation first.
 
-glyph-arts is terminal-first by default: core charts render directly in the
-CLI, with optional export and media adapters when you need files, images, or
-recordings. `pip install glyph-arts` gives your AI agent a native sense of
-sight inside the terminal.
+glyph-arts is the current CLI and package for Chat Arts: it turns chat requests
+into visuals that render safely in the conversation first, then optionally in
+terminals, files, media outputs, or host previews when the user's drawing intent
+requires it. `pip install glyph-arts` gives your AI agent a native visual
+language without forcing every drawing through a GUI.
 
 ![demo](demo/chartex-demo.gif)
 
@@ -28,8 +29,8 @@ pip install "glyph-arts[all]"
 
 ## Product layers
 
-glyph-arts is intentionally layered so the default install stays useful and
-the heavier integrations remain opt-in.
+glyph-arts is intentionally layered so chat-safe output stays the default and
+the heavier terminal, media, and host integrations remain opt-in.
 
 | Layer | What belongs here | Examples |
 |---|---|---|
@@ -529,10 +530,10 @@ glyph-arts --check-deps --all
 | drawille / braille | `curve` `hires` `radar` `textplot` `turtle` |
 | plotille | `plotille` |
 | uniplot | `uniplot` |
-| misc | `graph` `effect` `sparkline` `banner` `art` `animate` `record` `record-replay` `to-hyperframes` `to-ascii-motion` `code` `status` `splash` `demo` `gallery` `auto` `live` `doctor` `install-backends` `wave` `serve` |
+| misc | `graph` `effect` `sparkline` `banner` `art` `animate` `record` `record-replay` `to-hyperframes` `to-ascii-motion` `to-drawio` `code` `status` `splash` `demo` `gallery` `auto` `live` `doctor` `install-backends` `fonts` `chat-health` `petiglyph` `wave` `calibrate` `serve` |
 | media *(image uses Pillow/chafa; video requires chafa + ffmpeg)* | `image` `video` |
 
-Total: **74 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
+Total: **76 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
 
 For the chat-vs-ANSI-vs-artifact boundary, see
 [`docs/capability_matrix.md`](docs/capability_matrix.md).

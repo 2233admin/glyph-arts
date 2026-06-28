@@ -11,6 +11,8 @@ def dispatch_motion_command(
     *,
     load_ascii_motion_adapter,
     require_ascii_motion_npx,
+    load_drawio_adapter,
+    require_drawio_npx,
     render_ascii_motion_frames,
 ):
     if args.type == 'animate':
@@ -21,7 +23,7 @@ def dispatch_motion_command(
         chart_type = args.art_text[0]
         no_color = args.no_color or bool(os.environ.get('NO_COLOR'))
         if args.file:
-            with open(args.file, encoding='utf-8') as file_obj:
+            with open(args.file, encoding='utf-8-sig') as file_obj:
                 raw = file_obj.read().strip()
         elif args.data:
             raw = args.data
@@ -106,7 +108,7 @@ def dispatch_motion_command(
         adapter = load_ascii_motion_adapter()
         require_ascii_motion_npx()
         if args.file:
-            with open(args.file, encoding='utf-8') as file_obj:
+            with open(args.file, encoding='utf-8-sig') as file_obj:
                 raw = file_obj.read().strip()
         else:
             raw = args.data
@@ -133,6 +135,41 @@ def dispatch_motion_command(
             args.output_dir,
             int(max(args.duration, 0.1) * 1000 / max(args.frames, 1)),
         ))
+        return 0
+
+    if args.type == 'to-drawio':
+        if args.file:
+            with open(args.file, encoding='utf-8-sig') as file_obj:
+                raw = file_obj.read().strip()
+        elif args.data is not None:
+            raw = args.data
+        elif args.art_text:
+            raw = ' '.join(args.art_text)
+        else:
+            raw = sys.stdin.read().strip()
+        if not raw:
+            print('ERROR:schema: to-drawio needs --json TEXT, --file PATH, stdin, or trailing text', file=sys.stderr)
+            return 1
+        adapter = load_drawio_adapter()
+        require_drawio_npx()
+        import asyncio
+
+        try:
+            result = asyncio.run(adapter.preview_drawio(
+                raw,
+                output=args.output or None,
+                package=args.drawio_mcp_package,
+                drawio_base_url=args.drawio_base_url or None,
+                port=args.drawio_port or None,
+                hold_seconds=args.drawio_hold,
+            ))
+        except Exception as exc:
+            print(f'ERROR:drawio-mcp: {exc}', file=sys.stderr)
+            return 4
+        for key in ('start_session', 'create_new_diagram', 'export_diagram'):
+            text = result.get(key, '')
+            if text:
+                print(text.rstrip())
         return 0
 
     return None

@@ -1,7 +1,7 @@
 # glyph-arts Capability Matrix
 
 This matrix separates what renders directly in an AI chat pane from what needs
-ANSI support, an exported artifact, or an interactive terminal.
+ANSI support, an exported artifact, or a host preview.
 
 `glyph-arts chat ...` is the front door for chat drawing. It rewrites to
 `image --chat` for image inputs and to `--no-color` for chart inputs.
@@ -41,7 +41,7 @@ Machine-readable capabilities live in `docs/chat_drawing_capabilities.json`.
 Every capability declares `protocol.targets`, `chat_safe`, `uses_ansi`,
 `unicode_tier`, `fallback`, and `requires_host`.
 
-| Capability | Chat text | ANSI terminal | Artifact export | Interactive | Entry point |
+| Capability | Chat text | ANSI terminal | Artifact export | Host preview | Entry point |
 |---|---:|---:|---:|---:|---|
 | Image ASCII | yes | yes | yes | no | `glyph-arts chat image --file photo.jpg` |
 | Portrait foreground crop | yes | yes | yes | no | `glyph-arts image --chat --image-mode auto` |
