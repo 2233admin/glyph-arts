@@ -850,7 +850,7 @@ def _normalize_chafa_colors(value: str) -> str:
 
 def _resolve_video_mode_defaults(video_mode: int, *, pixel_mode: bool = False) -> dict[str, str | bool]:
     """Resolve ASCILINE-like defaults for video quality mode settings."""
-    resolved = {
+    resolved: dict[str, str | bool] = {
         "chafa_colors": _VIDEO_MODE_DEFAULT_CHAFA_COLORS.get(video_mode, "auto"),
         "force_no_color": video_mode == 1,
         "symbols": "vhalf" if pixel_mode else "braille",
