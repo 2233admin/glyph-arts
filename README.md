@@ -533,7 +533,7 @@ glyph-arts --check-deps --all
 | misc | `graph` `effect` `sparkline` `banner` `art` `animate` `record` `record-replay` `to-hyperframes` `to-ascii-motion` `to-drawio` `code` `status` `splash` `demo` `gallery` `auto` `live` `doctor` `install-backends` `fonts` `chat-health` `petiglyph` `wave` `calibrate` `serve` |
 | media *(image uses Pillow/chafa; video requires chafa + ffmpeg)* | `image` `video` |
 
-Total: **75 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
+Total: **76 types**. See `CHART_TYPE_COUNT` in `cli_charts/chart.py` for the authoritative count.
 
 For the chat-vs-ANSI-vs-artifact boundary, see
 [`docs/capability_matrix.md`](docs/capability_matrix.md).

@@ -18,7 +18,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-
 PETIGLYPH_INSTALL_HINT = "Install Petiglyph with `pip install petiglyph` or `npm install -g petiglyph`."
 
 

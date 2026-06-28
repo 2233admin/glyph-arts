@@ -1,8 +1,8 @@
 """Dispatch filesystem media inputs to image/video renderers."""
 
+import json
 import os
 import sys
-import json
 from pathlib import Path
 
 from cli_charts.render.media_engine import render_image, render_video
