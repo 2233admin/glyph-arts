@@ -1,3 +1,0 @@
-Comparing files CODEX_R1_WORK\baseline_equal_bar.txt and CODEX_R1_WORK\FINAL_BAR.TXT
-FC: no differences encountered
-

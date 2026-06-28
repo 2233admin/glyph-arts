@@ -29,6 +29,8 @@ coverage.xml
 .coverage.*
 _temp/
 export_test_outputs/
+.codex_r1/
+codex_r1_work/
 
 # Editor / OS
 .env
