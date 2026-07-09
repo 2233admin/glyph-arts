@@ -1,4 +1,1 @@
-from cli_charts.cmd._helpers import plotext
-from cli_charts.registry import register
-
-register("plotext")(plotext)
+from cli_charts.charts.media.plotext import plotext

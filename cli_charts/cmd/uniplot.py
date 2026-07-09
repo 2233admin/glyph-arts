@@ -1,4 +1,1 @@
-from cli_charts.cmd._helpers import uniplot
-from cli_charts.registry import register
-
-register("uniplot")(uniplot)
+from cli_charts.charts.media.uniplot import uniplot
