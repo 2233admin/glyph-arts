@@ -1,0 +1,12 @@
+=== SMOKE #2 (PRE-CUTOVER) ===
+CMDS count: 53
+missing: none
+non_callable: none
+=== SMOKE #1: file count ===
+media/ file count: 20
+missing files: none
+extra files: none
+=== SMOKE #3: shim import chain ===
+shim imports: OK (20/20)
+=== SMOKE #5: line count delta (pre-cutover) ===
+before: 1403 | after: 824 | delta: -579
