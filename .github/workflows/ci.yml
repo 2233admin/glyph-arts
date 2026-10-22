@@ -12,7 +12,7 @@ env:
 jobs:
   test:
     name: pytest (${{ matrix.os }}, ${{ matrix.python-version }})
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ vars.CI_5070X_ENABLED == 'true' && (((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && startsWith(github.ref, 'refs/heads/')) || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && contains(fromJSON('["ubuntu-latest","ubuntu-24.04"]'), matrix.os) && 'ci-5070x-linux' || matrix.os }}
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
@@ -47,7 +47,7 @@ jobs:
 
   quality:
     name: lint / typecheck / docs / doctor
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_5070X_ENABLED == 'true' && (((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && startsWith(github.ref, 'refs/heads/')) || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && 'ci-5070x-linux' || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -68,7 +68,7 @@ jobs:
         run: npx nx run-many -t lint typecheck docs-check doctor --parallel=3
 
   coverage:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_5070X_ENABLED == 'true' && (((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && startsWith(github.ref, 'refs/heads/')) || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && 'ci-5070x-linux' || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -94,7 +94,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
   check-deps:
     name: check-deps smoke test
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_5070X_ENABLED == 'true' && (((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && startsWith(github.ref, 'refs/heads/')) || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && 'ci-5070x-linux' || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -114,7 +114,7 @@ jobs:
 
   deepsource:
     name: DeepSource Analysis
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.CI_5070X_ENABLED == 'true' && (((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && startsWith(github.ref, 'refs/heads/')) || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)) && 'ci-5070x-linux' || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
